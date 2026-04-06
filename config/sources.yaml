@@ -1,0 +1,46 @@
+tier_1:
+  - name: Financial Times
+    url: https://www.ft.com
+  - name: Bloomberg
+    url: https://www.bloomberg.com
+  - name: Reuters
+    url: https://www.reuters.com
+  - name: Wall Street Journal
+    url: https://www.wsj.com
+  - name: Handelsblatt
+    url: https://www.handelsblatt.com
+  - name: The Economist
+    url: https://www.economist.com
+  - name: New York Times Business
+    url: https://www.nytimes.com/section/business
+
+regional:
+  - name: InfoMoney (Brazil)
+    url: https://www.infomoney.com.br
+  - name: Folha de S.Paulo (Brazil)
+    url: https://www.folha.uol.com.br
+  - name: El País (Latin America/Spain)
+    url: https://elpais.com
+  - name: The Guardian Europe
+    url: https://www.theguardian.com/europe
+
+reference:
+  - name: Investopedia
+    url: https://www.investopedia.com
+
+commodities:
+  mandatory:
+    - Gold
+    - Silver
+    - Brent Oil
+    - Natural Gas
+    - Copper
+  optional:
+    - Iron Ore
+    - Lithium
+    - Wheat
+    - Soybeans
+
+currencies:
+  mandatory:
+    - EUR/USD
