@@ -10,17 +10,19 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --paper:   #f7f6f3;
-      --ink:     #111111;
-      --ink-mid: #444444;
-      --ink-low: #777777;
-      --rule:    #b8b5ae;
-      --rule-strong: #111111;
-      --serif:   Georgia, "Times New Roman", Times, serif;
-      --sans:    -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+      --paper:     #f7f6f3;
+      --ink:       #111111;
+      --ink-mid:   #444444;
+      --ink-low:   #888888;
+      --rule:      #c8c5be;
+      --bg-widget: #ffffff;
+      --up:        #166534;
+      --down:      #991b1b;
+      --serif:     Georgia, "Times New Roman", Times, serif;
+      --sans:      -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
     }
 
-    html { font-size: 17px; }
+    html { font-size: 16px; }
 
     body {
       font-family: var(--serif);
@@ -31,78 +33,115 @@
     }
 
     /* ═══════════════════════════════════════════
-       SITE NAV  — ultra-minimal top strip
+       LIVE TICKER BAR  — scrolling strip
+    ═══════════════════════════════════════════ */
+    .ticker-wrap {
+      background: var(--ink);
+      overflow: hidden;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+
+    .ticker-track {
+      display: flex;
+      gap: 0;
+      animation: ticker-scroll 40s linear infinite;
+      white-space: nowrap;
+      will-change: transform;
+    }
+
+    /* Duplicate the list twice so the loop is seamless */
+    @keyframes ticker-scroll {
+      0%   { transform: translateX(0); }
+      100% { transform: translateX(-50%); }
+    }
+
+    .ticker-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 0 24px;
+      font-family: var(--sans);
+      font-size: 0.7rem;
+      letter-spacing: 0.02em;
+      border-right: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .ticker-item .t-sym  { font-weight: 700; color: rgba(255,255,255,0.9); }
+    .ticker-item .t-val  { color: rgba(255,255,255,0.6); }
+    .ticker-item .t-chg  { font-weight: 600; }
+    .ticker-item .t-chg.up   { color: #4ade80; }
+    .ticker-item .t-chg.down { color: #f87171; }
+    .ticker-item .t-chg.flat { color: rgba(255,255,255,0.4); }
+
+    /* ═══════════════════════════════════════════
+       SITE NAV
     ═══════════════════════════════════════════ */
     .site-nav {
       background: var(--ink);
-      padding: 0 28px;
+      padding: 0 24px;
       display: flex;
       align-items: center;
-      gap: 0;
+      border-top: 1px solid rgba(255,255,255,0.08);
       position: sticky;
-      top: 0;
+      top: 32px;   /* below ticker */
       z-index: 30;
     }
 
     .site-nav-brand {
       font-family: var(--sans);
-      font-size: 0.68rem;
+      font-size: 0.65rem;
       font-weight: 700;
-      letter-spacing: 0.18em;
+      letter-spacing: 0.2em;
       text-transform: uppercase;
       color: rgba(255,255,255,0.9);
       text-decoration: none;
-      padding: 12px 0;
-      margin-right: 28px;
+      padding: 11px 0;
+      margin-right: 24px;
     }
 
     .site-nav a.nav-link {
       font-family: var(--sans);
-      font-size: 0.72rem;
+      font-size: 0.68rem;
       font-weight: 500;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: rgba(255,255,255,0.5);
+      color: rgba(255,255,255,0.45);
       text-decoration: none;
-      padding: 12px 12px;
+      padding: 11px 12px;
       border-bottom: 2px solid transparent;
       transition: color 0.15s;
     }
     .site-nav a.nav-link:hover  { color: rgba(255,255,255,0.85); }
-    .site-nav a.nav-link.active { color: #fff; border-bottom-color: rgba(255,255,255,0.5); }
+    .site-nav a.nav-link.active { color: #fff; border-bottom-color: rgba(255,255,255,0.4); }
 
-    .site-nav-date {
+    .site-nav-right {
       margin-left: auto;
       font-family: var(--sans);
-      font-size: 0.68rem;
+      font-size: 0.65rem;
       letter-spacing: 0.04em;
-      color: rgba(255,255,255,0.35);
+      color: rgba(255,255,255,0.3);
     }
 
     /* ═══════════════════════════════════════════
-       MASTHEAD
+       MASTHEAD  — compact newspaper header
     ═══════════════════════════════════════════ */
     .masthead {
-      max-width: 900px;
+      max-width: 1200px;
       margin: 0 auto;
-      padding: 36px 24px 0;
+      padding: 28px 24px 0;
     }
 
-    /* Top double rule */
-    .masthead-top-rule {
-      border: none;
-      border-top: 4px solid var(--ink);
-      margin-bottom: 3px;
-    }
-    .masthead-top-rule-thin {
-      border: none;
-      border-top: 1px solid var(--ink);
-      margin-bottom: 20px;
-    }
+    .masthead-top-rule    { border: none; border-top: 4px solid var(--ink); margin-bottom: 3px; }
+    .masthead-top-rule-2  { border: none; border-top: 1px solid var(--ink); margin-bottom: 16px; }
 
     .masthead-title {
       font-family: var(--serif);
-      font-size: clamp(2.2rem, 6vw, 3.8rem);
+      font-size: clamp(1.8rem, 5vw, 3rem);
       font-weight: 700;
       letter-spacing: -0.02em;
       line-height: 1.05;
@@ -112,52 +151,41 @@
 
     .masthead-subtitle {
       font-family: var(--sans);
-      font-size: 0.7rem;
-      font-weight: 400;
+      font-size: 0.65rem;
       font-style: italic;
       color: var(--ink-low);
-      letter-spacing: 0.12em;
+      letter-spacing: 0.1em;
       text-align: center;
-      margin-top: 10px;
+      margin-top: 7px;
     }
 
-    /* Thin rule + meta row below title */
-    .masthead-divider {
-      border: none;
-      border-top: 1px solid var(--rule);
-      margin: 16px 0 10px;
-    }
+    .masthead-divider { border: none; border-top: 1px solid var(--rule); margin: 12px 0 8px; }
 
     .masthead-meta {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding-bottom: 14px;
-      border-bottom: 3px double var(--rule-strong);
+      padding-bottom: 12px;
+      border-bottom: 3px double var(--ink);
       font-family: var(--sans);
-      font-size: 0.7rem;
+      font-size: 0.65rem;
       color: var(--ink-low);
       letter-spacing: 0.03em;
       gap: 12px;
     }
 
-    .masthead-meta-center {
-      text-align: center;
-      font-style: italic;
-    }
-
     /* ═══════════════════════════════════════════
-       GENERATE BUTTON  — subtle, top-right
+       GENERATE BUTTON
     ═══════════════════════════════════════════ */
     #generateBtn {
       font-family: var(--sans);
-      font-size: 0.65rem;
+      font-size: 0.62rem;
       font-weight: 600;
       letter-spacing: 0.04em;
       color: var(--ink-low);
       background: none;
       border: 1px solid var(--rule);
-      border-radius: 3px;
+      border-radius: 2px;
       padding: 3px 8px;
       cursor: pointer;
       white-space: nowrap;
@@ -168,30 +196,50 @@
 
     #generateStatus {
       font-family: var(--sans);
-      font-size: 0.63rem;
+      font-size: 0.6rem;
       color: var(--ink-low);
-      margin-top: 3px;
+      margin-top: 2px;
       text-align: right;
       min-height: 1em;
     }
-    #generateStatus.error { color: #b91c1c; }
-    #generateStatus.ok    { color: #166534; }
+    #generateStatus.error { color: var(--down); }
+    #generateStatus.ok    { color: var(--up); }
 
     /* ═══════════════════════════════════════════
-       PAPER BODY
+       DASHBOARD GRID
     ═══════════════════════════════════════════ */
-    .paper {
-      max-width: 900px;
+    .dashboard {
+      max-width: 1200px;
       margin: 0 auto;
-      padding: 36px 24px 80px;
+      padding: 28px 24px 80px;
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      gap: 0 40px;
+      align-items: start;
+    }
+
+    @media (max-width: 900px) {
+      .dashboard { grid-template-columns: 1fr; }
+      .sidebar    { border-left: none; padding-left: 0; border-top: 2px solid var(--ink); padding-top: 28px; margin-top: 32px; }
     }
 
     /* ═══════════════════════════════════════════
-       LOADING / ERROR STATES
+       BRIEFING COLUMN  — left, main
     ═══════════════════════════════════════════ */
+    .briefing-col {
+      border-right: 1px solid var(--rule);
+      padding-right: 40px;
+      min-width: 0;
+    }
+
+    @media (max-width: 900px) {
+      .briefing-col { border-right: none; padding-right: 0; }
+    }
+
+    /* Loading / error */
     .briefing-loading {
       font-family: var(--sans);
-      font-size: 0.85rem;
+      font-size: 0.82rem;
       color: var(--ink-low);
       text-align: center;
       padding: 60px 0;
@@ -199,105 +247,82 @@
     }
     .briefing-error {
       font-family: var(--sans);
-      font-size: 0.85rem;
-      color: #9b1c1c;
+      font-size: 0.82rem;
+      color: var(--down);
       text-align: center;
       padding: 60px 0;
     }
 
-    /* ═══════════════════════════════════════════
-       BRIEFING BODY  — newspaper two-column layout
-    ═══════════════════════════════════════════ */
+    /* Rendered markdown */
     .briefing-body {
-      /* Two-column newspaper flow */
       columns: 2;
-      column-gap: 52px;
+      column-gap: 40px;
       column-rule: 1px solid var(--rule);
     }
 
-    /* Section headings break across both columns */
     .briefing-body h2 {
       column-span: all;
       font-family: var(--serif);
-      font-size: 1.45rem;
+      font-size: 1.35rem;
       font-weight: 700;
       line-height: 1.2;
       color: var(--ink);
-      /* Newspaper section divider style */
       border-top: 3px solid var(--ink);
-      padding-top: 14px;
-      margin-top: 44px;
-      margin-bottom: 20px;
+      padding-top: 13px;
+      margin-top: 36px;
+      margin-bottom: 16px;
     }
 
-    /* First section — no top margin, flush with masthead bottom */
     .briefing-body h2:first-child {
       margin-top: 0;
-      border-top-color: var(--rule);
       border-top-width: 1px;
+      border-top-color: var(--rule);
     }
 
-    /* The section label span — styled as editorial category tag */
     .briefing-section-label {
       display: block;
       font-family: var(--sans);
-      font-size: 0.62rem;
+      font-size: 0.58rem;
       font-weight: 700;
-      letter-spacing: 0.16em;
+      letter-spacing: 0.18em;
       text-transform: uppercase;
       color: var(--ink-mid);
-      margin-bottom: 6px;
+      margin-bottom: 5px;
     }
 
-    /* The actual heading text is the h2 itself — but since the span wraps it,
-       we use the h2 font as the display */
-    .briefing-body h2 .briefing-section-label {
-      /* Override: label is small, ink text below is the visible headline.
-         Since the markdown renders ## text as a single label, we show it
-         both as the label (uppercase small) and imply the heading via weight/size */
-    }
-
-    /* Sub-headings within a section — stay in column flow */
     .briefing-body h3 {
       font-family: var(--serif);
-      font-size: 1.08rem;
+      font-size: 1rem;
       font-weight: 700;
       line-height: 1.3;
       color: var(--ink);
-      margin-top: 22px;
-      margin-bottom: 8px;
+      margin-top: 18px;
+      margin-bottom: 6px;
       break-inside: avoid;
     }
 
-    /* Body paragraphs */
     .briefing-body p {
       font-family: var(--serif);
-      font-size: 1rem;
+      font-size: 0.94rem;
       line-height: 1.78;
       color: var(--ink);
-      margin-bottom: 15px;
+      margin-bottom: 12px;
       text-align: justify;
       hyphens: auto;
       break-inside: avoid;
-    }
-
-    /* First paragraph after h2 gets a drop-cap feel via larger first line */
-    .briefing-body h2 + p::first-line {
-      font-weight: 600;
     }
 
     .briefing-body strong { font-weight: 700; }
     .briefing-body em     { font-style: italic; }
 
     .briefing-body ul {
-      margin: 6px 0 14px 18px;
-      padding: 0;
+      margin: 4px 0 12px 16px;
       break-inside: avoid;
     }
     .briefing-body ul li {
-      font-size: 0.94rem;
-      line-height: 1.65;
-      margin-bottom: 4px;
+      font-size: 0.9rem;
+      line-height: 1.6;
+      margin-bottom: 3px;
       list-style: disc;
     }
 
@@ -305,60 +330,181 @@
       column-span: all;
       border: none;
       border-top: 1px solid var(--rule);
-      margin: 32px 0;
+      margin: 24px 0;
     }
 
-    /* Single-column on small screens */
     @media (max-width: 640px) {
-      .briefing-body {
-        columns: 1;
-        column-rule: none;
-      }
+      .briefing-body { columns: 1; column-rule: none; }
       .briefing-body h2 { column-span: unset; }
       .briefing-body hr  { column-span: unset; }
     }
 
     /* ═══════════════════════════════════════════
-       TOOLS STRIP  — editorial, minimal
+       SIDEBAR  — right column
+    ═══════════════════════════════════════════ */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 28px;
+      position: sticky;
+      top: 80px;   /* below ticker + nav */
+    }
+
+    /* ── Widget shell ── */
+    .widget {
+      background: var(--bg-widget);
+      border: 1px solid var(--rule);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .widget-header {
+      background: var(--ink);
+      padding: 8px 14px;
+    }
+
+    .widget-title {
+      font-family: var(--sans);
+      font-size: 0.58rem;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.8);
+    }
+
+    .widget-body { padding: 0; }
+
+    /* ── Market Snapshot rows ── */
+    .mkt-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 14px;
+      border-bottom: 1px solid #f0ede8;
+      font-family: var(--sans);
+      font-size: 0.78rem;
+    }
+    .mkt-row:last-child { border-bottom: none; }
+
+    .mkt-name  { font-weight: 600; color: var(--ink); }
+    .mkt-right { text-align: right; }
+    .mkt-price { font-weight: 700; font-size: 0.82rem; color: var(--ink); }
+    .mkt-chg   { font-size: 0.7rem; font-weight: 600; margin-top: 1px; }
+    .mkt-chg.up   { color: var(--up);   }
+    .mkt-chg.down { color: var(--down); }
+    .mkt-chg.flat { color: var(--ink-low); }
+
+    .mkt-loading {
+      padding: 16px 14px;
+      font-family: var(--sans);
+      font-size: 0.72rem;
+      color: var(--ink-low);
+      text-align: center;
+    }
+
+    /* ── Portfolio rows ── */
+    .port-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 4px 12px;
+      padding: 10px 14px;
+      border-bottom: 1px solid #f0ede8;
+      align-items: center;
+    }
+    .port-row:last-child { border-bottom: none; }
+
+    .port-ticker {
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: 0.8rem;
+      color: var(--ink);
+    }
+    .port-name {
+      font-family: var(--sans);
+      font-size: 0.65rem;
+      color: var(--ink-low);
+      grid-column: 1;
+    }
+    .port-right {
+      text-align: right;
+      grid-row: span 2;
+    }
+    .port-price {
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: 0.8rem;
+      color: var(--ink);
+    }
+    .port-chg {
+      font-family: var(--sans);
+      font-size: 0.68rem;
+      font-weight: 600;
+      margin-top: 1px;
+    }
+    .port-chg.up   { color: var(--up);   }
+    .port-chg.down { color: var(--down); }
+
+    .widget-footer {
+      padding: 8px 14px;
+      border-top: 1px solid #f0ede8;
+      font-family: var(--sans);
+      font-size: 0.62rem;
+      color: var(--ink-low);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .widget-footer a {
+      color: var(--ink-mid);
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .widget-footer a:hover { text-decoration: underline; }
+
+    /* ═══════════════════════════════════════════
+       TOOLS STRIP  — below grid
     ═══════════════════════════════════════════ */
     .tools-strip {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px 64px;
+    }
+
+    .tools-strip-inner {
       border-top: 2px solid var(--ink);
       border-bottom: 1px solid var(--rule);
-      padding: 22px 0;
-      margin-top: 48px;
+      padding: 18px 0;
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
-      gap: 16px;
+      gap: 14px;
     }
 
-    .tools-strip-copy p {
-      font-family: var(--sans);
-      font-size: 0.8rem;
-      font-weight: 400;
-      color: var(--ink-mid);
-      letter-spacing: 0.02em;
-    }
     .tools-strip-copy strong {
       font-family: var(--sans);
       font-weight: 700;
+      font-size: 0.82rem;
       color: var(--ink);
       display: block;
-      font-size: 0.88rem;
-      margin-bottom: 3px;
+      margin-bottom: 2px;
+    }
+    .tools-strip-copy p {
+      font-family: var(--sans);
+      font-size: 0.75rem;
+      color: var(--ink-mid);
     }
 
     .tools-strip-btn {
       font-family: var(--sans);
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       font-weight: 700;
       letter-spacing: 0.06em;
       text-transform: uppercase;
       color: var(--ink);
       text-decoration: none;
       border: 1.5px solid var(--ink);
-      padding: 9px 18px;
+      padding: 8px 16px;
       border-radius: 2px;
       white-space: nowrap;
       transition: background 0.15s, color 0.15s;
@@ -370,11 +516,10 @@
     ═══════════════════════════════════════════ */
     footer {
       border-top: 1px solid var(--rule);
-      margin-top: 48px;
-      padding: 20px 24px;
+      padding: 18px 24px;
       text-align: center;
       font-family: var(--sans);
-      font-size: 0.65rem;
+      font-size: 0.6rem;
       letter-spacing: 0.06em;
       color: var(--ink-low);
       text-transform: uppercase;
@@ -383,51 +528,100 @@
 </head>
 <body>
 
-<!-- ── Site Navigation ── -->
+<!-- ══════════════════════════════════════════════
+     LIVE TICKER BAR
+═══════════════════════════════════════════════ -->
+<div class="ticker-wrap">
+  <div class="ticker-track" id="tickerTrack">
+    <!-- Populated by JS; duplicated for seamless loop -->
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     SITE NAV
+═══════════════════════════════════════════════ -->
 <nav class="site-nav">
   <a class="site-nav-brand" href="index.html">Market Tools</a>
   <a class="nav-link active" href="index.html">Home</a>
   <a class="nav-link" href="dashboard.html">Dashboard</a>
-  <div class="site-nav-date" id="todayDate"></div>
+  <div class="site-nav-right" id="todayDate"></div>
 </nav>
 
-<!-- ── Masthead ── -->
+<!-- ══════════════════════════════════════════════
+     MASTHEAD
+═══════════════════════════════════════════════ -->
 <div class="masthead">
   <hr class="masthead-top-rule" />
-  <hr class="masthead-top-rule-thin" />
+  <hr class="masthead-top-rule-2" />
   <h1 class="masthead-title">Daily Global Economic Briefing</h1>
   <p class="masthead-subtitle">Markets &middot; Commodities &middot; Geopolitics &middot; Analysis</p>
   <hr class="masthead-divider" />
   <div class="masthead-meta">
     <span id="mastheadDate">—</span>
-    <span class="masthead-meta-center">Independent Market Intelligence</span>
+    <span style="font-style:italic;">Independent Market Intelligence</span>
     <span style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
-      <button id="generateBtn" onclick="generateBriefing()" title="Generate today's briefing">
-        ↻ Generate
-      </button>
+      <button id="generateBtn" onclick="generateBriefing()" title="Generate today's briefing">↻ Generate</button>
       <span id="generateStatus"></span>
     </span>
   </div>
 </div>
 
-<!-- ── Paper Body ── -->
-<div class="paper">
+<!-- ══════════════════════════════════════════════
+     DASHBOARD GRID
+═══════════════════════════════════════════════ -->
+<div class="dashboard">
 
-  <!-- Live briefing content injected here by JS -->
-  <div id="briefingContent" class="briefing-loading">Loading today's briefing…</div>
+  <!-- ── Left: Daily Briefing ── -->
+  <main class="briefing-col">
+    <div id="briefingContent" class="briefing-loading">Loading today's briefing…</div>
+  </main>
 
-  <!-- Tools strip -->
-  <div class="tools-strip">
+  <!-- ── Right: Sidebar ── -->
+  <aside class="sidebar">
+
+    <!-- Market Snapshot -->
+    <div class="widget">
+      <div class="widget-header">
+        <div class="widget-title">Market Snapshot</div>
+      </div>
+      <div class="widget-body" id="marketSnapshot">
+        <div class="mkt-loading">Fetching prices…</div>
+      </div>
+    </div>
+
+    <!-- My Portfolio -->
+    <div class="widget">
+      <div class="widget-header">
+        <div class="widget-title">My Portfolio</div>
+      </div>
+      <div class="widget-body" id="portfolioWidget">
+        <div class="mkt-loading">Fetching positions…</div>
+      </div>
+      <div class="widget-footer">
+        <span id="portfolioTotal">—</span>
+        <a href="dashboard.html">Full analysis →</a>
+      </div>
+    </div>
+
+  </aside>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     TOOLS STRIP
+═══════════════════════════════════════════════ -->
+<div class="tools-strip">
+  <div class="tools-strip-inner">
     <div class="tools-strip-copy">
       <strong>Market Dashboard</strong>
-      <p>Portfolio analysis, hot stocks screener, and deep technical analysis on any ticker.</p>
+      <p>Portfolio analyzer, hot stocks screener, and deep technical analysis on any ticker.</p>
     </div>
     <a class="tools-strip-btn" href="dashboard.html">Open Dashboard →</a>
   </div>
-
 </div>
 
-<!-- ── Footer ── -->
+<!-- ══════════════════════════════════════════════
+     FOOTER
+═══════════════════════════════════════════════ -->
 <footer>
   <p>Market Tools &nbsp;·&nbsp; Daily Global Economic Briefing &nbsp;·&nbsp; For informational purposes only. Not financial advice.</p>
 </footer>
@@ -441,30 +635,140 @@
   document.getElementById("mastheadDate").textContent = fmt;
   document.getElementById("todayDate").textContent    = fmt;
 
-  /* ── Minimal markdown → HTML renderer ──────────────────────────────────
-     Handles the output format produced by generate_briefing.py:
-       ## Section heading
-       ### Sub-heading
-       **bold**  *italic*
-       - bullet item
-       --- (horizontal rule)
-       Plain paragraphs
-  ─────────────────────────────────────────────────────────────────────── */
+  /* ══════════════════════════════════════════
+     MARKET DATA
+     Tickers: ^GSPC (S&P), ^IXIC (Nasdaq),
+              GC=F (Gold), BZ=F (Brent), EURUSD=X
+  ═════════════════════════════════════════= */
+  const SNAPSHOT_TICKERS = [
+    { sym: "^GSPC",   label: "S&P 500"  },
+    { sym: "^IXIC",   label: "Nasdaq"   },
+    { sym: "GC=F",    label: "Gold"     },
+    { sym: "BZ=F",    label: "Brent"    },
+    { sym: "EURUSD=X",label: "EUR/USD"  },
+  ];
+
+  // Portfolio positions — edit these to match your real holdings
+  const MY_PORTFOLIO = [
+    { ticker: "AAPL",  name: "Apple Inc.",          shares: 10 },
+    { ticker: "MSFT",  name: "Microsoft Corp.",     shares: 5  },
+    { ticker: "NVDA",  name: "NVIDIA Corp.",        shares: 8  },
+    { ticker: "TSLA",  name: "Tesla Inc.",          shares: 4  },
+    { ticker: "AMZN",  name: "Amazon.com Inc.",     shares: 3  },
+  ];
+
+  function fmtPrice(v) {
+    if (v == null) return "—";
+    return v >= 100
+      ? v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : v.toFixed(4);
+  }
+
+  function chgClass(v) { return v > 0 ? "up" : v < 0 ? "down" : "flat"; }
+  function chgSign(v)  { return v > 0 ? "+" : ""; }
+
+  /* ── Fetch snapshot + portfolio in one call ── */
+  function loadMarketData() {
+    const allTickers = [
+      ...SNAPSHOT_TICKERS.map(t => t.sym),
+      ...MY_PORTFOLIO.map(p => p.ticker),
+    ];
+
+    fetch(`${API_BASE}/market/prices?tickers=${allTickers.join(",")}`)
+      .then(r => r.ok ? r.json() : Promise.reject(r.status))
+      .then(data => {
+        const prices = data.prices ?? {};
+        renderSnapshot(prices);
+        renderPortfolio(prices);
+        renderTicker(prices);
+      })
+      .catch(err => {
+        console.error("Market data error:", err);
+        document.getElementById("marketSnapshot").innerHTML =
+          '<div class="mkt-loading">Data unavailable</div>';
+        document.getElementById("portfolioWidget").innerHTML =
+          '<div class="mkt-loading">Data unavailable</div>';
+      });
+  }
+
+  /* ── Market Snapshot widget ── */
+  function renderSnapshot(prices) {
+    const el = document.getElementById("marketSnapshot");
+    el.innerHTML = SNAPSHOT_TICKERS.map(({ sym, label }) => {
+      const price = prices[sym];
+      // Note: /market/prices doesn't return change % — we show price only
+      return `
+        <div class="mkt-row">
+          <span class="mkt-name">${label}</span>
+          <div class="mkt-right">
+            <div class="mkt-price">${fmtPrice(price)}</div>
+            <div class="mkt-chg flat">Live price</div>
+          </div>
+        </div>`;
+    }).join("");
+  }
+
+  /* ── Portfolio widget ── */
+  function renderPortfolio(prices) {
+    const el = document.getElementById("portfolioWidget");
+    let totalValue = 0;
+
+    el.innerHTML = MY_PORTFOLIO.map(({ ticker, name, shares }) => {
+      const price = prices[ticker];
+      const value = price != null ? price * shares : null;
+      if (value != null) totalValue += value;
+      return `
+        <div class="port-row">
+          <span class="port-ticker">${ticker}</span>
+          <div class="port-right">
+            <div class="port-price">${fmtPrice(price)}</div>
+            <div class="port-chg flat">${shares} sh · ${value != null ? "$" + value.toLocaleString("en-US",{maximumFractionDigits:0}) : "—"}</div>
+          </div>
+          <span class="port-name">${name}</span>
+        </div>`;
+    }).join("");
+
+    document.getElementById("portfolioTotal").textContent =
+      totalValue > 0
+        ? `Total · $${totalValue.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
+        : "Live prices";
+  }
+
+  /* ── Ticker bar ── */
+  function renderTicker(prices) {
+    const items = [
+      ...SNAPSHOT_TICKERS.map(({ sym, label }) => ({ sym, label, price: prices[sym] })),
+      ...MY_PORTFOLIO.map(({ ticker }) => ({ sym: ticker, label: ticker, price: prices[ticker] })),
+    ];
+
+    const html = items.map(({ label, price }) => `
+      <div class="ticker-item">
+        <span class="t-sym">${label}</span>
+        <span class="t-val">${fmtPrice(price)}</span>
+      </div>`).join("");
+
+    // Duplicate for seamless loop
+    const track = document.getElementById("tickerTrack");
+    track.innerHTML = html + html;
+  }
+
+  /* ══════════════════════════════════════════
+     MARKDOWN → HTML RENDERER
+  ═════════════════════════════════════════= */
   function mdToHtml(md) {
     const esc = s => s
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
 
-    // Inline: bold, italic, inline code
     const inline = s => esc(s)
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.+?)\*/g,     "<em>$1</em>")
       .replace(/`(.+?)`/g,       "<code>$1</code>");
 
     const lines  = md.split("\n");
-    const blocks = [];  // finished HTML blocks
-    let paraLines = []; // accumulating paragraph text lines
+    const blocks = [];
+    let paraLines = [];
     let inList    = false;
 
     const flushPara = () => {
@@ -483,37 +787,29 @@
 
       if (/^## /.test(line)) {
         flushPara(); closeList();
-        blocks.push(
-          `<h2><span class="briefing-section-label">${esc(line.slice(3).trim())}</span></h2>`
-        );
+        blocks.push(`<h2><span class="briefing-section-label">${esc(line.slice(3).trim())}</span></h2>`);
         continue;
       }
-
       if (/^### /.test(line)) {
         flushPara(); closeList();
         blocks.push(`<h3>${inline(line.slice(4).trim())}</h3>`);
         continue;
       }
-
       if (/^-{3,}$/.test(line.trim())) {
         flushPara(); closeList();
         blocks.push("<hr />");
         continue;
       }
-
       if (/^[-*] /.test(line)) {
         flushPara();
         if (!inList) { blocks.push("<ul>"); inList = true; }
         blocks.push(`<li>${inline(line.slice(2).trim())}</li>`);
         continue;
       }
-
       if (line.trim() === "") {
         flushPara(); closeList();
         continue;
       }
-
-      // Regular text — accumulate into paragraph
       closeList();
       paraLines.push(inline(line.trim()));
     }
@@ -523,7 +819,9 @@
     return blocks.join("\n");
   }
 
-  /* ── Fetch & render latest briefing ── */
+  /* ══════════════════════════════════════════
+     BRIEFING  — fetch + render
+  ═════════════════════════════════════════= */
   function loadBriefing() {
     const el = document.getElementById("briefingContent");
     el.className   = "briefing-loading";
@@ -546,14 +844,16 @@
       });
   }
 
-  /* ── Trigger briefing generation ── */
+  /* ══════════════════════════════════════════
+     GENERATE BRIEFING
+  ═════════════════════════════════════════= */
   function generateBriefing() {
     const btn    = document.getElementById("generateBtn");
     const status = document.getElementById("generateStatus");
 
-    btn.disabled     = true;
-    btn.textContent  = "↻ Updating…";
-    status.className = "";
+    btn.disabled       = true;
+    btn.textContent    = "↻ Updating…";
+    status.className   = "";
     status.textContent = "Updating briefing…";
 
     fetch(`${API_BASE}/generate-briefing`, { method: "POST" })
@@ -564,7 +864,7 @@
       .then(data => {
         status.className   = "ok";
         status.textContent = `Updated · ${data.words ?? "—"} words`;
-        loadBriefing();   // re-fetch and re-render the new content
+        loadBriefing();
       })
       .catch(err => {
         console.error("Generate error:", err);
@@ -577,8 +877,9 @@
       });
   }
 
-  // Load on page open
+  /* ── Boot ── */
   loadBriefing();
+  loadMarketData();
 </script>
 
 </body>
