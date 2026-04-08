@@ -300,17 +300,81 @@
     .tools-strip-btn:hover { background: #4338ca; }
 
     /* ─────────────────────────────────────────
-       PLACEHOLDER NOTICE
+       BRIEFING STATES
     ───────────────────────────────────────── */
-    .placeholder-notice {
-      background: #fffbeb;
-      border-left: 3px solid #f59e0b;
-      padding: 10px 14px;
+    .briefing-loading,
+    .briefing-error {
       font-family: var(--sans);
-      font-size: 0.78rem;
-      color: #92400e;
-      border-radius: 0 6px 6px 0;
-      margin-bottom: 24px;
+      font-size: 0.9rem;
+      padding: 32px 0;
+      color: var(--muted);
+      text-align: center;
+    }
+    .briefing-error { color: #dc2626; }
+
+    /* ─────────────────────────────────────────
+       RENDERED MARKDOWN STYLES
+    ───────────────────────────────────────── */
+    .briefing-body h2 {
+      font-family: var(--serif);
+      font-size: 1.55rem;
+      font-weight: 700;
+      line-height: 1.25;
+      margin: 36px 0 10px;
+      padding-top: 24px;
+      border-top: 2px solid var(--ink);
+      color: var(--ink);
+    }
+    /* First h2 gets no top margin so it's flush */
+    .briefing-body h2:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+
+    .briefing-body h3 {
+      font-family: var(--serif);
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin: 24px 0 8px;
+      color: var(--ink);
+    }
+
+    .briefing-body p {
+      font-size: 0.97rem;
+      line-height: 1.78;
+      margin-bottom: 14px;
+      text-align: justify;
+    }
+
+    .briefing-body strong { font-weight: 700; }
+    .briefing-body em     { font-style: italic; }
+
+    .briefing-body ul {
+      margin: 10px 0 14px 20px;
+      padding: 0;
+    }
+    .briefing-body ul li {
+      font-size: 0.93rem;
+      line-height: 1.65;
+      margin-bottom: 5px;
+      list-style: disc;
+    }
+
+    .briefing-body hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 28px 0;
+    }
+
+    /* Section label extracted from ## headings */
+    .briefing-section-label {
+      font-family: var(--sans);
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 4px;
+      margin-bottom: 10px;
+      display: block;
     }
 
     /* ─────────────────────────────────────────
@@ -325,6 +389,41 @@
       font-size: 0.75rem;
       color: var(--muted);
     }
+
+    /* ─────────────────────────────────────────
+       GENERATE BUTTON
+    ───────────────────────────────────────── */
+    #generateBtn {
+      font-family: var(--sans);
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--muted);
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 4px 10px;
+      cursor: pointer;
+      letter-spacing: 0.03em;
+      transition: color 0.15s, border-color 0.15s, background 0.15s;
+      white-space: nowrap;
+    }
+    #generateBtn:hover:not(:disabled) {
+      color: var(--accent);
+      border-color: var(--accent);
+      background: #eef2ff;
+    }
+    #generateBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    #generateStatus {
+      font-family: var(--sans);
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 4px;
+      text-align: right;
+      min-height: 1em;
+    }
+    #generateStatus.error { color: #dc2626; }
+    #generateStatus.ok    { color: #16a34a; }
   </style>
 </head>
 <body>
@@ -374,72 +473,23 @@
   <div class="masthead-meta">
     <span id="mastheadDate">—</span>
     <span>Vol. 1 · Issue 1</span>
-    <span>market-tools.onrender.com</span>
+    <span style="display:flex; flex-direction:column; align-items:flex-end; gap:3px;">
+      <button id="generateBtn" onclick="generateBriefing()" title="Generate today's briefing">
+        ↻ Generate briefing
+      </button>
+      <span id="generateStatus"></span>
+    </span>
   </div>
 </div>
 
 <!-- ── Paper Body ── -->
 <div class="paper">
 
-  <div class="placeholder-notice">
-    This is a placeholder briefing. Connect the backend to populate this page with live AI-generated content from <code>outputs/latest-briefing.md</code>.
-  </div>
+  <!-- Live briefing content injected here -->
+  <div id="briefingContent" class="briefing-loading">Loading today's briefing…</div>
 
-  <!-- Lead Story -->
-  <div class="lead-story">
-    <div class="section-label">Major Global Story</div>
-    <h2 class="lead-headline">Federal Reserve Holds Rates, Signals Caution Amid Persistent Inflation and Trade Uncertainty</h2>
-    <p class="lead-deck">
-      The FOMC left its benchmark rate unchanged at 5.25–5.50%, citing a resilient labor market but elevated core inflation. Markets interpreted the decision as a delayed pivot, sending equities lower and the dollar higher against major peers.
-    </p>
-    <p class="byline">By the Editorial Desk · April 2026</p>
-    <div class="lead-body">
-      <p>
-        The Federal Open Market Committee voted unanimously to hold its target rate for the fifth consecutive meeting, reinforcing a "higher for longer" posture that has reshaped global capital allocation since mid-2023. Chair Jerome Powell acknowledged progress on inflation but warned that the "last mile" of disinflation remains the most difficult to achieve without risking labor market deterioration.
-      </p>
-      <p>
-        Markets had priced in a 30% probability of a cut by June, a figure that fell to 12% following the statement. The two-year Treasury yield climbed 8 basis points to 4.91%, while the ten-year remained anchored near 4.55%, compressing the spread and signaling that investors continue to believe the current tightening cycle is near its terminal point.
-      </p>
-      <p>
-        In Europe, the European Central Bank faces a divergent path: headline inflation across the eurozone has fallen to 2.4%, closer to target than the US, yet the ECB is constrained by the risk that a premature cut would widen the EUR/USD rate differential, further depressing the euro and importing commodity inflation through a weakened currency. EUR/USD traded at 1.073 in the aftermath of the Fed decision, down 0.4% on the session.
-      </p>
-      <p>
-        Brazil's central bank, the Banco Central do Brasil, is navigating its own crosscurrents — a fiscal deficit that widened to 7.1% of GDP in Q4 2025, a currency under pressure from the stronger dollar, and an inflation rate still above the 4.5% upper bound of its target band. The BCB is expected to pause its easing cycle at the next meeting, with the Selic rate holding at 10.5%.
-      </p>
-    </div>
-  </div>
-
-  <!-- Secondary Grid -->
-  <div class="secondary-grid">
-
-    <div class="story-card">
-      <div class="story-card-label">Commodities</div>
-      <h3>Gold Holds Above $3,300 as Safe-Haven Demand Persists</h3>
-      <p>
-        Spot gold traded at $3,312 per troy ounce, supported by central bank buying from emerging market institutions and persistent geopolitical risk in the Middle East. Silver followed at $36.20/oz. Brent crude slipped to $82.40 amid demand concerns from China.
-      </p>
-    </div>
-
-    <div class="story-card">
-      <div class="story-card-label">Currency Markets</div>
-      <h3>Dollar Strength Pressures Emerging Market Currencies</h3>
-      <p>
-        The DXY index rose 0.6% to 105.8 following the Fed decision. EUR/USD fell to 1.073, its lowest since February. The Brazilian real weakened 1.2% against the dollar, adding pressure to Brazil's import bill and fiscal projections. The yen remained near 151 despite BOJ intervention warnings.
-      </p>
-    </div>
-
-    <div class="story-card">
-      <div class="story-card-label">Geopolitics</div>
-      <h3>Trade Tensions: US-China Tariff Regime Enters New Phase</h3>
-      <p>
-        The US Commerce Department announced an extension of existing tariff schedules on Chinese semiconductor equipment, effective Q3 2026. Beijing responded with export restrictions on germanium and gallium — materials critical to chip fabrication — escalating a strategic rivalry that now encompasses supply chains across Europe and Southeast Asia.
-      </p>
-    </div>
-
-  </div>
-
-  <!-- Tool Promo -->
-  <div class="tools-strip">
+  <!-- Tool Promo — always visible -->
+  <div class="tools-strip" style="margin-top:40px;">
     <div class="tools-strip-copy">
       <h3>Explore the Market Dashboard</h3>
       <p>Analyze your portfolio, track hot stocks, and get deep technical analysis on any ticker.</p>
@@ -455,11 +505,152 @@
 </footer>
 
 <script>
-  // Inject today's date into masthead and nav
+  const API_BASE = "https://market-tools.onrender.com";
+
+  /* ── Date ── */
   const now = new Date();
   const fmt = now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
   document.getElementById("mastheadDate").textContent = fmt;
   document.getElementById("todayDate").textContent    = fmt;
+
+  /* ── Minimal markdown → HTML renderer ──────────────────────────────────
+     Handles the output format produced by generate_briefing.py:
+       ## Section heading
+       ### Sub-heading
+       **bold**  *italic*
+       - bullet item
+       --- (horizontal rule)
+       Plain paragraphs
+  ─────────────────────────────────────────────────────────────────────── */
+  function mdToHtml(md) {
+    const esc = s => s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+
+    // Inline: bold, italic, inline code
+    const inline = s => esc(s)
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.+?)\*/g,     "<em>$1</em>")
+      .replace(/`(.+?)`/g,       "<code>$1</code>");
+
+    const lines  = md.split("\n");
+    const blocks = [];  // finished HTML blocks
+    let paraLines = []; // accumulating paragraph text lines
+    let inList    = false;
+
+    const flushPara = () => {
+      if (!paraLines.length) return;
+      blocks.push(`<p>${paraLines.join(" ")}</p>`);
+      paraLines = [];
+    };
+    const closeList = () => {
+      if (!inList) return;
+      blocks.push("</ul>");
+      inList = false;
+    };
+
+    for (const raw of lines) {
+      const line = raw.trimEnd();
+
+      if (/^## /.test(line)) {
+        flushPara(); closeList();
+        blocks.push(
+          `<h2><span class="briefing-section-label">${esc(line.slice(3).trim())}</span></h2>`
+        );
+        continue;
+      }
+
+      if (/^### /.test(line)) {
+        flushPara(); closeList();
+        blocks.push(`<h3>${inline(line.slice(4).trim())}</h3>`);
+        continue;
+      }
+
+      if (/^-{3,}$/.test(line.trim())) {
+        flushPara(); closeList();
+        blocks.push("<hr />");
+        continue;
+      }
+
+      if (/^[-*] /.test(line)) {
+        flushPara();
+        if (!inList) { blocks.push("<ul>"); inList = true; }
+        blocks.push(`<li>${inline(line.slice(2).trim())}</li>`);
+        continue;
+      }
+
+      if (line.trim() === "") {
+        flushPara(); closeList();
+        continue;
+      }
+
+      // Regular text — accumulate into paragraph
+      closeList();
+      paraLines.push(inline(line.trim()));
+    }
+
+    flushPara();
+    closeList();
+    return blocks.join("\n");
+  }
+
+  /* ── Fetch & render latest briefing ── */
+  function loadBriefing() {
+    const el = document.getElementById("briefingContent");
+    el.className   = "briefing-loading";
+    el.textContent = "Loading today's briefing…";
+
+    fetch(`${API_BASE}/daily-briefing`)
+      .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        if (!data.briefing) throw new Error("Empty briefing");
+        el.className = "briefing-body";
+        el.innerHTML = mdToHtml(data.briefing);
+      })
+      .catch(err => {
+        console.error("Briefing fetch failed:", err);
+        el.className   = "briefing-error";
+        el.textContent = "Today's briefing is currently unavailable. Please check back shortly.";
+      });
+  }
+
+  /* ── Trigger briefing generation ── */
+  function generateBriefing() {
+    const btn    = document.getElementById("generateBtn");
+    const status = document.getElementById("generateStatus");
+
+    btn.disabled     = true;
+    btn.textContent  = "↻ Updating…";
+    status.className = "";
+    status.textContent = "Updating briefing…";
+
+    fetch(`${API_BASE}/generate-briefing`, { method: "POST" })
+      .then(res => {
+        if (!res.ok) return res.json().then(e => { throw new Error(e.detail || `Error ${res.status}`); });
+        return res.json();
+      })
+      .then(data => {
+        status.className   = "ok";
+        status.textContent = `Updated · ${data.words ?? "—"} words`;
+        loadBriefing();   // re-fetch and re-render the new content
+      })
+      .catch(err => {
+        console.error("Generate error:", err);
+        status.className   = "error";
+        status.textContent = "Update failed — " + err.message;
+      })
+      .finally(() => {
+        btn.disabled    = false;
+        btn.textContent = "↻ Generate briefing";
+      });
+  }
+
+  // Load on page open
+  loadBriefing();
 </script>
 
 </body>
