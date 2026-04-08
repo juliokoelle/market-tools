@@ -9,47 +9,50 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Market Tools" />
   <style>
-    /* ═══════════════════════════════════════
-       RESET & DESIGN TOKENS
-    ═══════════════════════════════════════ */
+    /* ─────────────────────────────────────────────
+       RESET
+    ───────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { height: 100%; }
 
+    /* ─────────────────────────────────────────────
+       TOKENS
+    ───────────────────────────────────────────── */
     :root {
-      --bg:        #f2f2f7;
-      --surface:   #ffffff;
-      --border:    #e5e7eb;
-      --accent:    #5856d6;
-      --accent-lt: #eef2ff;
-      --ink:       #1c1c1e;
-      --muted:     #8e8e93;
-      --faint:     #aeaeb2;
-      --green:     #34c759;
-      --green-dk:  #16a34a;
-      --red:       #ff3b30;
-      --red-dk:    #dc2626;
-      --yellow:    #ff9f0a;
-      --sidebar-w: 240px;
-      --topbar-h:  44px;
-      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-      --shadow:    0 4px 20px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.04);
-      --radius:    16px;
-      --radius-sm: 10px;
-      --sans:      -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
-      --serif:     Georgia, "Times New Roman", Times, serif;
+      --bg:         #f2f2f7;
+      --surface:    #ffffff;
+      --border:     #e5e7eb;
+      --accent:     #5856d6;
+      --accent-lt:  #eef2ff;
+      --ink:        #1c1c1e;
+      --muted:      #8e8e93;
+      --faint:      #aeaeb2;
+      --green-dk:   #16a34a;
+      --red-dk:     #dc2626;
+      --yellow:     #ff9f0a;
+      --shadow-sm:  0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow:     0 4px 20px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.05);
+      --radius:     14px;
+      --radius-sm:  9px;
+      --sidebar-w:  240px;
+      --topbar-h:   44px;
+      --sans:       -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+      --serif:      Georgia, "Times New Roman", Times, serif;
     }
 
     body {
       font-family: var(--sans);
       background: var(--bg);
       color: var(--ink);
-      min-height: 100vh;
+      min-height: 100%;
       display: flex;
       -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
-    /* ═══════════════════════════════════════
-       SIDEBAR
-    ═══════════════════════════════════════ */
+    /* ─────────────────────────────────────────────
+       SIDEBAR — default: full (240px)
+    ───────────────────────────────────────────── */
     .sidebar {
       width: var(--sidebar-w);
       background: var(--surface);
@@ -60,71 +63,76 @@
       flex-direction: column;
       z-index: 50;
       overflow-y: auto;
+      overflow-x: hidden;
+      transition: width 0.2s ease;
+      flex-shrink: 0;
     }
 
+    /* Brand */
     .sidebar-brand {
-      padding: 18px 20px 16px;
+      padding: 16px 18px;
       display: flex;
       align-items: center;
       gap: 10px;
       border-bottom: 1px solid var(--border);
       flex-shrink: 0;
+      min-height: 60px;
     }
-
     .sidebar-brand-icon {
-      width: 32px; height: 32px;
+      width: 30px; height: 30px;
       background: var(--accent);
       border-radius: 8px;
       display: flex;
       align-items: center;
       justify-content: center;
       color: #fff;
-      font-size: 0.875rem;
+      font-size: 0.8rem;
       font-weight: 700;
       flex-shrink: 0;
     }
-
     .sidebar-brand-name {
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       font-weight: 700;
       color: var(--ink);
       letter-spacing: -0.01em;
+      white-space: nowrap;
+      overflow: hidden;
     }
 
-    .sidebar-nav {
-      padding: 10px;
-      flex: 1;
-    }
+    /* Nav */
+    .sidebar-nav { padding: 8px; flex: 1; }
 
-    .sidebar-section-label {
-      font-size: 0.63rem;
+    .nav-section-label {
+      font-size: 0.6rem;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.09em;
+      letter-spacing: 0.1em;
       color: var(--faint);
       padding: 14px 10px 5px;
+      white-space: nowrap;
+      overflow: hidden;
     }
 
     .nav-item {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 9px;
       padding: 9px 10px;
       border-radius: var(--radius-sm);
       cursor: pointer;
-      transition: background 0.15s, color 0.15s;
       font-size: 0.875rem;
       font-weight: 500;
       color: var(--muted);
-      text-decoration: none;
       border: none;
       background: none;
       width: 100%;
       text-align: left;
       margin-bottom: 2px;
+      transition: background 0.14s, color 0.14s;
+      white-space: nowrap;
+      overflow: hidden;
     }
-
-    .nav-item:hover { background: var(--bg); color: var(--ink); }
+    .nav-item:hover  { background: var(--bg); color: var(--ink); }
     .nav-item.active { background: var(--accent-lt); color: var(--accent); font-weight: 600; }
 
     .nav-item-icon {
@@ -136,16 +144,18 @@
       justify-content: center;
       font-size: 0.85rem;
       flex-shrink: 0;
-      transition: background 0.15s, color 0.15s;
+      transition: background 0.14s, color 0.14s;
     }
     .nav-item.active .nav-item-icon { background: var(--accent); color: #fff; }
 
+    .nav-item-label { overflow: hidden; }
+
+    /* Footer */
     .sidebar-footer {
-      padding: 14px 16px 20px;
+      padding: 12px 14px 18px;
       border-top: 1px solid var(--border);
       flex-shrink: 0;
     }
-
     .status-pill {
       display: flex;
       align-items: center;
@@ -157,24 +167,29 @@
       font-size: 0.72rem;
       font-weight: 600;
       color: var(--muted);
-      transition: all 0.3s;
+      transition: all 0.25s;
+      white-space: nowrap;
+      overflow: hidden;
     }
     .status-pill.connected { color: var(--green-dk); background: #f0fdf4; border-color: #bbf7d0; }
     .status-pill.error     { color: var(--red-dk);   background: #fef2f2; border-color: #fecaca; }
     .status-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0; }
 
-    /* ═══════════════════════════════════════
-       MAIN CONTENT
-    ═══════════════════════════════════════ */
+    /* ─────────────────────────────────────────────
+       MAIN
+    ───────────────────────────────────────────── */
     .main {
       margin-left: var(--sidebar-w);
       flex: 1;
-      min-height: 100vh;
+      min-width: 0;
       display: flex;
       flex-direction: column;
+      min-height: 100vh;
     }
 
-    /* ── Ticker banner ── */
+    /* ─────────────────────────────────────────────
+       TICKER BANNER
+    ───────────────────────────────────────────── */
     .ticker-banner {
       background: var(--ink);
       height: var(--topbar-h);
@@ -186,119 +201,123 @@
       z-index: 40;
       flex-shrink: 0;
     }
-
     .ticker-label {
-      padding: 0 16px;
-      font-size: 0.62rem;
+      padding: 0 14px;
+      font-size: 0.6rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.1em;
-      color: rgba(255,255,255,0.35);
+      color: rgba(255,255,255,0.3);
       border-right: 1px solid rgba(255,255,255,0.1);
       white-space: nowrap;
       flex-shrink: 0;
     }
-
     .ticker-track-wrap { overflow: hidden; flex: 1; }
-
     .ticker-track {
       display: flex;
       gap: 32px;
       width: max-content;
-      animation: tickerScroll 30s linear infinite;
+      animation: tickerScroll 32s linear infinite;
     }
-
-    @keyframes tickerScroll {
-      0%   { transform: translateX(0); }
-      100% { transform: translateX(-50%); }
-    }
-
+    @keyframes tickerScroll { to { transform: translateX(-50%); } }
     .ticker-item { display: inline-flex; align-items: center; gap: 8px; font-size: 0.775rem; }
     .t-sym  { font-weight: 700; color: rgba(255,255,255,0.85); }
-    .t-val  { color: rgba(255,255,255,0.5); }
-    .t-sep  { color: rgba(255,255,255,0.12); font-size: 0.65rem; }
+    .t-val  { color: rgba(255,255,255,0.45); }
+    .t-sep  { color: rgba(255,255,255,0.1); font-size: 0.6rem; }
 
-    /* ═══════════════════════════════════════
+    /* ─────────────────────────────────────────────
        VIEWS
-    ═══════════════════════════════════════ */
-    .view { display: none; padding: 28px 28px 60px; }
+    ───────────────────────────────────────────── */
+    .view { display: none; padding: 28px 28px 56px; max-width: 1280px; }
     .view.active { display: block; }
 
-    .view-header { margin-bottom: 24px; }
-    .view-header h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
-    .view-header p  { margin-top: 4px; color: var(--muted); font-size: 0.875rem; }
+    .view-header { margin-bottom: 22px; }
+    .view-header h1 { font-size: 1.45rem; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; }
+    .view-header p  { margin-top: 4px; color: var(--muted); font-size: 0.875rem; line-height: 1.5; }
 
-    /* ═══════════════════════════════════════
+    /* header row (title + action button) */
+    .view-header-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+
+    /* ─────────────────────────────────────────────
        CARDS
-    ═══════════════════════════════════════ */
+    ───────────────────────────────────────────── */
     .card {
       background: var(--surface);
       border-radius: var(--radius);
-      padding: 22px 24px;
+      padding: 20px 22px;
       box-shadow: var(--shadow-sm);
     }
+    .card + .card { margin-top: 14px; }
 
     .card-label {
-      font-size: 0.65rem;
+      font-size: 0.63rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.09em;
       color: var(--muted);
     }
 
-    /* ═══════════════════════════════════════
+    /* ─────────────────────────────────────────────
        GRIDS
-    ═══════════════════════════════════════ */
+    ───────────────────────────────────────────── */
+    /* 3-col stat cards */
     .grid-3 {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
-      gap: 16px;
-      margin-bottom: 20px;
+      gap: 14px;
+      margin-bottom: 18px;
     }
 
+    /* Dashboard 2-col: main + right sidebar */
     .grid-dash {
       display: grid;
-      grid-template-columns: 1fr 308px;
-      gap: 20px;
+      grid-template-columns: 1fr 300px;
+      gap: 18px;
+      align-items: start;
     }
+    .sidebar-stack { display: flex; flex-direction: column; gap: 14px; }
 
-    .sidebar-stack { display: flex; flex-direction: column; gap: 16px; }
+    /* Metric grids */
+    .metrics-grid   { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; margin-bottom: 14px; }
+    .metrics-grid-2 { display: grid; grid-template-columns: repeat(2,1fr); gap: 12px; margin-bottom: 14px; }
 
-    @media (max-width: 1100px) { .grid-3 { grid-template-columns: 1fr 1fr; } }
-    @media (max-width: 900px)  { .grid-dash { grid-template-columns: 1fr; } }
-    @media (max-width: 700px)  { .grid-3    { grid-template-columns: 1fr; } }
-
-    /* Stat card */
+    /* ─────────────────────────────────────────────
+       STAT CARDS
+    ───────────────────────────────────────────── */
     .stat-card {
       background: var(--surface);
       border-radius: var(--radius);
-      padding: 18px 20px;
+      padding: 16px 18px;
       box-shadow: var(--shadow-sm);
     }
-    .stat-label { font-size: 0.68rem; font-weight: 600; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.07em; }
-    .stat-value { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); line-height: 1; }
-    .stat-sub   { font-size: 0.7rem; color: var(--faint); margin-top: 5px; }
+    .stat-label { font-size: 0.65rem; font-weight: 700; color: var(--muted); margin-bottom: 7px; text-transform: uppercase; letter-spacing: 0.07em; }
+    .stat-value { font-size: 1.45rem; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); line-height: 1; }
+    .stat-sub   { font-size: 0.68rem; color: var(--faint); margin-top: 5px; }
 
-    /* ═══════════════════════════════════════
+    /* ─────────────────────────────────────────────
        FLIP CARDS
-    ═══════════════════════════════════════ */
+    ───────────────────────────────────────────── */
     .flip-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-      gap: 14px;
+      grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+      gap: 12px;
       margin-bottom: 24px;
     }
-
-    .flip-card { perspective: 1000px; height: 138px; cursor: pointer; }
-
+    .flip-card { perspective: 1000px; height: 140px; cursor: pointer; }
     .flip-card-inner {
       width: 100%; height: 100%;
       position: relative;
       transform-style: preserve-3d;
-      transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+      transition: transform 0.44s cubic-bezier(0.4,0,0.2,1);
     }
     .flip-card.flipped .flip-card-inner { transform: rotateY(180deg); }
-
     .flip-card-front,
     .flip-card-back {
       position: absolute;
@@ -306,55 +325,52 @@
       backface-visibility: hidden;
       -webkit-backface-visibility: hidden;
       border-radius: var(--radius);
-      padding: 16px;
+      padding: 15px;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
     }
-
     .flip-card-front { background: var(--surface); box-shadow: var(--shadow-sm); }
     .flip-card-back  { background: var(--accent); color: #fff; transform: rotateY(180deg); }
-
-    .fc-ticker { font-size: 1rem; font-weight: 700; color: var(--ink); }
-    .fc-name   { font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
-    .fc-price  { font-size: 1.15rem; font-weight: 700; color: var(--ink); }
-    .fc-val    { font-size: 0.7rem; color: var(--muted); margin-top: 2px; }
-    .fc-hint   { font-size: 0.6rem; color: var(--faint); text-align: right; }
-
+    .fc-ticker { font-size: 0.95rem; font-weight: 700; color: var(--ink); }
+    .fc-name   { font-size: 0.65rem; color: var(--muted); margin-top: 2px; }
+    .fc-price  { font-size: 1.1rem; font-weight: 700; color: var(--ink); }
+    .fc-val    { font-size: 0.68rem; color: var(--muted); margin-top: 2px; }
+    .fc-hint   { font-size: 0.58rem; color: var(--faint); text-align: right; }
     .fcb-ticker { font-size: 0.875rem; font-weight: 700; opacity: 0.8; }
-    .fcb-shares { font-size: 0.68rem; opacity: 0.65; margin-top: 2px; }
+    .fcb-shares { font-size: 0.65rem; opacity: 0.6; margin-top: 2px; }
     .fcb-val    { font-size: 1.2rem; font-weight: 700; }
-    .fcb-sub    { font-size: 0.68rem; opacity: 0.65; margin-top: 2px; }
-    .fcb-link   { font-size: 0.65rem; opacity: 0.7; text-align: right; transition: opacity 0.15s; }
+    .fcb-sub    { font-size: 0.65rem; opacity: 0.6; margin-top: 2px; }
+    .fcb-link   { font-size: 0.63rem; opacity: 0.65; text-align: right; transition: opacity 0.15s; }
     .fcb-link:hover { opacity: 1; }
 
-    /* ═══════════════════════════════════════
+    /* ─────────────────────────────────────────────
        MARKET ROWS
-    ═══════════════════════════════════════ */
+    ───────────────────────────────────────────── */
     .mkt-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 0;
+      padding: 9px 0;
       border-bottom: 1px solid var(--border);
-      font-size: 0.82rem;
     }
     .mkt-row:last-child { border-bottom: none; }
-    .mkt-name  { font-weight: 600; color: var(--ink); }
-    .mkt-sub   { font-size: 0.67rem; color: var(--faint); margin-top: 2px; }
-    .mkt-price { font-weight: 700; font-size: 0.875rem; color: var(--ink); }
+    .mkt-name  { font-size: 0.82rem; font-weight: 600; color: var(--ink); }
+    .mkt-sub   { font-size: 0.65rem; color: var(--faint); margin-top: 2px; }
+    .mkt-price { font-size: 0.85rem; font-weight: 700; color: var(--ink); }
     .mkt-right { text-align: right; }
-    .mkt-loading { font-size: 0.8rem; color: var(--faint); text-align: center; padding: 16px 0; }
+    .mkt-loading { font-size: 0.8rem; color: var(--faint); text-align: center; padding: 14px 0; }
 
-    /* ═══════════════════════════════════════
+    /* ─────────────────────────────────────────────
        BRIEFING
-    ═══════════════════════════════════════ */
+    ───────────────────────────────────────────── */
     .briefing-loading,
     .briefing-error {
       font-size: 0.875rem;
       color: var(--faint);
       text-align: center;
       padding: 48px 0;
+      line-height: 1.6;
     }
     .briefing-error { color: var(--red-dk); }
 
@@ -363,54 +379,52 @@
       column-gap: 36px;
       column-rule: 1px solid var(--border);
     }
-    @media (max-width: 700px) {
-      .briefing-body { columns: 1; column-rule: none; }
-    }
-
     .briefing-body h2 {
       column-span: all;
-      font-size: 0.68rem;
+      font-size: 0.65rem;
       font-weight: 700;
       color: var(--muted);
       text-transform: uppercase;
       letter-spacing: 0.09em;
       border-top: 1px solid var(--border);
-      padding-top: 20px;
-      margin: 24px 0 14px;
+      padding-top: 18px;
+      margin: 22px 0 12px;
     }
     .briefing-body h2:first-child { margin-top: 0; padding-top: 0; border-top: none; }
     .briefing-body h3 { font-family: var(--serif); font-size: 1.05rem; font-weight: 700; line-height: 1.3; color: var(--ink); margin: 16px 0 8px; break-inside: avoid; }
     .briefing-body p  { font-family: var(--serif); font-size: 0.92rem; line-height: 1.8; color: #374151; margin-bottom: 12px; hyphens: auto; break-inside: avoid; }
     .briefing-body ul { margin: 4px 0 12px 16px; break-inside: avoid; }
     .briefing-body ul li { font-family: var(--serif); font-size: 0.9rem; line-height: 1.65; color: #374151; margin-bottom: 4px; list-style: disc; }
-    .briefing-body hr { column-span: all; border: none; border-top: 1px solid var(--border); margin: 20px 0; }
+    .briefing-body hr { column-span: all; border: none; border-top: 1px solid var(--border); margin: 18px 0; }
     .briefing-body strong { font-weight: 700; }
     .briefing-body em     { font-style: italic; }
 
-    /* Dashboard briefing preview */
+    /* Dashboard preview */
     .briefing-preview {
-      max-height: 300px;
+      columns: 1 !important;
+      column-rule: none !important;
+      max-height: 280px;
       overflow: hidden;
       position: relative;
-      columns: 1;        /* always single-column in preview */
     }
     .briefing-preview::after {
       content: "";
       position: absolute;
       bottom: 0; left: 0; right: 0;
-      height: 72px;
+      height: 70px;
       background: linear-gradient(transparent, #fff);
       pointer-events: none;
     }
 
-    /* ═══════════════════════════════════════
+    /* ─────────────────────────────────────────────
        BUTTONS
-    ═══════════════════════════════════════ */
+    ───────────────────────────────────────────── */
     .btn-primary {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 6px;
-      padding: 10px 20px;
+      padding: 10px 18px;
       background: var(--accent);
       color: #fff;
       border: none;
@@ -419,19 +433,21 @@
       font-size: 0.875rem;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.15s, transform 0.1s;
+      transition: background 0.14s, transform 0.1s;
       text-decoration: none;
       white-space: nowrap;
+      min-height: 40px;
     }
-    .btn-primary:hover { background: #4745c0; }
+    .btn-primary:hover:not(:disabled) { background: #4745c0; }
     .btn-primary:active { transform: scale(0.98); }
-    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
     .btn-secondary {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 7px 14px;
+      justify-content: center;
+      gap: 5px;
+      padding: 7px 13px;
       background: var(--bg);
       color: var(--accent);
       border: 1px solid var(--border);
@@ -440,25 +456,28 @@
       font-size: 0.8rem;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.15s, border-color 0.15s;
+      transition: background 0.14s, border-color 0.14s;
       text-decoration: none;
       white-space: nowrap;
+      min-height: 36px;
     }
     .btn-secondary:hover { background: var(--accent-lt); border-color: #c7d2fe; }
     .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
 
+    /* Generate button */
     #generateBtn {
       font-family: var(--sans);
-      font-size: 0.78rem;
+      font-size: 0.8rem;
       font-weight: 600;
       color: var(--accent);
       background: var(--accent-lt);
       border: none;
-      border-radius: 6px;
-      padding: 6px 13px;
+      border-radius: 7px;
+      padding: 7px 14px;
       cursor: pointer;
-      transition: background 0.15s;
+      transition: background 0.14s;
       white-space: nowrap;
+      min-height: 36px;
     }
     #generateBtn:hover:not(:disabled) { background: #e0e7ff; }
     #generateBtn:disabled { opacity: 0.5; cursor: not-allowed; }
@@ -466,9 +485,9 @@
     #generateStatus.ok    { color: var(--green-dk); }
     #generateStatus.error { color: var(--red-dk); }
 
-    /* ═══════════════════════════════════════
+    /* ─────────────────────────────────────────────
        FORMS & INPUTS
-    ═══════════════════════════════════════ */
+    ───────────────────────────────────────────── */
     input[type="text"],
     input[type="number"] {
       font-family: var(--sans);
@@ -480,12 +499,28 @@
       padding: 10px 12px;
       width: 100%;
       outline: none;
-      box-sizing: border-box;
-      transition: border-color 0.2s, background 0.2s;
+      transition: border-color 0.18s, background 0.18s;
+      min-height: 42px;
     }
     input[type="text"]:focus,
     input[type="number"]:focus { border-color: var(--accent); background: #fff; }
     input[type="number"]::-webkit-inner-spin-button { opacity: 0.4; }
+
+    /* Holding row */
+    .form-labels {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .form-labels span {
+      font-size: 0.63rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--faint);
+      padding-left: 2px;
+    }
 
     .holding-row {
       display: grid;
@@ -494,9 +529,7 @@
       align-items: center;
       margin-bottom: 10px;
     }
-
     .ticker-wrap { position: relative; }
-
     .ticker-suggestions {
       display: none;
       position: absolute;
@@ -511,7 +544,7 @@
     }
     .ticker-suggestions li {
       list-style: none;
-      padding: 9px 14px;
+      padding: 10px 14px;
       font-size: 0.875rem;
       font-weight: 600;
       color: var(--ink);
@@ -526,21 +559,22 @@
       color: var(--red-dk);
       border: none;
       border-radius: var(--radius-sm);
-      width: 36px; height: 36px;
-      font-size: 1rem;
+      width: 40px; height: 40px;
+      font-size: 0.9rem;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
       padding: 0;
-      transition: background 0.15s;
+      transition: background 0.14s;
+      margin-top: 1px;
     }
     .remove-btn:hover { background: #fecaca; }
 
     .add-holding-btn {
       width: 100%;
-      padding: 9px;
+      padding: 10px;
       background: var(--accent-lt);
       color: var(--accent);
       font-size: 0.875rem;
@@ -548,72 +582,33 @@
       border: 1.5px dashed #c7d2fe;
       border-radius: var(--radius-sm);
       cursor: pointer;
-      transition: background 0.15s;
+      transition: background 0.14s;
       margin-bottom: 12px;
       margin-top: 4px;
+      min-height: 42px;
     }
     .add-holding-btn:hover { background: #e0e7ff; }
 
-    .form-labels {
-      display: grid;
-      grid-template-columns: 1fr 1fr auto;
-      gap: 10px;
-      margin-bottom: 6px;
-    }
-    .form-labels span {
-      font-size: 0.65rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.07em;
-      color: var(--faint);
-      padding-left: 2px;
-    }
-
-    /* ═══════════════════════════════════════
+    /* ─────────────────────────────────────────────
        METRIC CARDS
-    ═══════════════════════════════════════ */
-    .metrics-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 12px;
-      margin-bottom: 14px;
-    }
-    .metrics-grid-2 {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 12px;
-      margin-bottom: 14px;
-    }
-    @media (max-width: 700px) {
-      .metrics-grid   { grid-template-columns: repeat(2, 1fr); }
-      .metrics-grid-2 { grid-template-columns: 1fr; }
-    }
-
+    ───────────────────────────────────────────── */
     .metric-card {
       background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius-sm);
-      padding: 16px;
+      padding: 14px 16px;
       text-align: center;
     }
-    .metric-label { font-size: 0.65rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 8px; }
-    .metric-value { font-size: 1.55rem; font-weight: 700; line-height: 1; }
-    .metric-sub   { font-size: 0.7rem; color: var(--faint); margin-top: 6px; }
+    .metric-label { font-size: 0.63rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 8px; }
+    .metric-value { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+    .metric-sub   { font-size: 0.68rem; color: var(--faint); margin-top: 6px; line-height: 1.4; }
 
     .c-green  { color: var(--green-dk); }
     .c-yellow { color: var(--yellow); }
     .c-red    { color: var(--red-dk); }
     .c-accent { color: var(--accent); }
 
-    .risk-badge {
-      display: inline-block;
-      padding: 4px 14px;
-      border-radius: 999px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      margin-top: 8px;
-    }
+    .risk-badge { display: inline-block; padding: 4px 14px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; margin-top: 8px; }
     .badge-green  { background: #dcfce7; color: #15803d; }
     .badge-yellow { background: #fef9c3; color: #92400e; }
     .badge-red    { background: #fee2e2; color: #b91c1c; }
@@ -622,9 +617,9 @@
       background: var(--accent-lt);
       border-left: 3px solid var(--accent);
       border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-      padding: 16px 20px;
-      font-size: 0.9rem;
-      line-height: 1.7;
+      padding: 14px 18px;
+      font-size: 0.875rem;
+      line-height: 1.75;
       color: #374151;
     }
 
@@ -636,11 +631,11 @@
       border-radius: 50%;
       background: #e0e7ff;
       color: var(--accent);
-      font-size: 0.6rem;
+      font-size: 0.58rem;
       font-weight: 700;
       cursor: pointer;
       border: none;
-      transition: background 0.15s;
+      transition: background 0.14s;
       vertical-align: middle;
       margin-left: 4px;
       flex-shrink: 0;
@@ -657,25 +652,27 @@
       padding: 12px 16px;
       font-size: 0.875rem;
       margin: 12px 0;
+      line-height: 1.5;
     }
 
-    /* ═══════════════════════════════════════
-       HOT STOCKS
-    ═══════════════════════════════════════ */
-    .hot-table { width: 100%; border-collapse: collapse; }
+    /* ─────────────────────────────────────────────
+       HOT STOCKS TABLE
+    ───────────────────────────────────────────── */
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border-radius: var(--radius); }
+    .hot-table { width: 100%; border-collapse: collapse; min-width: 420px; }
     .hot-table thead tr { background: var(--bg); border-bottom: 1px solid var(--border); }
-    .hot-table th { padding: 10px 16px; text-align: left; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
+    .hot-table th { padding: 10px 14px; text-align: left; font-size: 0.63rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); white-space: nowrap; }
     .hot-table th.r { text-align: right; }
-    .hot-table td { padding: 13px 16px; border-bottom: 1px solid #f9fafb; }
+    .hot-table td { padding: 12px 14px; border-bottom: 1px solid #f9fafb; vertical-align: middle; }
     .hot-table td.r { text-align: right; }
     .hot-table tr:last-child td { border-bottom: none; }
 
     .pagination { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; flex-wrap: wrap; gap: 10px; }
-    .page-info { font-size: 0.8rem; color: var(--muted); }
-    .page-btns { display: flex; align-items: center; gap: 6px; }
+    .page-info { font-size: 0.78rem; color: var(--muted); }
+    .page-btns { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 
     .page-nav-btn {
-      padding: 6px 12px;
+      padding: 7px 12px;
       font-size: 0.8rem;
       font-weight: 600;
       background: var(--surface);
@@ -683,13 +680,14 @@
       border: 1px solid var(--border);
       border-radius: 7px;
       cursor: pointer;
-      transition: background 0.15s;
+      transition: background 0.14s;
+      min-height: 36px;
     }
     .page-nav-btn:hover:not(:disabled) { background: var(--accent-lt); border-color: #c7d2fe; }
     .page-nav-btn:disabled { color: var(--faint); cursor: not-allowed; }
 
     .page-num-btn {
-      width: 32px; height: 32px;
+      width: 34px; height: 34px;
       font-size: 0.8rem;
       font-weight: 600;
       background: var(--surface);
@@ -698,75 +696,75 @@
       border-radius: 7px;
       cursor: pointer;
       padding: 0;
-      transition: background 0.15s;
+      transition: background 0.14s;
     }
     .page-num-btn:hover  { background: var(--bg); }
     .page-num-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
-    /* ═══════════════════════════════════════
+    /* ─────────────────────────────────────────────
        MODAL
-    ═══════════════════════════════════════ */
+    ───────────────────────────────────────────── */
     @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
-    @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
     .modal-backdrop {
       display: none;
       position: fixed;
       inset: 0;
-      background: rgba(15,15,30,0.45);
+      background: rgba(15,15,30,0.5);
       z-index: 200;
       align-items: center;
       justify-content: center;
-      padding: 20px;
+      padding: 16px;
     }
     .modal-backdrop.open { display: flex; animation: fadeIn 0.15s ease; }
-
     .modal {
       background: #fff;
       border-radius: var(--radius);
-      box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+      box-shadow: 0 8px 40px rgba(0,0,0,0.2);
       width: 100%;
       max-width: 520px;
       max-height: 90vh;
       overflow-y: auto;
       animation: slideUp 0.18s ease;
     }
-    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px 0; }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 22px 0; }
     .modal-header h3 { font-size: 1rem; font-weight: 700; color: var(--ink); }
-    .modal-close { background: var(--bg); border: none; border-radius: 50%; width: 30px; height: 30px; font-size: 1rem; cursor: pointer; color: var(--muted); display: flex; align-items: center; justify-content: center; transition: background 0.15s; padding: 0; flex-shrink: 0; }
+    .modal-close { background: var(--bg); border: none; border-radius: 50%; width: 32px; height: 32px; font-size: 0.9rem; cursor: pointer; color: var(--muted); display: flex; align-items: center; justify-content: center; transition: background 0.14s; padding: 0; flex-shrink: 0; }
     .modal-close:hover { background: var(--border); }
-    .modal-body { padding: 16px 24px 24px; }
-    .modal-formula { background: #f3f4ff; border: 1px solid #c7d2fe; border-radius: var(--radius-sm); padding: 18px 24px; font-family: var(--serif); font-size: 1.2rem; font-style: italic; color: #312e81; margin: 14px 0; text-align: center; letter-spacing: 0.03em; }
-    .modal-section-title { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint); margin: 16px 0 8px; }
+    .modal-body { padding: 16px 22px 24px; }
+    .modal-formula { background: #f3f4ff; border: 1px solid #c7d2fe; border-radius: var(--radius-sm); padding: 16px 20px; font-family: var(--serif); font-size: 1.15rem; font-style: italic; color: #312e81; margin: 14px 0; text-align: center; letter-spacing: 0.03em; }
+    .modal-section-title { font-size: 0.63rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.09em; color: var(--faint); margin: 16px 0 8px; }
     .modal-explanation { font-size: 0.875rem; color: #374151; line-height: 1.75; }
-    .breakdown-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; margin-top: 4px; }
-    .breakdown-table th { padding: 8px 12px; font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--faint); border-bottom: 1px solid var(--border); text-align: right; }
+    .breakdown-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-top: 4px; }
+    .breakdown-table th { padding: 8px 10px; font-size: 0.63rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--faint); border-bottom: 1px solid var(--border); text-align: right; }
     .breakdown-table th:first-child { text-align: left; }
-    .breakdown-table td { padding: 10px 12px; text-align: right; border-bottom: 1px solid var(--bg); color: #374151; }
+    .breakdown-table td { padding: 9px 10px; text-align: right; border-bottom: 1px solid var(--bg); color: #374151; }
     .breakdown-table td:first-child { text-align: left; font-weight: 700; color: var(--ink); }
     .breakdown-table tr:last-child td { border-bottom: none; }
 
-    /* ═══════════════════════════════════════
-       IDEAS / COMING SOON
-    ═══════════════════════════════════════ */
+    /* ─────────────────────────────────────────────
+       COMING SOON
+    ───────────────────────────────────────────── */
     .coming-soon {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      min-height: 320px;
+      min-height: 300px;
       text-align: center;
       gap: 10px;
+      padding: 20px;
     }
     .coming-soon-icon { font-size: 2.5rem; margin-bottom: 6px; }
-    .coming-soon h2 { font-size: 1.15rem; font-weight: 700; color: var(--ink); }
-    .coming-soon p  { font-size: 0.875rem; color: var(--muted); max-width: 380px; line-height: 1.65; }
-    .coming-soon-tags { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 10px; }
+    .coming-soon h2 { font-size: 1.1rem; font-weight: 700; color: var(--ink); }
+    .coming-soon p  { font-size: 0.875rem; color: var(--muted); max-width: 360px; line-height: 1.65; }
+    .coming-soon-tags { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-top: 12px; }
     .tag { background: var(--bg); border: 1px solid var(--border); color: var(--muted); font-size: 0.72rem; font-weight: 600; padding: 5px 12px; border-radius: 20px; }
 
-    /* ═══════════════════════════════════════
-       MOBILE NAV
-    ═══════════════════════════════════════ */
+    /* ─────────────────────────────────────────────
+       MOBILE BOTTOM NAV — hidden by default
+    ───────────────────────────────────────────── */
     .mobile-nav {
       display: none;
       position: fixed;
@@ -782,31 +780,120 @@
       flex-direction: column;
       align-items: center;
       gap: 3px;
-      padding: 8px 10px;
+      padding: 8px 6px;
       cursor: pointer;
       border: none;
       background: none;
       font-family: var(--sans);
       color: var(--muted);
-      font-size: 0.58rem;
+      font-size: 0.56rem;
       font-weight: 600;
       border-radius: 8px;
-      transition: color 0.15s;
-      min-width: 44px;
+      transition: color 0.14s;
+      min-width: 48px;
+      flex: 1;
+      max-width: 80px;
     }
     .mobile-nav-item.active { color: var(--accent); }
-    .mobile-nav-icon { font-size: 1.15rem; }
+    .mobile-nav-icon { font-size: 1.2rem; line-height: 1; }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
+    /* ─────────────────────────────────────────────
+       TABLET — icon sidebar (769-1023px)
+    ───────────────────────────────────────────── */
+    @media (min-width: 769px) and (max-width: 1023px) {
+      :root { --sidebar-w: 64px; }
 
-    @media (max-width: 768px) {
-      .sidebar      { display: none; }
-      .main         { margin-left: 0; }
-      .mobile-nav   { display: block; }
-      .view         { padding: 16px 16px 80px; }
+      .sidebar-brand { padding: 14px 0; justify-content: center; }
+      .sidebar-brand-name { display: none; }
+      .nav-section-label { display: none; }
+      .nav-item { justify-content: center; padding: 10px 0; }
+      .nav-item-label { display: none; }
+      .nav-item-icon { width: 30px; height: 30px; border-radius: 8px; }
+      .sidebar-footer { padding: 10px 8px; }
+      .status-pill { padding: 8px; justify-content: center; }
+      #statusText { display: none; }
+
+      .view { padding: 22px 22px 50px; }
+      .grid-3 { grid-template-columns: repeat(2, 1fr); }
+      .grid-dash { grid-template-columns: 1fr; }
+      .sidebar-stack { display: grid; grid-template-columns: 1fr 1fr; }
+      .briefing-body { columns: 1; column-rule: none; }
+      .briefing-body h2 { column-span: unset; }
+      .briefing-body hr  { column-span: unset; }
     }
-    @media (max-width: 560px) {
+
+    /* ─────────────────────────────────────────────
+       MOBILE — bottom nav (≤768px)
+    ───────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      body { display: block; }
+      .sidebar     { display: none; }
+      .main        { margin-left: 0; min-height: 100vh; }
+      .mobile-nav  { display: block; }
+      .view        { padding: 16px 16px 78px; }
+
+      .grid-3      { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .grid-dash   { grid-template-columns: 1fr; gap: 14px; }
+      .metrics-grid   { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .metrics-grid-2 { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+
+      .briefing-body { columns: 1; column-rule: none; }
+      .briefing-body h2 { column-span: unset; }
+      .briefing-body hr  { column-span: unset; }
+
       .view-header h1 { font-size: 1.25rem; }
+      .stat-value     { font-size: 1.25rem; }
+      .metric-value   { font-size: 1.3rem; }
+
+      .card { padding: 16px 16px; }
+      .card + .card { margin-top: 12px; }
+      .stat-card { padding: 14px 14px; }
+
+      .flip-grid { gap: 10px; }
+    }
+
+    /* ─────────────────────────────────────────────
+       SMALL MOBILE (≤480px)
+    ───────────────────────────────────────────── */
+    @media (max-width: 480px) {
+      .grid-3 { grid-template-columns: 1fr; }
+      .metrics-grid   { grid-template-columns: 1fr; }
+      .metrics-grid-2 { grid-template-columns: 1fr; }
+      .flip-grid { grid-template-columns: repeat(2, 1fr); }
+
+      /* Holding row: ticker full width, then investment + delete */
+      .form-labels { grid-template-columns: 1fr auto; }
+      .form-labels span:nth-child(2) { display: none; }
+      .form-labels span:nth-child(3) { display: none; }
+      .holding-row { grid-template-columns: 1fr auto; }
+      .holding-row .ticker-wrap { grid-column: 1 / -1; }
+
+      .view-header h1 { font-size: 1.15rem; }
+      .metric-value   { font-size: 1.2rem; }
+      .btn-primary    { width: 100%; }
+
+      /* Stock input: full width on small mobile */
+      #stockInputRow { flex-direction: column; }
+      #stockInputRow input { max-width: 100% !important; }
+    }
+
+    /* ─────────────────────────────────────────────
+       LANDSCAPE PHONE (height ≤ 500px)
+    ───────────────────────────────────────────── */
+    @media (max-height: 500px) and (max-width: 900px) {
+      .view { padding-bottom: 16px; }
+      .mobile-nav { display: none; }
+      .sidebar { display: flex; width: 64px; }
+      .sidebar-brand { justify-content: center; padding: 10px 0; }
+      .sidebar-brand-name { display: none; }
+      .nav-section-label { display: none; }
+      .nav-item { justify-content: center; padding: 8px 0; }
+      .nav-item-label { display: none; }
+      .nav-item-icon { width: 26px; height: 26px; }
+      .sidebar-footer { padding: 8px; }
+      #statusText { display: none; }
+      .status-pill { justify-content: center; padding: 6px; }
+      .main { margin-left: 64px; }
     }
   </style>
 </head>
@@ -822,34 +909,34 @@
   </div>
 
   <nav class="sidebar-nav">
-    <div class="sidebar-section-label">Overview</div>
-    <button class="nav-item active" data-view="dashboard" onclick="showView('dashboard')">
+    <div class="nav-section-label">Overview</div>
+    <button class="nav-item active" data-view="dashboard" title="Dashboard" onclick="showView('dashboard')">
       <div class="nav-item-icon">⊞</div>
-      Dashboard
+      <span class="nav-item-label">Dashboard</span>
     </button>
-    <button class="nav-item" data-view="briefing" onclick="showView('briefing')">
+    <button class="nav-item" data-view="briefing" title="Daily Briefing" onclick="showView('briefing')">
       <div class="nav-item-icon">📰</div>
-      Daily Briefing
+      <span class="nav-item-label">Daily Briefing</span>
     </button>
 
-    <div class="sidebar-section-label">Tools</div>
-    <button class="nav-item" data-view="portfolio" onclick="showView('portfolio')">
+    <div class="nav-section-label">Tools</div>
+    <button class="nav-item" data-view="portfolio" title="Portfolio" onclick="showView('portfolio')">
       <div class="nav-item-icon">◈</div>
-      Portfolio
+      <span class="nav-item-label">Portfolio</span>
     </button>
-    <button class="nav-item" data-view="hotstocks" onclick="showView('hotstocks')">
+    <button class="nav-item" data-view="hotstocks" title="Hot Stocks" onclick="showView('hotstocks')">
       <div class="nav-item-icon">↑</div>
-      Hot Stocks
+      <span class="nav-item-label">Hot Stocks</span>
     </button>
-    <button class="nav-item" data-view="analyzer" onclick="showView('analyzer')">
+    <button class="nav-item" data-view="analyzer" title="Stock Analyzer" onclick="showView('analyzer')">
       <div class="nav-item-icon">◉</div>
-      Stock Analyzer
+      <span class="nav-item-label">Stock Analyzer</span>
     </button>
 
-    <div class="sidebar-section-label">Coming Soon</div>
-    <button class="nav-item" data-view="ideas" onclick="showView('ideas')">
+    <div class="nav-section-label">Coming Soon</div>
+    <button class="nav-item" data-view="ideas" title="Ideas Tracker" onclick="showView('ideas')">
       <div class="nav-item-icon">✦</div>
-      Ideas Tracker
+      <span class="nav-item-label">Ideas Tracker</span>
     </button>
   </nav>
 
@@ -870,9 +957,7 @@
   <div class="ticker-banner">
     <span class="ticker-label">Live</span>
     <div class="ticker-track-wrap">
-      <div class="ticker-track" id="tickerTrack">
-        <!-- populated by JS -->
-      </div>
+      <div class="ticker-track" id="tickerTrack"></div>
     </div>
   </div>
 
@@ -883,7 +968,7 @@
       <p id="dashDate"></p>
     </div>
 
-    <!-- Top stat row -->
+    <!-- Stat row -->
     <div class="grid-3">
       <div class="stat-card">
         <div class="stat-label">S&amp;P 500</div>
@@ -902,14 +987,14 @@
       </div>
     </div>
 
-    <!-- Dashboard grid -->
+    <!-- Dashboard 2-col grid -->
     <div class="grid-dash">
-      <!-- Main: Briefing preview -->
+      <!-- Briefing preview -->
       <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; gap:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:14px; flex-wrap:wrap;">
           <div>
             <div class="card-label">Today's Briefing</div>
-            <div id="dashBriefingDate" style="font-size:0.7rem; color:var(--faint); margin-top:3px;"></div>
+            <div id="dashBriefingDate" style="font-size:0.68rem; color:var(--faint); margin-top:3px;"></div>
           </div>
           <button class="btn-secondary" onclick="showView('briefing')">Read full →</button>
         </div>
@@ -918,28 +1003,26 @@
         </div>
       </div>
 
-      <!-- Sidebar column -->
+      <!-- Right column: Market snapshot + Portfolio widget -->
       <div class="sidebar-stack">
-        <!-- Market Snapshot -->
         <div class="card">
-          <div class="card-label" style="margin-bottom:12px;">Market Snapshot</div>
+          <div class="card-label" style="margin-bottom:10px;">Market Snapshot</div>
           <div id="dashMarketSnapshot">
             <div class="mkt-loading">Fetching prices…</div>
           </div>
         </div>
 
-        <!-- My Portfolio widget -->
         <div class="card">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <div class="card-label">My Portfolio</div>
-            <button class="btn-secondary" style="font-size:0.7rem; padding:4px 10px;" onclick="showView('portfolio')">Analyze →</button>
+            <button class="btn-secondary" style="font-size:0.7rem; padding:5px 10px; min-height:30px;" onclick="showView('portfolio')">Analyze →</button>
           </div>
           <div id="dashPortfolio">
             <div class="mkt-loading">Fetching positions…</div>
           </div>
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; padding-top:10px; border-top:1px solid var(--border); font-size:0.75rem;">
-            <span style="color:var(--muted); font-weight:600;">Total value</span>
-            <span style="color:var(--ink); font-weight:700;" id="dashPortTotal">—</span>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+            <span style="font-size:0.72rem; color:var(--muted); font-weight:600;">Total value</span>
+            <span style="font-size:0.82rem; color:var(--ink); font-weight:700;" id="dashPortTotal">—</span>
           </div>
         </div>
       </div>
@@ -948,8 +1031,8 @@
 
   <!-- ═══ VIEW: Daily Briefing ═══ -->
   <section id="view-briefing" class="view">
-    <div class="view-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:14px;">
-      <div>
+    <div class="view-header-row">
+      <div class="view-header" style="margin-bottom:0;">
         <h1>Daily Briefing</h1>
         <p id="briefingSubtitle">Markets · Commodities · Geopolitics · Analysis</p>
       </div>
@@ -967,29 +1050,25 @@
   <section id="view-portfolio" class="view">
     <div class="view-header">
       <h1>Portfolio</h1>
-      <p>Live positions at a glance — click any card to flip. Use the analyzer below for full risk analysis.</p>
+      <p>Live positions at a glance — tap any card to flip. Use the analyzer below for full risk analysis.</p>
     </div>
 
-    <!-- Flip cards -->
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-      <div style="font-size:0.65rem; font-weight:700; text-transform:uppercase; letter-spacing:0.09em; color:var(--muted);">
-        My Positions <span style="font-weight:400; text-transform:none; letter-spacing:0; color:var(--faint);">— click to flip</span>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:6px;">
+      <div class="card-label">
+        My Positions <span style="font-weight:400; text-transform:none; letter-spacing:0; color:var(--faint);">— tap to flip</span>
       </div>
       <span style="font-size:0.72rem; color:var(--faint);" id="portFlipTotal"></span>
     </div>
-    <div class="flip-grid" id="flipGrid">
-      <!-- populated by JS -->
+    <div class="flip-grid" id="flipGrid"></div>
+
+    <div style="border-top:1px solid var(--border); margin:20px 0 18px;"></div>
+
+    <div style="margin-bottom:14px;">
+      <div style="font-size:1.1rem; font-weight:700; color:var(--ink); letter-spacing:-0.01em;">Portfolio Analyzer</div>
+      <div style="font-size:0.875rem; color:var(--muted); margin-top:3px; line-height:1.5;">Enter any holdings with invested amounts to get a risk and return assessment.</div>
     </div>
 
-    <div style="border-top:1px solid var(--border); margin:24px 0 20px;"></div>
-
-    <!-- Portfolio Analyzer -->
-    <div style="margin-bottom:16px;">
-      <div style="font-size:1.15rem; font-weight:700; color:var(--ink); letter-spacing:-0.01em;">Portfolio Analyzer</div>
-      <div style="font-size:0.875rem; color:var(--muted); margin-top:3px;">Enter any holdings with invested amounts to get a risk and return assessment.</div>
-    </div>
-
-    <div class="card" style="margin-bottom:0;">
+    <div class="card">
       <div class="form-labels">
         <span>Ticker</span>
         <span>Investment (USD)</span>
@@ -1002,7 +1081,7 @@
 
     <div class="error-banner" id="errorBanner"></div>
 
-    <div id="results" style="display:none; margin-top:16px;">
+    <div id="results" style="display:none; margin-top:14px;">
       <div class="metrics-grid-2">
         <div class="metric-card">
           <div class="metric-label">Total Portfolio Value</div>
@@ -1029,16 +1108,16 @@
         <div class="metric-card">
           <div class="metric-label">Diversification <button class="info-icon" onclick="openModal('diversification')">i</button></div>
           <div class="metric-value c-accent" id="metricDiversification">—</div>
-          <div class="metric-sub">Score 0 (concentrated) → 1</div>
+          <div class="metric-sub">Score 0 → 1</div>
         </div>
       </div>
-      <div class="card" style="margin-bottom:14px;">
+      <div class="card" style="margin-bottom:12px;">
         <div class="card-label" style="margin-bottom:8px;">Risk Assessment</div>
-        <div id="riskLabel" style="font-size:1.05rem; font-weight:600; margin-bottom:8px;"></div>
+        <div id="riskLabel" style="font-size:1rem; font-weight:600; margin-bottom:8px;"></div>
         <span class="risk-badge" id="riskBadge"></span>
       </div>
       <div class="card">
-        <div class="card-label" style="margin-bottom:12px;">Key Insights</div>
+        <div class="card-label" style="margin-bottom:10px;">Key Insights</div>
         <div class="insight-box" id="insightText"></div>
       </div>
     </div>
@@ -1046,10 +1125,10 @@
 
   <!-- ═══ VIEW: Hot Stocks ═══ -->
   <section id="view-hotstocks" class="view">
-    <div class="view-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:14px;">
-      <div>
+    <div class="view-header-row">
+      <div class="view-header" style="margin-bottom:0;">
         <h1>Hot Stocks</h1>
-        <p>Top momentum picks from the last 5 trading days — scored by return and volume.</p>
+        <p>Top momentum picks — scored by 5-day return and average volume.</p>
       </div>
       <button class="btn-primary" id="hotBtn" onclick="loadHotStocks()">Find Hot Stocks</button>
     </div>
@@ -1057,7 +1136,7 @@
     <div class="error-banner" id="hotError"></div>
 
     <div id="hotResults" style="display:none;">
-      <div class="card" style="padding:0; overflow:hidden; margin-bottom:0;">
+      <div class="table-scroll card" style="padding:0;">
         <table class="hot-table">
           <thead>
             <tr>
@@ -1075,11 +1154,11 @@
         <span class="page-info" id="hotRangeLabel"></span>
         <div class="page-btns">
           <button class="page-nav-btn" id="hotPrev" onclick="hotChangePage(hotPage - 1)">← Prev</button>
-          <div id="hotPageNumbers" style="display:flex; gap:4px;"></div>
+          <div id="hotPageNumbers" style="display:flex; gap:4px; flex-wrap:wrap;"></div>
           <button class="page-nav-btn" id="hotNext" onclick="hotChangePage(hotPage + 1)">Next →</button>
         </div>
       </div>
-      <p style="margin-top:8px; font-size:0.7rem; color:var(--faint);">Score = return × 0.7 + normalised volume × 0.3 · Last 5 trading days</p>
+      <p style="margin-top:8px; font-size:0.68rem; color:var(--faint);">Score = return × 0.7 + normalised volume × 0.3 · Last 5 trading days</p>
     </div>
   </section>
 
@@ -1090,11 +1169,11 @@
       <p>Technicals, moving averages, momentum, and news sentiment — last 6 months.</p>
     </div>
 
-    <div class="card" style="margin-bottom:16px;">
+    <div class="card" style="margin-bottom:14px;">
       <div class="card-label" style="margin-bottom:10px;">Ticker Symbol</div>
-      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <div id="stockInputRow" style="display:flex; gap:10px; flex-wrap:wrap; align-items:stretch;">
         <input type="text" id="stockInput" placeholder="e.g. AAPL"
-               style="max-width:200px; width:auto; flex:none;"
+               style="max-width:220px; flex:1 1 120px;"
                onkeydown="if(event.key==='Enter') analyzeStock()" />
         <button class="btn-primary" id="stockBtn" onclick="analyzeStock()">Analyze</button>
       </div>
@@ -1103,29 +1182,29 @@
     <div class="error-banner" id="stockError"></div>
 
     <div id="stockResults" style="display:none;">
-      <div class="insight-box" id="stockSummary" style="margin-bottom:16px;"></div>
+      <div class="insight-box" id="stockSummary" style="margin-bottom:14px;"></div>
 
-      <div class="card" style="margin-bottom:16px;">
+      <div class="card" style="margin-bottom:14px;">
         <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
           <div>
             <div class="card-label">Current Price</div>
-            <div id="stockCurrentPrice" style="font-size:1.75rem; font-weight:700; color:var(--ink); letter-spacing:-0.02em; margin-top:4px;"></div>
+            <div id="stockCurrentPrice" style="font-size:1.7rem; font-weight:700; color:var(--ink); letter-spacing:-0.02em; margin-top:4px; line-height:1;"></div>
           </div>
-          <a id="stockYahooLink" href="#" target="_blank" rel="noopener" class="btn-secondary">View on Yahoo Finance ↗</a>
+          <a id="stockYahooLink" href="#" target="_blank" rel="noopener" class="btn-secondary">Yahoo Finance ↗</a>
         </div>
         <canvas id="stockCanvas" style="width:100%; display:block; max-height:160px;"></canvas>
         <div id="stockChartFallback" style="display:none; padding:12px 0 4px; border-top:1px solid var(--border);">
-          <p style="margin:0 0 6px; color:var(--faint); font-size:0.85rem;">Chart unavailable — insufficient data.</p>
-          <a id="stockFallbackLink" href="#" target="_blank" rel="noopener" class="btn-secondary" style="display:inline-flex;">View chart on Yahoo Finance ↗</a>
+          <p style="margin:0 0 8px; color:var(--faint); font-size:0.85rem;">Chart unavailable — insufficient data.</p>
+          <a id="stockFallbackLink" href="#" target="_blank" rel="noopener" class="btn-secondary" style="display:inline-flex;">View on Yahoo Finance ↗</a>
         </div>
         <div id="stockChartDates" style="display:none; justify-content:space-between; margin-top:6px;">
-          <span id="stockChartDateMin" style="font-size:0.7rem; color:var(--faint);"></span>
-          <span id="stockChartDateMax" style="font-size:0.7rem; color:var(--faint);"></span>
+          <span id="stockChartDateMin" style="font-size:0.68rem; color:var(--faint);"></span>
+          <span id="stockChartDateMax" style="font-size:0.68rem; color:var(--faint);"></span>
         </div>
       </div>
 
-      <div class="card" style="margin-bottom:16px;">
-        <div class="card-label" style="margin-bottom:12px;">Trend Analysis</div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-label" style="margin-bottom:10px;">Trend Analysis</div>
         <div class="metrics-grid">
           <div class="metric-card">
             <div class="metric-label">Trend</div>
@@ -1145,8 +1224,8 @@
         </div>
       </div>
 
-      <div class="card" style="margin-bottom:16px;">
-        <div class="card-label" style="margin-bottom:12px;">Risk Metrics</div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-label" style="margin-bottom:10px;">Risk Metrics</div>
         <div class="metrics-grid">
           <div class="metric-card">
             <div class="metric-label">30d Return</div>
@@ -1167,7 +1246,7 @@
       </div>
 
       <div class="card">
-        <div class="card-label" style="margin-bottom:12px;">News Sentiment</div>
+        <div class="card-label" style="margin-bottom:10px;">News Sentiment</div>
         <div class="metrics-grid-2">
           <div class="metric-card">
             <div class="metric-label">Sentiment</div>
@@ -1196,14 +1275,10 @@
         <h2>Coming Soon</h2>
         <p>The Ideas Tracker will let you capture investment theses, track conviction over time, and attach market events to each idea.</p>
         <div class="coming-soon-tags">
-          <!-- TODO: Market Drivers Panel -->
-          <span class="tag">Market Drivers Panel</span>
-          <!-- TODO: Recommendation Engine -->
-          <span class="tag">Recommendation Engine</span>
-          <!-- TODO: Podcast Integration -->
-          <span class="tag">Podcast Integration</span>
-          <!-- TODO: Screenshot Parser -->
-          <span class="tag">Screenshot Parser</span>
+          <span class="tag">Market Drivers Panel</span><!-- TODO -->
+          <span class="tag">Recommendation Engine</span><!-- TODO -->
+          <span class="tag">Podcast Integration</span><!-- TODO -->
+          <span class="tag">Screenshot Parser</span><!-- TODO -->
         </div>
       </div>
     </div>
@@ -1211,28 +1286,23 @@
 
 </main>
 
-<!-- Mobile nav -->
+<!-- Mobile bottom nav -->
 <nav class="mobile-nav">
   <div class="mobile-nav-inner">
     <button class="mobile-nav-item active" data-view="dashboard" onclick="showView('dashboard')">
-      <span class="mobile-nav-icon">⊞</span>
-      <span>Home</span>
+      <span class="mobile-nav-icon">⊞</span><span>Home</span>
     </button>
     <button class="mobile-nav-item" data-view="briefing" onclick="showView('briefing')">
-      <span class="mobile-nav-icon">📰</span>
-      <span>Briefing</span>
+      <span class="mobile-nav-icon">📰</span><span>Briefing</span>
     </button>
     <button class="mobile-nav-item" data-view="portfolio" onclick="showView('portfolio')">
-      <span class="mobile-nav-icon">◈</span>
-      <span>Portfolio</span>
+      <span class="mobile-nav-icon">◈</span><span>Portfolio</span>
     </button>
     <button class="mobile-nav-item" data-view="hotstocks" onclick="showView('hotstocks')">
-      <span class="mobile-nav-icon">↑</span>
-      <span>Hot</span>
+      <span class="mobile-nav-icon">↑</span><span>Hot</span>
     </button>
     <button class="mobile-nav-item" data-view="analyzer" onclick="showView('analyzer')">
-      <span class="mobile-nav-icon">◉</span>
-      <span>Analyzer</span>
+      <span class="mobile-nav-icon">◉</span><span>Analyzer</span>
     </button>
   </div>
 </nav>
@@ -1291,7 +1361,6 @@ const MY_PORTFOLIO = [
 function showView(name) {
   document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
   document.getElementById("view-" + name).classList.add("active");
-
   document.querySelectorAll("[data-view]").forEach(el => {
     el.classList.toggle("active", el.dataset.view === name);
   });
@@ -1370,10 +1439,8 @@ function renderTicker(prices) {
     `<span class="ticker-item">
       <span class="t-sym">${label}</span>
       <span class="t-val">${fmtPrice(prices[sym])}</span>
-    </span>
-    <span class="t-sep">|</span>`
+    </span><span class="t-sep">|</span>`
   ).join("");
-  // Duplicate for seamless loop
   document.getElementById("tickerTrack").innerHTML = items + items;
 }
 
@@ -1416,8 +1483,8 @@ function renderPortfolioMini(prices) {
     }).join("");
 
   const totalStr = total > 0 ? `$${total.toLocaleString("en-US", {maximumFractionDigits:0})}` : "—";
-  document.getElementById("dashPortTotal").textContent  = totalStr;
-  document.getElementById("portFlipTotal").textContent  = total > 0 ? `Total: ${totalStr}` : "";
+  document.getElementById("dashPortTotal").textContent = totalStr;
+  document.getElementById("portFlipTotal").textContent = total > 0 ? `Total: ${totalStr}` : "";
 }
 
 function renderFlipCards(prices) {
@@ -1521,20 +1588,17 @@ function loadBriefing() {
       if (!data.briefing) throw new Error("Empty briefing");
       const html = mdToHtml(data.briefing);
 
-      // Full briefing view
       const fullEl = document.getElementById("briefingContent");
       fullEl.className = "briefing-body";
       fullEl.innerHTML = html;
 
-      // Date labels
       if (data.last_updated) {
         const d   = new Date(data.last_updated);
         const str = d.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
         document.getElementById("briefingSubtitle").textContent = str;
-        document.getElementById("dashBriefingDate").textContent  = str;
+        document.getElementById("dashBriefingDate").textContent = str;
       }
 
-      // Dashboard preview (single-column, faded)
       const previewEl = document.getElementById("dashBriefingPreview");
       previewEl.className = "briefing-preview briefing-body";
       previewEl.innerHTML = html;
@@ -1668,7 +1732,6 @@ function readHoldings() {
   return holdings;
 }
 
-// Seed default rows on load
 (function initForm() {
   addHoldingRow("AAPL", 5000);
   addHoldingRow("MSFT", 3000);
@@ -1728,19 +1791,15 @@ function analyze() {
       const risk = riskProfile(vol);
 
       document.getElementById("metricTotalValue").textContent = usd(totalVal);
-
       const largestEl = document.getElementById("metricLargestUSD");
       largestEl.textContent = usd(largestUSD);
       largestEl.className = "metric-value " + (largestUSD / totalVal > 0.4 ? "c-yellow" : "c-green");
-
       const retEl = document.getElementById("metricReturn");
       retEl.textContent = pct(ret);
       retEl.className   = "metric-value " + (ret >= 0 ? "c-green" : "c-red");
-
       const volEl = document.getElementById("metricVolatility");
       volEl.textContent = pct(vol);
       volEl.className   = "metric-value " + risk.cls;
-
       document.getElementById("metricDiversification").textContent = round2(div);
       document.getElementById("riskLabel").textContent  = risk.label;
       document.getElementById("riskLabel").className    = risk.cls;
@@ -1864,9 +1923,9 @@ function renderHotPage() {
         <td style="color:var(--faint); font-size:0.82rem;">#${rank}</td>
         <td>
           <a href="https://finance.yahoo.com/quote/${s.ticker}" target="_blank" rel="noopener"
-             style="font-weight:700; font-size:0.95rem; color:var(--ink); text-decoration:none; transition:color 0.15s;"
+             style="font-weight:700; font-size:0.95rem; color:var(--ink); text-decoration:none; transition:color 0.14s;"
              onmouseover="this.style.color='#5856d6'" onmouseout="this.style.color='var(--ink)'"
-          >${s.ticker} <span style="font-size:0.62rem; opacity:0.35;">↗</span></a>
+          >${s.ticker} <span style="font-size:0.6rem; opacity:0.3;">↗</span></a>
         </td>
         <td class="r" style="font-weight:600; color:${retColor};">${retText}</td>
         <td class="r" style="color:var(--muted); font-size:0.875rem;">${vol}</td>
