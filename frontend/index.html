@@ -3,311 +3,264 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Daily Global Economic Briefing</title>
+  <title>Daily Briefing — Market Tools</title>
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#111" />
+  <meta name="theme-color" content="#4f46e5" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Market Tools" />
   <style>
+    /* ─── Design tokens (matches dashboard.html exactly) ─── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --paper:     #f7f6f3;
-      --ink:       #111111;
-      --ink-mid:   #444444;
-      --ink-low:   #888888;
-      --rule:      #c8c5be;
-      --bg-widget: #ffffff;
-      --up:        #166534;
-      --down:      #991b1b;
-      --serif:     Georgia, "Times New Roman", Times, serif;
-      --sans:      -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
+      --bg:      #f4f6f9;
+      --surface: #ffffff;
+      --border:  #e5e7eb;
+      --ink:     #1a1a2e;
+      --muted:   #6b7280;
+      --faint:   #9ca3af;
+      --accent:  #4f46e5;
+      --green:   #16a34a;
+      --red:     #dc2626;
+      --shadow:  0 1px 4px rgba(0,0,0,0.08);
+      --radius:  12px;
+      --sans:    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --serif:   Georgia, "Times New Roman", Times, serif;
     }
 
-    html { font-size: 16px; }
-
     body {
-      font-family: var(--serif);
-      background: var(--paper);
+      font-family: var(--sans);
+      background: var(--bg);
       color: var(--ink);
       min-height: 100vh;
       -webkit-font-smoothing: antialiased;
     }
 
-    /* ═══════════════════════════════════════════
-       LIVE TICKER BAR  — scrolling strip
-    ═══════════════════════════════════════════ */
-    .ticker-wrap {
-      background: var(--ink);
-      overflow: hidden;
-      height: 32px;
+    /* ═══════════════════════════════════════
+       NAV  — identical to dashboard.html
+    ═══════════════════════════════════════ */
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
       display: flex;
       align-items: center;
       position: sticky;
       top: 0;
-      z-index: 40;
-    }
-
-    .ticker-track {
-      display: flex;
-      gap: 0;
-      animation: ticker-scroll 40s linear infinite;
-      white-space: nowrap;
-      will-change: transform;
-    }
-
-    /* Duplicate the list twice so the loop is seamless */
-    @keyframes ticker-scroll {
-      0%   { transform: translateX(0); }
-      100% { transform: translateX(-50%); }
-    }
-
-    .ticker-item {
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
-      padding: 0 24px;
-      font-family: var(--sans);
-      font-size: 0.7rem;
-      letter-spacing: 0.02em;
-      border-right: 1px solid rgba(255,255,255,0.1);
-    }
-
-    .ticker-item .t-sym  { font-weight: 700; color: rgba(255,255,255,0.9); }
-    .ticker-item .t-val  { color: rgba(255,255,255,0.6); }
-    .ticker-item .t-chg  { font-weight: 600; }
-    .ticker-item .t-chg.up   { color: #4ade80; }
-    .ticker-item .t-chg.down { color: #f87171; }
-    .ticker-item .t-chg.flat { color: rgba(255,255,255,0.4); }
-
-    /* ═══════════════════════════════════════════
-       SITE NAV
-    ═══════════════════════════════════════════ */
-    .site-nav {
-      background: var(--ink);
-      padding: 0 24px;
-      display: flex;
-      align-items: center;
-      border-top: 1px solid rgba(255,255,255,0.08);
-      position: sticky;
-      top: 32px;   /* below ticker */
       z-index: 30;
     }
 
-    .site-nav-brand {
-      font-family: var(--sans);
-      font-size: 0.65rem;
+    .nav-brand {
+      font-size: 1rem;
       font-weight: 700;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.9);
+      color: var(--ink);
       text-decoration: none;
-      padding: 11px 0;
-      margin-right: 24px;
+      padding: 18px 24px 18px 0;
+      margin-right: 8px;
+      border-right: 1px solid var(--border);
+      white-space: nowrap;
     }
 
-    .site-nav a.nav-link {
-      font-family: var(--sans);
-      font-size: 0.68rem;
+    .nav-link {
+      padding: 18px 16px;
+      font-size: 0.9rem;
       font-weight: 500;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.45);
+      color: var(--muted);
       text-decoration: none;
-      padding: 11px 12px;
       border-bottom: 2px solid transparent;
       transition: color 0.15s;
-    }
-    .site-nav a.nav-link:hover  { color: rgba(255,255,255,0.85); }
-    .site-nav a.nav-link.active { color: #fff; border-bottom-color: rgba(255,255,255,0.4); }
-
-    .site-nav-right {
-      margin-left: auto;
-      font-family: var(--sans);
-      font-size: 0.65rem;
-      letter-spacing: 0.04em;
-      color: rgba(255,255,255,0.3);
-    }
-
-    /* ═══════════════════════════════════════════
-       MASTHEAD  — compact newspaper header
-    ═══════════════════════════════════════════ */
-    .masthead {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 28px 24px 0;
-    }
-
-    .masthead-top-rule    { border: none; border-top: 4px solid var(--ink); margin-bottom: 3px; }
-    .masthead-top-rule-2  { border: none; border-top: 1px solid var(--ink); margin-bottom: 16px; }
-
-    .masthead-title {
-      font-family: var(--serif);
-      font-size: clamp(1.8rem, 5vw, 3rem);
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      line-height: 1.05;
-      color: var(--ink);
-      text-align: center;
-    }
-
-    .masthead-subtitle {
-      font-family: var(--sans);
-      font-size: 0.65rem;
-      font-style: italic;
-      color: var(--ink-low);
-      letter-spacing: 0.1em;
-      text-align: center;
-      margin-top: 7px;
-    }
-
-    .masthead-divider { border: none; border-top: 1px solid var(--rule); margin: 12px 0 8px; }
-
-    .masthead-meta {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding-bottom: 12px;
-      border-bottom: 3px double var(--ink);
-      font-family: var(--sans);
-      font-size: 0.65rem;
-      color: var(--ink-low);
-      letter-spacing: 0.03em;
-      gap: 12px;
-    }
-
-    /* ═══════════════════════════════════════════
-       GENERATE BUTTON
-    ═══════════════════════════════════════════ */
-    #generateBtn {
-      font-family: var(--sans);
-      font-size: 0.62rem;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      color: var(--ink-low);
-      background: none;
-      border: 1px solid var(--rule);
-      border-radius: 2px;
-      padding: 3px 8px;
-      cursor: pointer;
       white-space: nowrap;
-      transition: color 0.15s, border-color 0.15s;
     }
-    #generateBtn:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-mid); }
-    #generateBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .nav-link:hover        { color: var(--ink); }
+    .nav-link.active       { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
 
-    #generateStatus {
-      font-family: var(--sans);
-      font-size: 0.6rem;
-      color: var(--ink-low);
-      margin-top: 2px;
-      text-align: right;
-      min-height: 1em;
+    /* Ticker strip — lightweight, in the nav right side */
+    .nav-ticker {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      overflow: hidden;
+      max-width: 480px;
     }
-    #generateStatus.error { color: var(--down); }
-    #generateStatus.ok    { color: var(--up); }
 
-    /* ═══════════════════════════════════════════
-       DASHBOARD GRID
-    ═══════════════════════════════════════════ */
-    .dashboard {
-      max-width: 1200px;
+    .nav-ticker-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.75rem;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .nav-ticker-item .t-sym  { font-weight: 700; color: var(--ink); }
+    .nav-ticker-item .t-val  { color: var(--muted); }
+    .nav-ticker-item .t-up   { color: var(--green); font-weight: 600; }
+    .nav-ticker-item .t-down { color: var(--red);   font-weight: 600; }
+
+    @media (max-width: 700px) { .nav-ticker { display: none; } }
+
+    /* ═══════════════════════════════════════
+       PAGE LAYOUT
+    ═══════════════════════════════════════ */
+    .page {
+      max-width: 1160px;
       margin: 0 auto;
-      padding: 28px 24px 80px;
+      padding: 32px 20px 64px;
+    }
+
+    /* Page header */
+    .page-header {
+      margin-bottom: 24px;
+    }
+
+    .page-header h1 {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .page-header p {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+
+    /* Two-column grid */
+    .dashboard-grid {
       display: grid;
-      grid-template-columns: 1fr 300px;
-      gap: 0 40px;
+      grid-template-columns: 1fr 292px;
+      gap: 24px;
       align-items: start;
     }
 
     @media (max-width: 900px) {
-      .dashboard { grid-template-columns: 1fr; }
-      .sidebar    { border-left: none; padding-left: 0; border-top: 2px solid var(--ink); padding-top: 28px; margin-top: 32px; }
+      .dashboard-grid { grid-template-columns: 1fr; }
     }
 
-    /* ═══════════════════════════════════════════
-       BRIEFING COLUMN  — left, main
-    ═══════════════════════════════════════════ */
-    .briefing-col {
-      border-right: 1px solid var(--rule);
-      padding-right: 40px;
-      min-width: 0;
+    /* ═══════════════════════════════════════
+       CARD  — identical to dashboard.html
+    ═══════════════════════════════════════ */
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow);
+      margin-bottom: 0;
     }
 
-    @media (max-width: 900px) {
-      .briefing-col { border-right: none; padding-right: 0; }
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
     }
 
-    /* Loading / error */
-    .briefing-loading {
+    .card-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* ═══════════════════════════════════════
+       GENERATE BUTTON — small, secondary
+    ═══════════════════════════════════════ */
+    #generateBtn {
       font-family: var(--sans);
-      font-size: 0.82rem;
-      color: var(--ink-low);
-      text-align: center;
-      padding: 60px 0;
-      letter-spacing: 0.04em;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--accent);
+      background: #eef2ff;
+      border: none;
+      border-radius: 6px;
+      padding: 5px 12px;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
     }
+    #generateBtn:hover:not(:disabled) { background: #e0e7ff; }
+    #generateBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    #generateStatus {
+      font-size: 0.72rem;
+      color: var(--faint);
+      text-align: right;
+    }
+    #generateStatus.ok    { color: var(--green); }
+    #generateStatus.error { color: var(--red); }
+
+    /* ═══════════════════════════════════════
+       BRIEFING BODY — editorial typography
+       (serif, two-col flow inside the card)
+    ═══════════════════════════════════════ */
+    .briefing-loading,
     .briefing-error {
-      font-family: var(--sans);
-      font-size: 0.82rem;
-      color: var(--down);
+      font-size: 0.875rem;
+      color: var(--faint);
       text-align: center;
-      padding: 60px 0;
+      padding: 48px 0;
     }
+    .briefing-error { color: var(--red); }
 
-    /* Rendered markdown */
     .briefing-body {
       columns: 2;
-      column-gap: 40px;
-      column-rule: 1px solid var(--rule);
+      column-gap: 36px;
+      column-rule: 1px solid var(--border);
     }
 
+    @media (max-width: 640px) {
+      .briefing-body { columns: 1; column-rule: none; }
+      .briefing-body h2 { column-span: unset; }
+      .briefing-body hr  { column-span: unset; }
+    }
+
+    /* Section headings span both columns */
     .briefing-body h2 {
       column-span: all;
-      font-family: var(--serif);
-      font-size: 1.35rem;
-      font-weight: 700;
-      line-height: 1.2;
-      color: var(--ink);
-      border-top: 3px solid var(--ink);
-      padding-top: 13px;
-      margin-top: 36px;
-      margin-bottom: 16px;
+      font-family: var(--sans);
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      border-top: 1px solid var(--border);
+      padding-top: 20px;
+      margin-top: 24px;
+      margin-bottom: 14px;
     }
 
     .briefing-body h2:first-child {
       margin-top: 0;
-      border-top-width: 1px;
-      border-top-color: var(--rule);
+      padding-top: 0;
+      border-top: none;
     }
 
+    /* The section label text */
     .briefing-section-label {
       display: block;
-      font-family: var(--sans);
-      font-size: 0.58rem;
-      font-weight: 700;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: var(--ink-mid);
-      margin-bottom: 5px;
     }
 
+    /* Sub-headings — serif, editorial */
     .briefing-body h3 {
       font-family: var(--serif);
-      font-size: 1rem;
+      font-size: 1.05rem;
       font-weight: 700;
       line-height: 1.3;
       color: var(--ink);
-      margin-top: 18px;
-      margin-bottom: 6px;
+      margin-top: 16px;
+      margin-bottom: 8px;
       break-inside: avoid;
     }
 
+    /* Body paragraphs — serif for editorial feel */
     .briefing-body p {
       font-family: var(--serif);
-      font-size: 0.94rem;
-      line-height: 1.78;
-      color: var(--ink);
+      font-size: 0.93rem;
+      line-height: 1.8;
+      color: #374151;
       margin-bottom: 12px;
-      text-align: justify;
       hyphens: auto;
       break-inside: avoid;
     }
@@ -320,441 +273,295 @@
       break-inside: avoid;
     }
     .briefing-body ul li {
+      font-family: var(--serif);
       font-size: 0.9rem;
-      line-height: 1.6;
-      margin-bottom: 3px;
+      line-height: 1.65;
+      color: #374151;
+      margin-bottom: 4px;
       list-style: disc;
     }
 
     .briefing-body hr {
       column-span: all;
       border: none;
-      border-top: 1px solid var(--rule);
-      margin: 24px 0;
+      border-top: 1px solid var(--border);
+      margin: 20px 0;
     }
 
-    @media (max-width: 640px) {
-      .briefing-body { columns: 1; column-rule: none; }
-      .briefing-body h2 { column-span: unset; }
-      .briefing-body hr  { column-span: unset; }
-    }
-
-    /* ═══════════════════════════════════════════
-       SIDEBAR  — right column
-    ═══════════════════════════════════════════ */
+    /* ═══════════════════════════════════════
+       SIDEBAR STACK
+    ═══════════════════════════════════════ */
     .sidebar {
       display: flex;
       flex-direction: column;
-      gap: 28px;
+      gap: 20px;
       position: sticky;
-      top: 80px;   /* below ticker + nav */
+      top: 72px;   /* clear the sticky nav */
     }
 
-    /* ── Widget shell ── */
-    .widget {
-      background: var(--bg-widget);
-      border: 1px solid var(--rule);
-      border-radius: 3px;
-      overflow: hidden;
-    }
-
-    .widget-header {
-      background: var(--ink);
-      padding: 8px 14px;
-    }
-
-    .widget-title {
-      font-family: var(--sans);
-      font-size: 0.58rem;
-      font-weight: 700;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.8);
-    }
-
-    .widget-body { padding: 0; }
-
-    /* ── Market Snapshot rows ── */
+    /* ── Market snapshot rows ── */
     .mkt-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 14px;
-      border-bottom: 1px solid #f0ede8;
-      font-family: var(--sans);
-      font-size: 0.78rem;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.82rem;
     }
     .mkt-row:last-child { border-bottom: none; }
 
     .mkt-name  { font-weight: 600; color: var(--ink); }
     .mkt-right { text-align: right; }
-    .mkt-price { font-weight: 700; font-size: 0.82rem; color: var(--ink); }
-    .mkt-chg   { font-size: 0.7rem; font-weight: 600; margin-top: 1px; }
-    .mkt-chg.up   { color: var(--up);   }
-    .mkt-chg.down { color: var(--down); }
-    .mkt-chg.flat { color: var(--ink-low); }
+    .mkt-price { font-weight: 700; font-size: 0.85rem; color: var(--ink); }
+    .mkt-sub   { font-size: 0.68rem; color: var(--faint); margin-top: 1px; }
+    .mkt-up    { color: var(--green); }
+    .mkt-down  { color: var(--red);   }
 
     .mkt-loading {
-      padding: 16px 14px;
-      font-family: var(--sans);
-      font-size: 0.72rem;
-      color: var(--ink-low);
+      font-size: 0.8rem;
+      color: var(--faint);
       text-align: center;
+      padding: 16px 0;
     }
 
     /* ── Portfolio rows ── */
     .port-row {
-      display: grid;
-      grid-template-columns: 1fr auto;
-      gap: 4px 12px;
-      padding: 10px 14px;
-      border-bottom: 1px solid #f0ede8;
+      display: flex;
+      justify-content: space-between;
       align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.82rem;
     }
     .port-row:last-child { border-bottom: none; }
 
-    .port-ticker {
-      font-family: var(--sans);
-      font-weight: 700;
-      font-size: 0.8rem;
-      color: var(--ink);
-    }
-    .port-name {
-      font-family: var(--sans);
-      font-size: 0.65rem;
-      color: var(--ink-low);
-      grid-column: 1;
-    }
-    .port-right {
-      text-align: right;
-      grid-row: span 2;
-    }
-    .port-price {
-      font-family: var(--sans);
-      font-weight: 700;
-      font-size: 0.8rem;
-      color: var(--ink);
-    }
-    .port-chg {
-      font-family: var(--sans);
-      font-size: 0.68rem;
-      font-weight: 600;
-      margin-top: 1px;
-    }
-    .port-chg.up   { color: var(--up);   }
-    .port-chg.down { color: var(--down); }
+    .port-left  { }
+    .port-ticker { font-weight: 700; color: var(--ink); font-size: 0.85rem; }
+    .port-name   { font-size: 0.68rem; color: var(--faint); margin-top: 1px; }
+    .port-right  { text-align: right; }
+    .port-price  { font-weight: 700; font-size: 0.85rem; color: var(--ink); }
+    .port-value  { font-size: 0.68rem; color: var(--faint); margin-top: 1px; }
 
-    .widget-footer {
-      padding: 8px 14px;
-      border-top: 1px solid #f0ede8;
-      font-family: var(--sans);
-      font-size: 0.62rem;
-      color: var(--ink-low);
+    .widget-footer-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-    }
-    .widget-footer a {
-      color: var(--ink-mid);
-      text-decoration: none;
-      font-weight: 600;
-    }
-    .widget-footer a:hover { text-decoration: underline; }
-
-    /* ═══════════════════════════════════════════
-       TOOLS STRIP  — below grid
-    ═══════════════════════════════════════════ */
-    .tools-strip {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 0 24px 64px;
-    }
-
-    .tools-strip-inner {
-      border-top: 2px solid var(--ink);
-      border-bottom: 1px solid var(--rule);
-      padding: 18px 0;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 14px;
-    }
-
-    .tools-strip-copy strong {
-      font-family: var(--sans);
-      font-weight: 700;
-      font-size: 0.82rem;
-      color: var(--ink);
-      display: block;
-      margin-bottom: 2px;
-    }
-    .tools-strip-copy p {
-      font-family: var(--sans);
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
       font-size: 0.75rem;
-      color: var(--ink-mid);
     }
 
-    .tools-strip-btn {
-      font-family: var(--sans);
-      font-size: 0.7rem;
-      font-weight: 700;
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-      color: var(--ink);
+    .widget-footer-row span { color: var(--muted); font-weight: 600; }
+
+    .widget-footer-row a {
+      color: var(--accent);
       text-decoration: none;
-      border: 1.5px solid var(--ink);
-      padding: 8px 16px;
-      border-radius: 2px;
-      white-space: nowrap;
-      transition: background 0.15s, color 0.15s;
+      font-weight: 600;
+      font-size: 0.75rem;
     }
-    .tools-strip-btn:hover { background: var(--ink); color: var(--paper); }
+    .widget-footer-row a:hover { text-decoration: underline; }
 
-    /* ═══════════════════════════════════════════
-       FOOTER
-    ═══════════════════════════════════════════ */
-    footer {
-      border-top: 1px solid var(--rule);
-      padding: 18px 24px;
-      text-align: center;
-      font-family: var(--sans);
-      font-size: 0.6rem;
-      letter-spacing: 0.06em;
-      color: var(--ink-low);
-      text-transform: uppercase;
+    /* ── Date in card header ── */
+    #mastheadDate {
+      font-size: 0.72rem;
+      color: var(--faint);
+      font-weight: 400;
+    }
+
+    @media (max-width: 560px) {
+      .nav-brand { display: none; }
     }
   </style>
 </head>
 <body>
 
-<!-- ══════════════════════════════════════════════
-     LIVE TICKER BAR
-═══════════════════════════════════════════════ -->
-<div class="ticker-wrap">
-  <div class="ticker-track" id="tickerTrack">
-    <!-- Populated by JS; duplicated for seamless loop -->
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════
-     SITE NAV
-═══════════════════════════════════════════════ -->
-<nav class="site-nav">
-  <a class="site-nav-brand" href="index.html">Market Tools</a>
+<!-- ═══════════════════════════════════
+     NAV
+════════════════════════════════════ -->
+<nav>
+  <a class="nav-brand" href="index.html">Market Tools</a>
   <a class="nav-link active" href="index.html">Home</a>
   <a class="nav-link" href="dashboard.html">Dashboard</a>
-  <div class="site-nav-right" id="todayDate"></div>
+
+  <!-- Live ticker embedded in nav right side -->
+  <div class="nav-ticker" id="navTicker">
+    <!-- Populated by JS after market data loads -->
+  </div>
 </nav>
 
-<!-- ══════════════════════════════════════════════
-     MASTHEAD
-═══════════════════════════════════════════════ -->
-<div class="masthead">
-  <hr class="masthead-top-rule" />
-  <hr class="masthead-top-rule-2" />
-  <h1 class="masthead-title">Daily Global Economic Briefing</h1>
-  <p class="masthead-subtitle">Markets &middot; Commodities &middot; Geopolitics &middot; Analysis</p>
-  <hr class="masthead-divider" />
-  <div class="masthead-meta">
-    <span id="mastheadDate">—</span>
-    <span style="font-style:italic;">Independent Market Intelligence</span>
-    <span style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
-      <button id="generateBtn" onclick="generateBriefing()" title="Generate today's briefing">↻ Generate</button>
-      <span id="generateStatus"></span>
-    </span>
+<!-- ═══════════════════════════════════
+     PAGE
+════════════════════════════════════ -->
+<div class="page">
+
+  <!-- Page header -->
+  <div class="page-header">
+    <h1>Daily Global Economic Briefing</h1>
+    <p id="todayDate">Markets · Commodities · Geopolitics · Analysis</p>
+  </div>
+
+  <!-- Two-column dashboard grid -->
+  <div class="dashboard-grid">
+
+    <!-- ── Main: Daily Briefing card ── -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-label">Today's Briefing</div>
+          <div id="mastheadDate" style="font-size:0.72rem; color:var(--faint); margin-top:2px;"></div>
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px;">
+          <button id="generateBtn" onclick="generateBriefing()">↻ Generate</button>
+          <span id="generateStatus"></span>
+        </div>
+      </div>
+
+      <div id="briefingContent" class="briefing-loading">Loading today's briefing…</div>
+    </div>
+
+    <!-- ── Sidebar ── -->
+    <aside class="sidebar">
+
+      <!-- Market Snapshot -->
+      <div class="card">
+        <div class="card-header" style="margin-bottom:12px;">
+          <div class="card-label">Market Snapshot</div>
+        </div>
+        <div id="marketSnapshot">
+          <div class="mkt-loading">Fetching prices…</div>
+        </div>
+      </div>
+
+      <!-- My Portfolio -->
+      <div class="card">
+        <div class="card-header" style="margin-bottom:12px;">
+          <div class="card-label">My Portfolio</div>
+        </div>
+        <div id="portfolioWidget">
+          <div class="mkt-loading">Fetching positions…</div>
+        </div>
+        <div class="widget-footer-row">
+          <span id="portfolioTotal">—</span>
+          <a href="dashboard.html">Full analysis →</a>
+        </div>
+      </div>
+
+    </aside>
   </div>
 </div>
-
-<!-- ══════════════════════════════════════════════
-     DASHBOARD GRID
-═══════════════════════════════════════════════ -->
-<div class="dashboard">
-
-  <!-- ── Left: Daily Briefing ── -->
-  <main class="briefing-col">
-    <div id="briefingContent" class="briefing-loading">Loading today's briefing…</div>
-  </main>
-
-  <!-- ── Right: Sidebar ── -->
-  <aside class="sidebar">
-
-    <!-- Market Snapshot -->
-    <div class="widget">
-      <div class="widget-header">
-        <div class="widget-title">Market Snapshot</div>
-      </div>
-      <div class="widget-body" id="marketSnapshot">
-        <div class="mkt-loading">Fetching prices…</div>
-      </div>
-    </div>
-
-    <!-- My Portfolio -->
-    <div class="widget">
-      <div class="widget-header">
-        <div class="widget-title">My Portfolio</div>
-      </div>
-      <div class="widget-body" id="portfolioWidget">
-        <div class="mkt-loading">Fetching positions…</div>
-      </div>
-      <div class="widget-footer">
-        <span id="portfolioTotal">—</span>
-        <a href="dashboard.html">Full analysis →</a>
-      </div>
-    </div>
-
-  </aside>
-</div>
-
-<!-- ══════════════════════════════════════════════
-     TOOLS STRIP
-═══════════════════════════════════════════════ -->
-<div class="tools-strip">
-  <div class="tools-strip-inner">
-    <div class="tools-strip-copy">
-      <strong>Market Dashboard</strong>
-      <p>Portfolio analyzer, hot stocks screener, and deep technical analysis on any ticker.</p>
-    </div>
-    <a class="tools-strip-btn" href="dashboard.html">Open Dashboard →</a>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════════
-     FOOTER
-═══════════════════════════════════════════════ -->
-<footer>
-  <p>Market Tools &nbsp;·&nbsp; Daily Global Economic Briefing &nbsp;·&nbsp; For informational purposes only. Not financial advice.</p>
-</footer>
 
 <script>
   const API_BASE = "https://market-tools.onrender.com";
 
   /* ── Date ── */
   const now = new Date();
-  const fmt = now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-  document.getElementById("mastheadDate").textContent = fmt;
-  document.getElementById("todayDate").textContent    = fmt;
+  const fmtLong  = now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+  const fmtShort = now.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+  document.getElementById("mastheadDate").textContent = fmtLong;
+  document.getElementById("todayDate").textContent    = fmtShort;
 
-  /* ══════════════════════════════════════════
+  /* ═══════════════════════════════════════
      MARKET DATA
-     Tickers: ^GSPC (S&P), ^IXIC (Nasdaq),
-              GC=F (Gold), BZ=F (Brent), EURUSD=X
-  ═════════════════════════════════════════= */
+  ══════════════════════════════════════ */
   const SNAPSHOT_TICKERS = [
-    { sym: "^GSPC",   label: "S&P 500"  },
-    { sym: "^IXIC",   label: "Nasdaq"   },
-    { sym: "GC=F",    label: "Gold"     },
-    { sym: "BZ=F",    label: "Brent"    },
-    { sym: "EURUSD=X",label: "EUR/USD"  },
+    { sym: "^GSPC",    label: "S&P 500"  },
+    { sym: "^IXIC",    label: "Nasdaq"   },
+    { sym: "GC=F",     label: "Gold"     },
+    { sym: "BZ=F",     label: "Brent"    },
+    { sym: "EURUSD=X", label: "EUR/USD"  },
   ];
 
-  // Portfolio positions — edit these to match your real holdings
+  // Edit these to match your actual holdings
   const MY_PORTFOLIO = [
-    { ticker: "AAPL",  name: "Apple Inc.",          shares: 10 },
-    { ticker: "MSFT",  name: "Microsoft Corp.",     shares: 5  },
-    { ticker: "NVDA",  name: "NVIDIA Corp.",        shares: 8  },
-    { ticker: "TSLA",  name: "Tesla Inc.",          shares: 4  },
-    { ticker: "AMZN",  name: "Amazon.com Inc.",     shares: 3  },
+    { ticker: "AAPL", name: "Apple",    shares: 10 },
+    { ticker: "MSFT", name: "Microsoft",shares: 5  },
+    { ticker: "NVDA", name: "NVIDIA",   shares: 8  },
+    { ticker: "TSLA", name: "Tesla",    shares: 4  },
+    { ticker: "AMZN", name: "Amazon",   shares: 3  },
   ];
 
   function fmtPrice(v) {
     if (v == null) return "—";
-    return v >= 100
-      ? v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-      : v.toFixed(4);
+    if (v < 10)    return v.toFixed(4);
+    return v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
 
-  function chgClass(v) { return v > 0 ? "up" : v < 0 ? "down" : "flat"; }
-  function chgSign(v)  { return v > 0 ? "+" : ""; }
-
-  /* ── Fetch snapshot + portfolio in one call ── */
   function loadMarketData() {
-    const allTickers = [
+    const all = [
       ...SNAPSHOT_TICKERS.map(t => t.sym),
       ...MY_PORTFOLIO.map(p => p.ticker),
     ];
 
-    fetch(`${API_BASE}/market/prices?tickers=${allTickers.join(",")}`)
+    fetch(`${API_BASE}/market/prices?tickers=${all.join(",")}`)
       .then(r => r.ok ? r.json() : Promise.reject(r.status))
       .then(data => {
         const prices = data.prices ?? {};
         renderSnapshot(prices);
         renderPortfolio(prices);
-        renderTicker(prices);
+        renderNavTicker(prices);
       })
       .catch(err => {
         console.error("Market data error:", err);
-        document.getElementById("marketSnapshot").innerHTML =
-          '<div class="mkt-loading">Data unavailable</div>';
-        document.getElementById("portfolioWidget").innerHTML =
-          '<div class="mkt-loading">Data unavailable</div>';
+        document.getElementById("marketSnapshot").innerHTML  = '<div class="mkt-loading">Unavailable</div>';
+        document.getElementById("portfolioWidget").innerHTML = '<div class="mkt-loading">Unavailable</div>';
       });
   }
 
-  /* ── Market Snapshot widget ── */
   function renderSnapshot(prices) {
-    const el = document.getElementById("marketSnapshot");
-    el.innerHTML = SNAPSHOT_TICKERS.map(({ sym, label }) => {
-      const price = prices[sym];
-      // Note: /market/prices doesn't return change % — we show price only
-      return `
-        <div class="mkt-row">
-          <span class="mkt-name">${label}</span>
-          <div class="mkt-right">
-            <div class="mkt-price">${fmtPrice(price)}</div>
-            <div class="mkt-chg flat">Live price</div>
-          </div>
-        </div>`;
-    }).join("");
+    document.getElementById("marketSnapshot").innerHTML =
+      SNAPSHOT_TICKERS.map(({ sym, label }) => {
+        const p = prices[sym];
+        return `
+          <div class="mkt-row">
+            <span class="mkt-name">${label}</span>
+            <div class="mkt-right">
+              <div class="mkt-price">${fmtPrice(p)}</div>
+              <div class="mkt-sub">Live</div>
+            </div>
+          </div>`;
+      }).join("");
   }
 
-  /* ── Portfolio widget ── */
   function renderPortfolio(prices) {
-    const el = document.getElementById("portfolioWidget");
-    let totalValue = 0;
-
-    el.innerHTML = MY_PORTFOLIO.map(({ ticker, name, shares }) => {
-      const price = prices[ticker];
-      const value = price != null ? price * shares : null;
-      if (value != null) totalValue += value;
-      return `
-        <div class="port-row">
-          <span class="port-ticker">${ticker}</span>
-          <div class="port-right">
-            <div class="port-price">${fmtPrice(price)}</div>
-            <div class="port-chg flat">${shares} sh · ${value != null ? "$" + value.toLocaleString("en-US",{maximumFractionDigits:0}) : "—"}</div>
-          </div>
-          <span class="port-name">${name}</span>
-        </div>`;
-    }).join("");
+    let total = 0;
+    document.getElementById("portfolioWidget").innerHTML =
+      MY_PORTFOLIO.map(({ ticker, name, shares }) => {
+        const p = prices[ticker];
+        const v = p != null ? p * shares : null;
+        if (v != null) total += v;
+        return `
+          <div class="port-row">
+            <div class="port-left">
+              <div class="port-ticker">${ticker}</div>
+              <div class="port-name">${name} · ${shares} sh</div>
+            </div>
+            <div class="port-right">
+              <div class="port-price">${fmtPrice(p)}</div>
+              <div class="port-value">${v != null ? "$" + v.toLocaleString("en-US", {maximumFractionDigits:0}) : "—"}</div>
+            </div>
+          </div>`;
+      }).join("");
 
     document.getElementById("portfolioTotal").textContent =
-      totalValue > 0
-        ? `Total · $${totalValue.toLocaleString("en-US", { maximumFractionDigits: 0 })}`
-        : "Live prices";
+      total > 0 ? `$${total.toLocaleString("en-US", {maximumFractionDigits:0})}` : "Live prices";
   }
 
-  /* ── Ticker bar ── */
-  function renderTicker(prices) {
-    const items = [
-      ...SNAPSHOT_TICKERS.map(({ sym, label }) => ({ sym, label, price: prices[sym] })),
-      ...MY_PORTFOLIO.map(({ ticker }) => ({ sym: ticker, label: ticker, price: prices[ticker] })),
-    ];
-
-    const html = items.map(({ label, price }) => `
-      <div class="ticker-item">
-        <span class="t-sym">${label}</span>
-        <span class="t-val">${fmtPrice(price)}</span>
-      </div>`).join("");
-
-    // Duplicate for seamless loop
-    const track = document.getElementById("tickerTrack");
-    track.innerHTML = html + html;
+  function renderNavTicker(prices) {
+    document.getElementById("navTicker").innerHTML =
+      SNAPSHOT_TICKERS.map(({ sym, label }) => {
+        const p = prices[sym];
+        return `
+          <div class="nav-ticker-item">
+            <span class="t-sym">${label}</span>
+            <span class="t-val">${fmtPrice(p)}</span>
+          </div>`;
+      }).join("");
   }
 
-  /* ══════════════════════════════════════════
-     MARKDOWN → HTML RENDERER
-  ═════════════════════════════════════════= */
+  /* ═══════════════════════════════════════
+     MARKDOWN → HTML
+  ══════════════════════════════════════ */
   function mdToHtml(md) {
     const esc = s => s
       .replace(/&/g, "&amp;")
@@ -766,10 +573,10 @@
       .replace(/\*(.+?)\*/g,     "<em>$1</em>")
       .replace(/`(.+?)`/g,       "<code>$1</code>");
 
-    const lines  = md.split("\n");
-    const blocks = [];
-    let paraLines = [];
-    let inList    = false;
+    const lines     = md.split("\n");
+    const blocks    = [];
+    let paraLines   = [];
+    let inList      = false;
 
     const flushPara = () => {
       if (!paraLines.length) return;
@@ -819,9 +626,9 @@
     return blocks.join("\n");
   }
 
-  /* ══════════════════════════════════════════
-     BRIEFING  — fetch + render
-  ═════════════════════════════════════════= */
+  /* ═══════════════════════════════════════
+     BRIEFING — fetch + render
+  ══════════════════════════════════════ */
   function loadBriefing() {
     const el = document.getElementById("briefingContent");
     el.className   = "briefing-loading";
@@ -844,9 +651,9 @@
       });
   }
 
-  /* ══════════════════════════════════════════
-     GENERATE BRIEFING
-  ═════════════════════════════════════════= */
+  /* ═══════════════════════════════════════
+     GENERATE
+  ══════════════════════════════════════ */
   function generateBriefing() {
     const btn    = document.getElementById("generateBtn");
     const status = document.getElementById("generateStatus");
@@ -854,7 +661,7 @@
     btn.disabled       = true;
     btn.textContent    = "↻ Updating…";
     status.className   = "";
-    status.textContent = "Updating briefing…";
+    status.textContent = "Updating…";
 
     fetch(`${API_BASE}/generate-briefing`, { method: "POST" })
       .then(res => {
@@ -863,13 +670,13 @@
       })
       .then(data => {
         status.className   = "ok";
-        status.textContent = `Updated · ${data.words ?? "—"} words`;
+        status.textContent = `Done · ${data.words ?? "—"} words`;
         loadBriefing();
       })
       .catch(err => {
         console.error("Generate error:", err);
         status.className   = "error";
-        status.textContent = "Update failed — " + err.message;
+        status.textContent = "Failed — " + err.message;
       })
       .finally(() => {
         btn.disabled    = false;
