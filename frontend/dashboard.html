@@ -1,0 +1,1514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dashboard — Market Tools</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#4f46e5" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Market Tools" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f4f6f9;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    /* ── Nav ── */
+    nav {
+      background: #fff;
+      border-bottom: 1px solid #e5e7eb;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .nav-brand {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      padding: 18px 24px 18px 0;
+      margin-right: 8px;
+      border-right: 1px solid #e5e7eb;
+      white-space: nowrap;
+    }
+
+    .tab-btn {
+      padding: 18px 20px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #6b7280;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      margin-top: 0;
+      width: auto;
+      border-radius: 0;
+    }
+
+    .tab-btn:hover { color: #1a1a2e; }
+    .tab-btn:disabled { background: none; color: #6b7280; cursor: pointer; }
+
+    .tab-btn.active {
+      color: #4f46e5;
+      border-bottom-color: #4f46e5;
+      font-weight: 600;
+    }
+
+    .nav-page-link {
+      padding: 18px 16px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      color: #6b7280;
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s;
+    }
+    .nav-page-link:hover { color: #1a1a2e; }
+    .nav-page-link.active { color: #4f46e5; border-bottom-color: #4f46e5; font-weight: 600; }
+
+    .nav-divider {
+      width: 1px;
+      height: 20px;
+      background: #e5e7eb;
+      margin: 0 8px;
+    }
+
+    /* ── Page body ── */
+    .page {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 40px 20px;
+    }
+
+    /* ── Tab panels ── */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; }
+
+    /* ── Shared components ── */
+    .panel-header { margin-bottom: 32px; }
+    .panel-header h1 { font-size: 1.6rem; font-weight: 700; }
+    .panel-header p  { margin-top: 6px; color: #6b7280; font-size: 0.95rem; }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: 24px;
+    }
+
+    .card h2 {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #6b7280;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    textarea, input[type="text"] {
+      width: 100%;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.875rem;
+      color: #1a1a2e;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 12px;
+      line-height: 1.6;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    textarea { resize: vertical; }
+    textarea:focus, input[type="text"]:focus { border-color: #4f46e5; }
+
+    button.primary {
+      margin-top: 16px;
+      width: 100%;
+      padding: 13px;
+      background: #4f46e5;
+      color: #fff;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    button.primary:hover    { background: #4338ca; }
+    button.primary:disabled { background: #a5b4fc; cursor: not-allowed; }
+
+    .error-banner {
+      background: #fef2f2;
+      border: 1px solid #fca5a5;
+      color: #b91c1c;
+      border-radius: 8px;
+      padding: 12px 16px;
+      font-size: 0.9rem;
+      margin-bottom: 24px;
+      display: none;
+    }
+
+    /* ── Metrics ── */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .metrics-wide {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 560px) {
+      .metrics, .metrics-wide { grid-template-columns: 1fr; }
+      .tab-btn { padding: 18px 12px; font-size: 0.82rem; }
+      .nav-brand { display: none; }
+    }
+
+    .metric {
+      background: #fff;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      text-align: center;
+    }
+
+    .metric .label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #6b7280;
+      margin-bottom: 8px;
+    }
+
+    .metric .value { font-size: 2rem; font-weight: 700; line-height: 1; }
+    .metric .sub   { font-size: 0.78rem; color: #9ca3af; margin-top: 6px; }
+
+    /* Color tokens */
+    .green   { color: #16a34a; }
+    .yellow  { color: #d97706; }
+    .red     { color: #dc2626; }
+    .neutral { color: #4f46e5; }
+
+    /* Risk badge */
+    .risk-badge {
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      margin-top: 8px;
+    }
+
+    .badge-green  { background: #dcfce7; color: #15803d; }
+    .badge-yellow { background: #fef9c3; color: #92400e; }
+    .badge-red    { background: #fee2e2; color: #b91c1c; }
+
+    /* Insight */
+    .insight {
+      background: #eef2ff;
+      border-left: 4px solid #4f46e5;
+      border-radius: 0 8px 8px 0;
+      padding: 16px 20px;
+      font-size: 0.95rem;
+      line-height: 1.7;
+      color: #374151;
+    }
+
+    /* Placeholder panel */
+    .placeholder {
+      text-align: center;
+      padding: 64px 24px;
+      color: #9ca3af;
+    }
+
+    .placeholder .icon {
+      font-size: 2.5rem;
+      margin-bottom: 16px;
+    }
+
+    .placeholder h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #6b7280;
+      margin-bottom: 8px;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .placeholder p { font-size: 0.9rem; }
+
+    /* ── Info icon ── */
+    .info-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #e0e7ff;
+      color: #4f46e5;
+      font-size: 0.65rem;
+      font-weight: 700;
+      font-style: normal;
+      cursor: pointer;
+      margin-left: 5px;
+      vertical-align: middle;
+      line-height: 1;
+      border: none;
+      transition: background 0.15s;
+      flex-shrink: 0;
+    }
+    .info-icon:hover { background: #c7d2fe; }
+
+    .metric .label { display: flex; align-items: center; justify-content: center; gap: 4px; }
+
+    /* ── Modal ── */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 15, 30, 0.45);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-backdrop.open {
+      display: flex;
+      animation: fadeIn 0.15s ease;
+    }
+
+    @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+
+    .modal {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+      width: 100%;
+      max-width: 520px;
+      max-height: 90vh;
+      overflow-y: auto;
+      animation: slideUp 0.18s ease;
+    }
+
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px 0;
+    }
+
+    .modal-header h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #1a1a2e;
+    }
+
+    .modal-close {
+      background: #f3f4f6;
+      border: none;
+      border-radius: 50%;
+      width: 30px;
+      height: 30px;
+      font-size: 1rem;
+      cursor: pointer;
+      color: #6b7280;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 0;
+      width: 30px;
+      padding: 0;
+      transition: background 0.15s;
+    }
+    .modal-close:hover { background: #e5e7eb; }
+
+    .modal-body { padding: 16px 24px 24px; }
+
+    .modal-formula {
+      background: #f3f4ff;
+      border: 1px solid #c7d2fe;
+      border-radius: 10px;
+      padding: 18px 24px;
+      font-family: "Georgia", "Times New Roman", serif;
+      font-size: 1.25rem;
+      font-style: italic;
+      color: #312e81;
+      margin: 16px 0;
+      text-align: center;
+      letter-spacing: 0.03em;
+    }
+
+    .modal-section-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #9ca3af;
+      margin: 20px 0 10px;
+    }
+
+    .modal-explanation {
+      font-size: 0.9rem;
+      color: #374151;
+      line-height: 1.75;
+      margin-bottom: 4px;
+    }
+
+    /* Asset breakdown table */
+    .breakdown-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.875rem;
+      margin-top: 4px;
+    }
+
+    .breakdown-table th {
+      padding: 8px 12px;
+      text-align: right;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #9ca3af;
+      border-bottom: 1px solid #f3f4f6;
+    }
+
+    .breakdown-table th:first-child { text-align: left; }
+
+    .breakdown-table td {
+      padding: 10px 12px;
+      text-align: right;
+      border-bottom: 1px solid #f9fafb;
+      color: #374151;
+    }
+
+    .breakdown-table td:first-child {
+      text-align: left;
+      font-weight: 700;
+      color: #1a1a2e;
+    }
+
+    .breakdown-table tr:last-child td { border-bottom: none; }
+
+    /* ── Holdings form ── */
+    .holding-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+
+    .ticker-wrap {
+      position: relative;
+    }
+
+    .ticker-wrap input,
+    .holding-row input[type="number"] {
+      font-family: inherit;
+      font-size: 0.9rem;
+      color: #1a1a2e;
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 10px 12px;
+      width: 100%;
+      outline: none;
+      box-sizing: border-box;
+      transition: border-color 0.2s;
+    }
+
+    .ticker-wrap input:focus,
+    .holding-row input[type="number"]:focus { border-color: #4f46e5; background: #fff; }
+
+    .holding-row input[type="number"]::-webkit-inner-spin-button { opacity: 0.4; }
+
+    .ticker-suggestions {
+      display: none;
+      position: absolute;
+      top: calc(100% + 4px);
+      left: 0;
+      right: 0;
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.10);
+      z-index: 100;
+      overflow: hidden;
+    }
+
+    .ticker-suggestions li {
+      list-style: none;
+      padding: 9px 14px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: #1a1a2e;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .ticker-suggestions li:hover,
+    .ticker-suggestions li.active {
+      background: #f0f0ff;
+      color: #4f46e5;
+    }
+
+    .remove-btn {
+      background: #fee2e2;
+      color: #dc2626;
+      border: none;
+      border-radius: 8px;
+      width: 36px;
+      height: 36px;
+      font-size: 1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      margin-top: 0;
+      padding: 0;
+      transition: background 0.15s;
+    }
+    .remove-btn:hover { background: #fecaca; }
+
+    .add-holding-btn {
+      margin-top: 4px;
+      width: 100%;
+      padding: 9px;
+      background: #f0f0ff;
+      color: #4f46e5;
+      font-size: 0.875rem;
+      font-weight: 600;
+      border: 1.5px dashed #c7d2fe;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+      margin-bottom: 12px;
+    }
+    .add-holding-btn:hover { background: #e0e7ff; border-color: #a5b4fc; }
+
+    /* ── Pagination ── */
+    .page-nav-btn {
+      padding: 6px 14px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      background: #fff;
+      color: #4f46e5;
+      border: 1px solid #e5e7eb;
+      border-radius: 7px;
+      cursor: pointer;
+      margin-top: 0;
+      width: auto;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .page-nav-btn:hover:not(:disabled) { background: #eef2ff; border-color: #c7d2fe; }
+    .page-nav-btn:disabled { color: #d1d5db; cursor: not-allowed; }
+
+    .page-num-btn {
+      width: 32px;
+      height: 32px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      background: #fff;
+      color: #374151;
+      border: 1px solid #e5e7eb;
+      border-radius: 7px;
+      cursor: pointer;
+      margin-top: 0;
+      padding: 0;
+      transition: background 0.15s;
+    }
+    .page-num-btn:hover  { background: #f3f4f6; }
+    .page-num-btn.active { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+
+    .form-col-labels {
+      display: grid;
+      grid-template-columns: 1fr 1fr auto;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+    .form-col-labels span {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #9ca3af;
+      padding-left: 2px;
+    }
+
+    /* ── Backend status pill ── */
+    #backendStatus {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #9ca3af;
+      white-space: nowrap;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: #f3f4f6;
+      border: 1px solid #e5e7eb;
+      transition: color 0.3s, background 0.3s, border-color 0.3s;
+    }
+    #backendStatus.connected  { color: #16a34a; background: #f0fdf4; border-color: #bbf7d0; }
+    #backendStatus.error      { color: #dc2626; background: #fef2f2; border-color: #fecaca; }
+    #statusDot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+    }
+
+    /* ── Spinner ── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      display: inline-block;
+      width: 14px; height: 14px;
+      border: 2px solid #e5e7eb;
+      border-top-color: #4f46e5;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Navigation ── -->
+<nav>
+  <a class="nav-brand" href="index.html" style="text-decoration:none; color:inherit;">Market Tools</a>
+  <a class="nav-page-link" href="index.html">Home</a>
+  <a class="nav-page-link active" href="dashboard.html">Dashboard</a>
+  <div class="nav-divider"></div>
+  <button class="tab-btn active" onclick="switchTab('portfolio', this)">Portfolio</button>
+  <button class="tab-btn"        onclick="switchTab('hotstocks', this)">Hot Stocks</button>
+  <button class="tab-btn"        onclick="switchTab('stockanalyzer', this)">Stock Analyzer</button>
+  <div id="backendStatus" title="Backend connectivity">
+    <span id="statusDot"></span>
+    <span id="statusText">Checking…</span>
+  </div>
+</nav>
+
+<div class="page">
+
+  <!-- ── Tab: Portfolio ── -->
+  <div id="tab-portfolio" class="tab-panel active">
+
+    <div class="panel-header">
+      <h1>Portfolio Analyzer</h1>
+      <p>Build your portfolio, enter invested amounts, and get an instant risk and return assessment.</p>
+    </div>
+
+    <div class="card">
+      <h2>Holdings</h2>
+      <div class="form-col-labels">
+        <span>Ticker</span>
+        <span>Investment (USD)</span>
+        <span style="visibility:hidden;">✕</span>
+      </div>
+      <div id="holdingsForm"></div>
+      <button class="add-holding-btn" onclick="addHoldingRow()">+ Add Holding</button>
+      <button class="primary" id="analyzeBtn" onclick="analyze()">Analyze Portfolio</button>
+    </div>
+
+    <div class="error-banner" id="errorBanner"></div>
+
+    <div id="results" style="display:none;">
+      <div class="metrics-wide">
+        <div class="metric">
+          <div class="label">Total Portfolio Value</div>
+          <div class="value neutral" id="metricTotalValue">—</div>
+          <div class="sub">Sum of invested capital (USD)</div>
+        </div>
+        <div class="metric">
+          <div class="label">Largest Position</div>
+          <div class="value" id="metricLargestUSD">—</div>
+          <div class="sub">Biggest single holding (USD)</div>
+        </div>
+      </div>
+
+      <div class="metrics">
+        <div class="metric">
+          <div class="label">Annual Return <button class="info-icon" onclick="openModal('return')" title="How is this calculated?">i</button></div>
+          <div class="value" id="metricReturn">—</div>
+          <div class="sub">Expected yearly return</div>
+        </div>
+        <div class="metric">
+          <div class="label">Volatility <button class="info-icon" onclick="openModal('volatility')" title="How is this calculated?">i</button></div>
+          <div class="value" id="metricVolatility">—</div>
+          <div class="sub">Annualised std. deviation</div>
+        </div>
+        <div class="metric">
+          <div class="label">Diversification <button class="info-icon" onclick="openModal('diversification')" title="How is this calculated?">i</button></div>
+          <div class="value neutral" id="metricDiversification">—</div>
+          <div class="sub">Score 0 (concentrated) → 1</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:24px;">
+        <h2>Risk Assessment</h2>
+        <div id="riskLabel" style="font-size:1.1rem; font-weight:600; margin-bottom:8px;"></div>
+        <span class="risk-badge" id="riskBadge"></span>
+      </div>
+
+      <div class="card">
+        <h2>Key Insights</h2>
+        <div class="insight" id="insightText"></div>
+      </div>
+    </div>
+
+  </div><!-- /tab-portfolio -->
+
+  <!-- ── Tab: Hot Stocks ── -->
+  <div id="tab-hotstocks" class="tab-panel">
+
+    <div class="panel-header">
+      <h1>Hot Stocks Watcher</h1>
+      <p>Top momentum picks from the last 5 trading days — scored by return and volume.</p>
+    </div>
+
+    <div class="card">
+      <h2>Universe: ~100 large-cap stocks across Technology, Finance, Healthcare, Energy, and more</h2>
+      <button class="primary" id="hotBtn" onclick="loadHotStocks()">Find Hot Stocks</button>
+    </div>
+
+    <div class="error-banner" id="hotError"></div>
+
+    <div id="hotResults" style="display:none;">
+      <div class="card" style="padding:0; overflow:hidden;">
+        <table style="width:100%; border-collapse:collapse;">
+          <thead>
+            <tr style="background:#f9fafb; border-bottom:1px solid #e5e7eb;">
+              <th style="padding:12px 20px; text-align:left;  font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em;">Rank</th>
+              <th style="padding:12px 20px; text-align:left;  font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em;">Ticker</th>
+              <th style="padding:12px 20px; text-align:right; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em;">5d Return</th>
+              <th style="padding:12px 20px; text-align:right; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em;">Avg Volume</th>
+              <th style="padding:12px 20px; text-align:right; font-size:0.75rem; font-weight:600; color:#6b7280; text-transform:uppercase; letter-spacing:0.05em;">Score</th>
+            </tr>
+          </thead>
+          <tbody id="hotBody"></tbody>
+        </table>
+      </div>
+
+      <!-- Pagination bar -->
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-top:14px; flex-wrap:wrap; gap:10px;">
+        <span id="hotRangeLabel" style="font-size:0.82rem; color:#6b7280;"></span>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <button class="page-nav-btn" id="hotPrev" onclick="hotChangePage(hotPage - 1)">← Prev</button>
+          <div id="hotPageNumbers" style="display:flex; gap:4px;"></div>
+          <button class="page-nav-btn" id="hotNext" onclick="hotChangePage(hotPage + 1)">Next →</button>
+        </div>
+      </div>
+
+      <p style="margin-top:10px; font-size:0.75rem; color:#9ca3af;">
+        Score = return × 0.7 + normalised volume × 0.3 · Last 5 trading days
+      </p>
+    </div>
+
+  </div><!-- /tab-hotstocks -->
+
+  <!-- ── Tab: Stock Analyzer ── -->
+  <div id="tab-stockanalyzer" class="tab-panel">
+
+    <div class="panel-header">
+      <h1>Stock Analyzer</h1>
+      <p>Technicals, moving averages, momentum, and news sentiment — last 6 months.</p>
+    </div>
+
+    <div class="card">
+      <h2>Ticker</h2>
+      <input type="text" id="stockInput" placeholder="e.g. AAPL" onkeydown="if(event.key==='Enter') analyzeStock()" />
+      <button class="primary" id="stockBtn" onclick="analyzeStock()">Analyze Stock</button>
+    </div>
+
+    <div class="error-banner" id="stockError"></div>
+
+    <div id="stockResults" style="display:none;">
+
+      <!-- Summary -->
+      <div class="insight" id="stockSummary" style="margin-bottom:24px;"></div>
+
+      <!-- Price Overview -->
+      <div class="card" style="padding:16px 20px 16px; margin-bottom:24px;">
+        <h2>Price Overview</h2>
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+          <span id="stockCurrentPrice" style="font-size:1.6rem; font-weight:700; color:#1a1a2e;"></span>
+          <a id="stockYahooLink" href="#" target="_blank" rel="noopener"
+             style="font-size:0.82rem; color:#4f46e5; font-weight:600; text-decoration:none;">
+            View on Yahoo Finance ↗
+          </a>
+        </div>
+        <!-- Chart -->
+        <canvas id="stockCanvas" style="width:100%; display:block; max-height:160px;"></canvas>
+        <div id="stockChartFallback" style="display:none; padding:12px 0 4px; border-top:1px solid #f3f4f6;">
+          <p style="margin:0 0 6px; color:#9ca3af; font-size:0.85rem;">Chart unavailable — insufficient data.</p>
+          <a id="stockFallbackLink" href="#" target="_blank" rel="noopener"
+             style="display:inline-block; font-size:0.82rem; font-weight:600; color:#4f46e5; text-decoration:none;">
+            View full chart on Yahoo Finance ↗
+          </a>
+        </div>
+        <div id="stockChartDates" style="display:none; justify-content:space-between; margin-top:4px;">
+          <span id="stockChartDateMin" style="font-size:0.72rem; color:#9ca3af;"></span>
+          <span id="stockChartDateMax" style="font-size:0.72rem; color:#9ca3af;"></span>
+        </div>
+      </div>
+
+      <!-- Trend Analysis -->
+      <div class="card" style="margin-bottom:24px;">
+        <h2>Trend Analysis</h2>
+        <div class="metrics" style="margin-bottom:0;">
+          <div class="metric" style="box-shadow:none; border:1px solid #f3f4f6; padding:16px;">
+            <div class="label">Trend</div>
+            <div class="value" id="stockTrend">—</div>
+            <div class="sub" id="stockTrendSub"></div>
+          </div>
+          <div class="metric" style="box-shadow:none; border:1px solid #f3f4f6; padding:16px;">
+            <div class="label">50d MA</div>
+            <div class="value neutral" id="stockMA50">—</div>
+            <div class="sub">Medium-term avg.</div>
+          </div>
+          <div class="metric" style="box-shadow:none; border:1px solid #f3f4f6; padding:16px;">
+            <div class="label">200d MA</div>
+            <div class="value neutral" id="stockMA200">—</div>
+            <div class="sub">Long-term avg.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Risk Metrics -->
+      <div class="card" style="margin-bottom:24px;">
+        <h2>Risk Metrics</h2>
+        <div class="metrics" style="margin-bottom:0;">
+          <div class="metric" style="box-shadow:none; border:1px solid #f3f4f6; padding:16px;">
+            <div class="label">30d Return</div>
+            <div class="value" id="stockReturn30">—</div>
+            <div class="sub">≈ last month</div>
+          </div>
+          <div class="metric" style="box-shadow:none; border:1px solid #f3f4f6; padding:16px;">
+            <div class="label">90d Return</div>
+            <div class="value" id="stockReturn90">—</div>
+            <div class="sub">≈ last quarter</div>
+          </div>
+          <div class="metric" style="box-shadow:none; border:1px solid #f3f4f6; padding:16px;">
+            <div class="label">Volatility</div>
+            <div class="value" id="stockVol">—</div>
+            <div class="sub" id="stockRiskLevel"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Sentiment -->
+      <div class="card">
+        <h2>Sentiment</h2>
+        <div class="metrics-wide" style="margin-bottom:0;">
+          <div class="metric" style="box-shadow:none; border:1px solid #f3f4f6; padding:16px;">
+            <div class="label">News Sentiment</div>
+            <div class="value" id="stockSentiment">—</div>
+            <div class="sub" id="stockSentimentConf"></div>
+          </div>
+          <div class="metric" style="box-shadow:none; border:1px solid #f3f4f6; padding:16px;">
+            <div class="label">Articles Analysed</div>
+            <div class="value neutral" id="stockArticleCount">—</div>
+            <div class="sub" id="stockSignalSplit"></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /stockResults -->
+
+  </div><!-- /tab-stockanalyzer -->
+
+</div><!-- /page -->
+
+<!-- ── Explainability Modal ── -->
+<div class="modal-backdrop" id="modalBackdrop" onclick="handleBackdropClick(event)">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-header">
+      <h3 id="modalTitle">—</h3>
+      <button class="modal-close" onclick="closeModal()" aria-label="Close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-section-title">Formula</div>
+      <div class="modal-formula" id="modalFormula"></div>
+
+      <div class="modal-section-title">Explanation</div>
+      <div class="modal-explanation" id="modalExplanation"></div>
+
+      <div id="modalBreakdownSection" style="display:none;">
+        <div class="modal-section-title">Asset Breakdown</div>
+        <table class="breakdown-table">
+          <thead>
+            <tr>
+              <th>Ticker</th>
+              <th>Return</th>
+              <th>Volatility</th>
+              <th>Weight</th>
+            </tr>
+          </thead>
+          <tbody id="breakdownBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  /* ── API base URL — swap for local dev if needed ── */
+  const API_BASE = "https://market-tools.onrender.com";
+
+  /* ── Backend status indicator ── */
+  function setStatus(state) {
+    // state: "checking" | "connected" | "error"
+    const pill = document.getElementById("backendStatus");
+    const text = document.getElementById("statusText");
+    pill.className = state === "connected" ? "connected" : state === "error" ? "error" : "";
+    text.textContent = state === "connected" ? "Connected" : state === "error" ? "Offline" : "Checking…";
+  }
+
+  function checkBackendStatus() {
+    setStatus("checking");
+    fetch(`${API_BASE}/`)
+      .then(r => { setStatus(r.ok ? "connected" : "error"); })
+      .catch(() => setStatus("error"));
+  }
+
+  // Check on load, then every 60 s
+  checkBackendStatus();
+  setInterval(checkBackendStatus, 60_000);
+
+  /* ── Tab switching ── */
+  function switchTab(name, btn) {
+    document.querySelectorAll(".tab-panel").forEach(p => p.classList.remove("active"));
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    document.getElementById("tab-" + name).classList.add("active");
+    btn.classList.add("active");
+  }
+
+  /* ── Formatters ── */
+  const pct   = v => (v * 100).toFixed(2) + "%";
+  const round2 = v => parseFloat(v).toFixed(2);
+  const usd   = v => "$" + parseFloat(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  /* ── Portfolio logic ── */
+  function riskProfile(volatility) {
+    if (volatility < 0.15) return { label: "Low Risk",      cls: "green",  badge: "badge-green"  };
+    if (volatility <= 0.25) return { label: "Moderate Risk", cls: "yellow", badge: "badge-yellow" };
+    return                         { label: "High Risk",     cls: "red",    badge: "badge-red"    };
+  }
+
+  function buildInsight(ret, vol, div) {
+    const risk    = riskProfile(vol);
+    const retDesc = ret >= 0.08 ? "strong positive" : ret >= 0 ? "modest positive" : "negative";
+    const divDesc = div >= 0.7  ? "well-diversified" : div >= 0.4 ? "moderately diversified" : "concentrated";
+
+    let insight = `Your portfolio has a <strong>${risk.label.toLowerCase()} profile</strong> with ` +
+      `<strong>${pct(vol)} annualised volatility</strong> and a ` +
+      `diversification score of <strong>${round2(div)}</strong> — ${divDesc}. ` +
+      `Expected annual return is <strong>${pct(ret)}</strong>, which is ${retDesc}.`;
+
+    if (ret < 0) {
+      insight += " Negative expected returns may indicate excessive exposure to high-volatility assets without sufficient compensation.";
+    } else if (vol > 0.25 && ret < 0.1) {
+      insight += " The risk-to-return ratio appears unfavourable — consider rebalancing toward lower-volatility assets.";
+    } else if (div < 0.4) {
+      insight += " The portfolio is highly concentrated; adding uncorrelated assets could improve the risk-adjusted return.";
+    } else if (ret >= 0.08 && vol < 0.15) {
+      insight += " This is an efficient allocation — solid returns with contained downside risk.";
+    }
+
+    return insight;
+  }
+
+  function showError(msg) {
+    const banner = document.getElementById("errorBanner");
+    banner.textContent = msg;
+    banner.style.display = "block";
+    document.getElementById("results").style.display = "none";
+  }
+
+  function clearError() {
+    document.getElementById("errorBanner").style.display = "none";
+  }
+
+  /* ── Holdings form ── */
+  const UNIVERSE = [
+    "AAPL","MSFT","NVDA","GOOG","META","AVGO","AMD","ORCL","CRM","ADBE",
+    "INTC","QCOM","TXN","IBM","NOW","SNOW","PLTR","MU","AMAT","LRCX",
+    "AMZN","TSLA","HD","MCD","NKE","SBUX","BKNG","LOW","TGT","ABNB",
+    "EBAY","GM","F","UBER","LYFT","NFLX","DIS","CMCSA","T","VZ",
+    "TMUS","SNAP","PINS","BRK-B","JPM","BAC","WFC","GS","MS","C",
+    "AXP","BLK","SCHW","V","MA","PYPL","COF","JNJ","LLY","UNH",
+    "PFE","ABBV","MRK","TMO","ABT","DHR","AMGN","GILD","ISRG","CVS",
+    "HUM","CAT","HON","GE","BA","LMT","RTX","DE","UPS","FDX",
+    "CSX","NSC","XOM","CVX","COP","SLB","EOG","PSX","MPC","PG",
+    "KO","PEP","COST","WMT","PM","MO","CL","LIN","APD","FCX",
+    "NEM","DOW","AMT","PLD","EQIX","SPG","NEE","DUK","SO","D",
+  ];
+
+  function addHoldingRow(ticker = "", investment = "") {
+    const form = document.getElementById("holdingsForm");
+    const row  = document.createElement("div");
+    row.className = "holding-row";
+    row.innerHTML = `
+      <div class="ticker-wrap">
+        <input type="text" class="ticker-input" placeholder="e.g. AAPL" autocomplete="off" spellcheck="false" />
+        <ul class="ticker-suggestions"></ul>
+      </div>
+      <input type="number" min="1" step="1" placeholder="e.g. 5000" value="${investment || ""}" />
+      <button class="remove-btn" onclick="removeRow(this)" title="Remove">✕</button>
+    `;
+    form.appendChild(row);
+
+    const input = row.querySelector(".ticker-input");
+    const list  = row.querySelector(".ticker-suggestions");
+    let activeIdx = -1;
+
+    if (ticker) input.value = ticker.toUpperCase();
+
+    function showSuggestions(q) {
+      const matches = q
+        ? UNIVERSE.filter(t => t.startsWith(q)).slice(0, 5)
+        : [];
+      if (!matches.length) { list.style.display = "none"; return; }
+      activeIdx = -1;
+      list.innerHTML = matches.map(t => `<li>${t}</li>`).join("");
+      list.style.display = "block";
+
+      list.querySelectorAll("li").forEach(li => {
+        li.addEventListener("mousedown", e => {
+          e.preventDefault(); // don't blur input before click fires
+          input.value = li.textContent;
+          list.style.display = "none";
+        });
+      });
+    }
+
+    input.addEventListener("input", () => {
+      input.value = input.value.toUpperCase().replace(/\s/g, "");
+      showSuggestions(input.value);
+    });
+
+    input.addEventListener("keydown", e => {
+      const items = list.querySelectorAll("li");
+      if (!items.length) return;
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        activeIdx = Math.min(activeIdx + 1, items.length - 1);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        activeIdx = Math.max(activeIdx - 1, -1);
+      } else if (e.key === "Enter" && activeIdx >= 0) {
+        e.preventDefault();
+        input.value = items[activeIdx].textContent;
+        list.style.display = "none";
+        return;
+      } else if (e.key === "Escape") {
+        list.style.display = "none";
+        return;
+      } else { return; }
+      items.forEach((li, i) => li.classList.toggle("active", i === activeIdx));
+      if (activeIdx >= 0) input.value = items[activeIdx].textContent;
+    });
+
+    input.addEventListener("blur", () => {
+      // small delay so mousedown on li fires first
+      setTimeout(() => { list.style.display = "none"; }, 150);
+    });
+  }
+
+  function removeRow(btn) {
+    const form = document.getElementById("holdingsForm");
+    if (form.children.length <= 1) return;
+    btn.closest(".holding-row").remove();
+  }
+
+  function readHoldings() {
+    const rows = document.querySelectorAll("#holdingsForm .holding-row");
+    const holdings = [];
+    for (const row of rows) {
+      const ticker     = row.querySelector(".ticker-input").value.trim().toUpperCase();
+      const investment = parseFloat(row.querySelectorAll("input")[1].value);
+      if (!ticker) continue;
+      if (isNaN(investment) || investment <= 0) return null;
+      holdings.push({ ticker, investment });
+    }
+    return holdings;
+  }
+
+  // Seed with three default rows on load
+  (function initForm() {
+    addHoldingRow("AAPL", 5000);
+    addHoldingRow("MSFT", 3000);
+    addHoldingRow("TSLA", 2000);
+  })();
+
+  function analyze() {
+    clearError();
+    const btn = document.getElementById("analyzeBtn");
+
+    const holdings = readHoldings();
+    if (holdings === null) {
+      showError("All investment amounts must be greater than 0.");
+      return;
+    }
+    if (holdings.length === 0) {
+      showError("Add at least one holding before analyzing.");
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Analyzing…";
+
+    fetch(`${API_BASE}/portfolio/analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ holdings }),
+    })
+      .then(res => {
+        if (!res.ok) return res.json().then(e => { throw new Error(e.detail || `Server error ${res.status}`); });
+        return res.json();
+      })
+      .then(data => {
+        console.log("Response:", data);
+        lastAssets = data.assets ?? [];
+
+        const ret        = data.annualized_return     ?? 0;
+        const vol        = data.annualized_volatility ?? 0;
+        const div        = data.diversification_score ?? 0;
+        const totalVal   = data.total_value           ?? 0;
+        const largestUSD = data.largest_position_usd  ?? 0;
+
+        const risk = riskProfile(vol);
+
+        document.getElementById("metricTotalValue").textContent = usd(totalVal);
+
+        const largestEl = document.getElementById("metricLargestUSD");
+        largestEl.textContent = usd(largestUSD);
+        largestEl.className = "value " + (largestUSD / totalVal > 0.4 ? "yellow" : "green");
+
+        const retEl = document.getElementById("metricReturn");
+        retEl.textContent = pct(ret);
+        retEl.className = "value " + (ret >= 0 ? "green" : "red");
+
+        const volEl = document.getElementById("metricVolatility");
+        volEl.textContent = pct(vol);
+        volEl.className = "value " + risk.cls;
+
+        document.getElementById("metricDiversification").textContent = round2(div);
+
+        document.getElementById("riskLabel").textContent = risk.label;
+        document.getElementById("riskLabel").className = risk.cls;
+        const badge = document.getElementById("riskBadge");
+        badge.textContent = risk.label;
+        badge.className = "risk-badge " + risk.badge;
+
+        document.getElementById("insightText").innerHTML = buildInsight(ret, vol, div);
+
+        document.getElementById("results").style.display = "block";
+      })
+      .catch(err => {
+        console.error("Portfolio fetch error:", err);
+        setStatus("error");
+        showError("Request failed — " + err.message);
+      })
+      .finally(() => {
+        btn.disabled = false;
+        btn.textContent = "Analyze Portfolio";
+      });
+  }
+  /* ── Explainability modal ── */
+  let lastAssets = [];
+
+  const EXPLAIN = {
+    return: {
+      title: "Annual Return",
+      formula: "Rₚ = (∏(1 + rₜ))^(252/T) − 1",
+      explanation:
+        "Each daily return rₜ is compounded over the full period, then rescaled to one year " +
+        "(252 trading days). Geometric compounding reflects actual investor growth — a 50% loss " +
+        "followed by a 50% gain leaves you down 25%, not flat. The portfolio return is the " +
+        "weighted sum of each asset's compounded return, where weights reflect capital invested.",
+      showBreakdown: true,
+    },
+    volatility: {
+      title: "Volatility",
+      formula: "σₚ = √(wᵀ Σ w) × √252",
+      explanation:
+        "Σ is the covariance matrix of daily returns. The portfolio variance wᵀΣw captures " +
+        "each asset's individual variance and all pairwise covariances — which is why " +
+        "diversification reduces volatility even when individual stocks are risky. " +
+        "Annualised by multiplying by √252. Asset volatility shown below is standalone (no correlation effect).",
+      showBreakdown: true,
+    },
+    diversification: {
+      title: "Diversification Score",
+      formula: "D = 1 − Σᵢ wᵢ²",
+      explanation:
+        "The complement of the Herfindahl–Hirschman Index (HHI). If all capital is in one " +
+        "stock, wᵢ = 1 and D = 0. Equal allocation across N stocks gives D = 1 − 1/N. " +
+        "Above 0.7 indicates healthy diversification; below 0.4 signals concentration risk. " +
+        "This measures weight dispersion only — correlation is captured by volatility.",
+      showBreakdown: true,
+    },
+  };
+
+  function renderBreakdown(assets) {
+    const tbody = document.getElementById("breakdownBody");
+    tbody.innerHTML = "";
+    assets.forEach(a => {
+      const retColor = a.annual_return >= 0 ? "#16a34a" : "#dc2626";
+      const retText  = (a.annual_return >= 0 ? "+" : "") + (a.annual_return * 100).toFixed(2) + "%";
+      tbody.insertAdjacentHTML("beforeend", `
+        <tr>
+          <td>${a.ticker}</td>
+          <td style="color:${retColor}; font-weight:600;">${retText}</td>
+          <td>${(a.volatility * 100).toFixed(2)}%</td>
+          <td>${(a.weight * 100).toFixed(2)}%</td>
+        </tr>`);
+    });
+  }
+
+  function openModal(key) {
+    const def = EXPLAIN[key];
+    document.getElementById("modalTitle").textContent       = def.title;
+    document.getElementById("modalFormula").textContent     = def.formula;
+    document.getElementById("modalExplanation").textContent = def.explanation;
+
+    const breakdownSection = document.getElementById("modalBreakdownSection");
+    if (def.showBreakdown && lastAssets.length > 0) {
+      renderBreakdown(lastAssets);
+      breakdownSection.style.display = "block";
+    } else {
+      breakdownSection.style.display = "none";
+    }
+
+    document.getElementById("modalBackdrop").classList.add("open");
+    document.addEventListener("keydown", handleEsc);
+  }
+
+  function closeModal() {
+    document.getElementById("modalBackdrop").classList.remove("open");
+    document.removeEventListener("keydown", handleEsc);
+  }
+
+  function handleBackdropClick(e) {
+    if (e.target === document.getElementById("modalBackdrop")) closeModal();
+  }
+
+  function handleEsc(e) {
+    if (e.key === "Escape") closeModal();
+  }
+
+  /* ── Stock Analyzer ── */
+  function analyzeStock() {
+    const ticker = document.getElementById("stockInput").value.trim().toUpperCase();
+    const errEl  = document.getElementById("stockError");
+    errEl.style.display = "none";
+
+    if (!ticker) {
+      errEl.textContent = "Please enter a ticker symbol.";
+      errEl.style.display = "block";
+      return;
+    }
+
+    const btn = document.getElementById("stockBtn");
+    btn.disabled = true;
+    btn.textContent = "Analyzing…";
+    document.getElementById("stockResults").style.display = "none";
+
+    fetch(`${API_BASE}/stock/analyze?ticker=${encodeURIComponent(ticker)}`)
+      .then(res => {
+        if (!res.ok) return res.json().then(e => { throw new Error(e.detail || res.statusText); });
+        return res.json();
+      })
+      .then(data => {
+        console.log("Stock analysis:", data);
+
+        // Summary
+        document.getElementById("stockSummary").textContent = data.summary || "";
+
+        // Yahoo Finance links
+        const yahooUrl = `https://finance.yahoo.com/quote/${data.ticker}`;
+        document.getElementById("stockYahooLink").href      = yahooUrl;
+        document.getElementById("stockFallbackLink").href   = yahooUrl;
+
+        // Current price
+        document.getElementById("stockCurrentPrice").textContent =
+          `$${data.current_price.toLocaleString("en-US", {minimumFractionDigits: 2})}`;
+
+        // Chart — show canvas if prices available, else fallback message
+        const canvas    = document.getElementById("stockCanvas");
+        const fallback  = document.getElementById("stockChartFallback");
+        const datesRow  = document.getElementById("stockChartDates");
+        const dateMin   = document.getElementById("stockChartDateMin");
+        const dateMax   = document.getElementById("stockChartDateMax");
+        if (data.prices && data.prices.length > 1) {
+          canvas.style.display        = "block";
+          fallback.style.display      = "none";
+          datesRow.style.display      = "flex";
+          drawStockChart(data.prices);
+          const today  = new Date().toISOString().slice(0, 10);
+          const rawMin = data.prices[0].date;
+          const rawMax = data.prices[data.prices.length - 1].date;
+          dateMin.textContent = rawMin <= today ? rawMin : today;
+          dateMax.textContent = rawMax <= today ? rawMax : today;
+        } else {
+          canvas.style.display   = "none";
+          fallback.style.display = "block";
+          datesRow.style.display = "none";
+        }
+
+        // Trend
+        const trendEl = document.getElementById("stockTrend");
+        const isBull  = data.trend === "bullish";
+        trendEl.textContent = isBull ? "Bullish" : "Bearish";
+        trendEl.className   = "value " + (isBull ? "green" : "red");
+        const strengthLabel = { strong: "Strong", moderate: "Moderate", weak: "Weak" }[data.trend_strength] ?? "";
+        document.getElementById("stockTrendSub").textContent =
+          strengthLabel ? `${strengthLabel} — ${isBull ? "above" : "below"} key MAs` : "";
+
+        // MA values
+        document.getElementById("stockMA50").textContent =
+          data.ma50 != null ? `$${data.ma50.toLocaleString("en-US", {minimumFractionDigits: 2})}` : "N/A";
+        document.getElementById("stockMA200").textContent =
+          data.ma200 != null ? `$${data.ma200.toLocaleString("en-US", {minimumFractionDigits: 2})}` : "N/A";
+
+        // Returns
+        const fmtRet = (v) => {
+          if (v === null || v === undefined) return "<span>N/A</span>";
+          const cls = v >= 0 ? "green" : "red";
+          return `<span class="${cls}">${v >= 0 ? "+" : ""}${(v * 100).toFixed(2)}%</span>`;
+        };
+        document.getElementById("stockReturn30").innerHTML = fmtRet(data.return_30d);
+        document.getElementById("stockReturn90").innerHTML = fmtRet(data.return_90d);
+
+        // Volatility + risk level
+        const volEl  = document.getElementById("stockVol");
+        const volPct = (data.volatility * 100).toFixed(2) + "%";
+        volEl.textContent = volPct;
+        volEl.className   = "value " + (data.volatility > 0.35 ? "red" : data.volatility > 0.2 ? "yellow" : "green");
+        const riskLabel = { low: "Low risk", medium: "Medium risk", high: "High risk" }[data.risk_level] ?? "";
+        document.getElementById("stockRiskLevel").textContent = riskLabel;
+
+        // Sentiment
+        const sentEl  = document.getElementById("stockSentiment");
+        const sentMap = { positive: ["Positive", "green"], neutral: ["Neutral", "yellow"], negative: ["Negative", "red"] };
+        const [sentLabel, sentCls] = sentMap[data.sentiment] ?? ["Neutral", "yellow"];
+        sentEl.textContent = sentLabel;
+        sentEl.className   = "value " + sentCls;
+        const confLabel = { high: "High confidence", moderate: "Moderate confidence", low: "Low confidence" }[data.sentiment_confidence] ?? "";
+        document.getElementById("stockSentimentConf").textContent = confLabel;
+
+        // Articles count + signal split
+        document.getElementById("stockArticleCount").textContent =
+          data.headlines_analyzed != null ? data.headlines_analyzed : "—";
+        document.getElementById("stockSignalSplit").textContent =
+          (data.positive_signals != null && data.negative_signals != null)
+            ? `+${data.positive_signals} / −${data.negative_signals} signals`
+            : "";
+
+        document.getElementById("stockResults").style.display = "block";
+      })
+      .catch(err => {
+        console.error("Stock analyzer error:", err);
+        setStatus("error");
+        errEl.textContent = "Analysis failed — " + err.message;
+        errEl.style.display = "block";
+      })
+      .finally(() => {
+        btn.disabled = false;
+        btn.textContent = "Analyze Stock";
+      });
+  }
+
+  function drawStockChart(prices) {
+    const canvas = document.getElementById("stockCanvas");
+    const dpr    = window.devicePixelRatio || 1;
+    const W      = canvas.parentElement.clientWidth;
+    const H      = 160;
+    canvas.width  = W * dpr;
+    canvas.height = H * dpr;
+    canvas.style.width  = W + "px";
+    canvas.style.height = H + "px";
+
+    const ctx = canvas.getContext("2d");
+    ctx.scale(dpr, dpr);
+
+    const pad = { top: 10, right: 10, bottom: 8, left: 52 };
+    const iW  = W - pad.left - pad.right;
+    const iH  = H - pad.top  - pad.bottom;
+
+    const closes = prices.map(p => p.close);
+    const minV   = Math.min(...closes), maxV = Math.max(...closes);
+    const range  = maxV - minV || 1;
+    const first  = closes[0];
+    const isUp   = closes[closes.length - 1] >= first;
+    const lineColor = isUp ? "#16a34a" : "#dc2626";
+    const fillStart = isUp ? "rgba(22,163,74,0.15)"  : "rgba(220,38,38,0.12)";
+
+    const xOf = i => pad.left + (i / (closes.length - 1)) * iW;
+    const yOf = v => pad.top  + iH - ((v - minV) / range) * iH;
+
+    ctx.fillStyle = "#f9fafb";
+    ctx.fillRect(0, 0, W, H);
+
+    // Gradient fill
+    const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + iH);
+    grad.addColorStop(0, fillStart);
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.beginPath();
+    ctx.moveTo(xOf(0), yOf(closes[0]));
+    closes.forEach((v, i) => i > 0 && ctx.lineTo(xOf(i), yOf(v)));
+    ctx.lineTo(xOf(closes.length - 1), pad.top + iH);
+    ctx.lineTo(xOf(0), pad.top + iH);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    ctx.moveTo(xOf(0), yOf(closes[0]));
+    closes.forEach((v, i) => i > 0 && ctx.lineTo(xOf(i), yOf(v)));
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth   = 2;
+    ctx.lineJoin    = "round";
+    ctx.stroke();
+
+    // Y-axis labels
+    ctx.fillStyle = "#9ca3af";
+    ctx.font      = "11px -apple-system, sans-serif";
+    ctx.textAlign = "right";
+    ctx.fillText("$" + maxV.toFixed(0), pad.left - 6, pad.top + 10);
+    ctx.fillText("$" + minV.toFixed(0), pad.left - 6, pad.top + iH);
+
+  }
+
+  /* ── Hot Stocks ── */
+  const HOT_PAGE_SIZE = 10;
+  let hotAllStocks = [];
+  let hotPage      = 1;
+
+  function loadHotStocks() {
+    const btn   = document.getElementById("hotBtn");
+    const errEl = document.getElementById("hotError");
+    errEl.style.display = "none";
+    btn.disabled = true;
+    btn.textContent = "Fetching…";
+
+    fetch(`${API_BASE}/market/hot-stocks`)
+      .then(res => {
+        if (!res.ok) return res.json().then(e => { throw new Error(e.detail || res.statusText); });
+        return res.json();
+      })
+      .then(data => {
+        console.log("Hot stocks:", data);
+        hotAllStocks = data.stocks ?? data;   // backwards-compat if shape changes
+        hotPage = 1;
+        renderHotPage();
+        document.getElementById("hotResults").style.display = "block";
+      })
+      .catch(err => {
+        console.error("Hot stocks error:", err);
+        setStatus("error");
+        errEl.textContent = "Request failed — " + err.message;
+        errEl.style.display = "block";
+      })
+      .finally(() => {
+        btn.disabled = false;
+        btn.textContent = "Find Hot Stocks";
+      });
+  }
+
+  function hotChangePage(page) {
+    const totalPages = Math.ceil(hotAllStocks.length / HOT_PAGE_SIZE);
+    if (page < 1 || page > totalPages) return;
+    hotPage = page;
+    renderHotPage();
+  }
+
+  function renderHotPage() {
+    const total      = hotAllStocks.length;
+    const totalPages = Math.ceil(total / HOT_PAGE_SIZE);
+    const start      = (hotPage - 1) * HOT_PAGE_SIZE;       // 0-based slice start
+    const end        = Math.min(start + HOT_PAGE_SIZE, total);
+    const pageStocks = hotAllStocks.slice(start, end);
+
+    // Table rows
+    const tbody = document.getElementById("hotBody");
+    tbody.innerHTML = "";
+    pageStocks.forEach((s, i) => {
+      const rank     = start + i + 1;                         // global rank preserved
+      const isPos    = s.return >= 0;
+      const retColor = isPos ? "#16a34a" : "#dc2626";
+      const retText  = (isPos ? "+" : "") + (s.return * 100).toFixed(2) + "%";
+      const vol      = s.volume_avg >= 1_000_000
+        ? (s.volume_avg / 1_000_000).toFixed(1) + "M"
+        : (s.volume_avg / 1_000).toFixed(0) + "K";
+
+      tbody.insertAdjacentHTML("beforeend", `
+        <tr style="border-bottom:1px solid #f3f4f6;">
+          <td style="padding:14px 20px; color:#9ca3af; font-size:0.85rem;">#${rank}</td>
+          <td style="padding:14px 20px;">
+            <a href="https://finance.yahoo.com/quote/${s.ticker}" target="_blank" rel="noopener"
+               style="font-weight:700; font-size:1rem; color:#1a1a2e; text-decoration:none; border-bottom:1px solid transparent; transition:color 0.15s, border-color 0.15s;"
+               onmouseover="this.style.color='#4f46e5';this.style.borderBottomColor='#4f46e5';"
+               onmouseout="this.style.color='#1a1a2e';this.style.borderBottomColor='transparent';"
+            >${s.ticker} <span style="font-size:0.7rem; opacity:0.5;">↗</span></a>
+          </td>
+          <td style="padding:14px 20px; text-align:right; font-weight:600; color:${retColor};">${retText}</td>
+          <td style="padding:14px 20px; text-align:right; color:#6b7280; font-size:0.9rem;">${vol}</td>
+          <td style="padding:14px 20px; text-align:right; font-weight:700; color:#4f46e5;">${s.score.toFixed(4)}</td>
+        </tr>`);
+    });
+
+    // Range label
+    document.getElementById("hotRangeLabel").textContent =
+      `Showing ${start + 1}–${end} of ${total} stocks`;
+
+    // Prev / Next
+    document.getElementById("hotPrev").disabled = hotPage === 1;
+    document.getElementById("hotNext").disabled = hotPage === totalPages;
+
+    // Page number buttons
+    const numContainer = document.getElementById("hotPageNumbers");
+    numContainer.innerHTML = "";
+    for (let p = 1; p <= totalPages; p++) {
+      const btn = document.createElement("button");
+      btn.textContent = p;
+      btn.className   = "page-num-btn" + (p === hotPage ? " active" : "");
+      btn.onclick     = () => hotChangePage(p);
+      numContainer.appendChild(btn);
+    }
+  }
+</script>
+</body>
+</html>
