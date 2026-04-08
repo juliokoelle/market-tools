@@ -3,267 +3,329 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Daily Global Economic Briefing — Market Tools</title>
+  <title>Daily Global Economic Briefing</title>
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#1a1a2e" />
+  <meta name="theme-color" content="#111" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --ink:     #1a1a2e;
-      --muted:   #4b5563;
-      --border:  #d1d5db;
-      --bg:      #fafaf8;
-      --accent:  #4f46e5;
+      --paper:   #f7f6f3;
+      --ink:     #111111;
+      --ink-mid: #444444;
+      --ink-low: #777777;
+      --rule:    #b8b5ae;
+      --rule-strong: #111111;
       --serif:   Georgia, "Times New Roman", Times, serif;
-      --sans:    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --sans:    -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
     }
+
+    html { font-size: 17px; }
 
     body {
       font-family: var(--serif);
-      background: var(--bg);
+      background: var(--paper);
       color: var(--ink);
       min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* ─────────────────────────────────────────
-       SITE NAV
-    ───────────────────────────────────────── */
+    /* ═══════════════════════════════════════════
+       SITE NAV  — ultra-minimal top strip
+    ═══════════════════════════════════════════ */
     .site-nav {
       background: var(--ink);
-      padding: 0 32px;
+      padding: 0 28px;
       display: flex;
       align-items: center;
       gap: 0;
       position: sticky;
       top: 0;
-      z-index: 20;
+      z-index: 30;
     }
 
     .site-nav-brand {
-      font-family: var(--serif);
-      font-size: 0.95rem;
+      font-family: var(--sans);
+      font-size: 0.68rem;
       font-weight: 700;
-      color: #fff;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.9);
       text-decoration: none;
-      padding: 14px 0;
-      margin-right: 24px;
-      letter-spacing: 0.04em;
+      padding: 12px 0;
+      margin-right: 28px;
     }
 
     .site-nav a.nav-link {
       font-family: var(--sans);
-      font-size: 0.8rem;
+      font-size: 0.72rem;
       font-weight: 500;
-      color: rgba(255,255,255,0.65);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,0.5);
       text-decoration: none;
-      padding: 14px 14px;
+      padding: 12px 12px;
       border-bottom: 2px solid transparent;
       transition: color 0.15s;
-      letter-spacing: 0.03em;
     }
-    .site-nav a.nav-link:hover { color: #fff; }
-    .site-nav a.nav-link.active { color: #fff; border-bottom-color: var(--accent); }
+    .site-nav a.nav-link:hover  { color: rgba(255,255,255,0.85); }
+    .site-nav a.nav-link.active { color: #fff; border-bottom-color: rgba(255,255,255,0.5); }
 
-    .site-nav-right {
+    .site-nav-date {
       margin-left: auto;
       font-family: var(--sans);
-      font-size: 0.75rem;
-      color: rgba(255,255,255,0.45);
+      font-size: 0.68rem;
+      letter-spacing: 0.04em;
+      color: rgba(255,255,255,0.35);
     }
 
-    /* ─────────────────────────────────────────
+    /* ═══════════════════════════════════════════
        MASTHEAD
-    ───────────────────────────────────────── */
+    ═══════════════════════════════════════════ */
     .masthead {
-      text-align: center;
-      border-bottom: 3px double var(--ink);
-      padding: 36px 24px 20px;
-      background: var(--bg);
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 36px 24px 0;
     }
 
-    .masthead-rule {
-      height: 1px;
-      background: var(--ink);
-      margin-bottom: 18px;
+    /* Top double rule */
+    .masthead-top-rule {
+      border: none;
+      border-top: 4px solid var(--ink);
+      margin-bottom: 3px;
+    }
+    .masthead-top-rule-thin {
+      border: none;
+      border-top: 1px solid var(--ink);
+      margin-bottom: 20px;
     }
 
     .masthead-title {
       font-family: var(--serif);
-      font-size: clamp(2rem, 6vw, 3.6rem);
+      font-size: clamp(2.2rem, 6vw, 3.8rem);
       font-weight: 700;
-      letter-spacing: -0.01em;
-      line-height: 1.1;
+      letter-spacing: -0.02em;
+      line-height: 1.05;
       color: var(--ink);
+      text-align: center;
     }
 
     .masthead-subtitle {
       font-family: var(--sans);
-      font-size: 0.8rem;
-      color: var(--muted);
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
+      font-size: 0.7rem;
+      font-weight: 400;
+      font-style: italic;
+      color: var(--ink-low);
+      letter-spacing: 0.12em;
+      text-align: center;
       margin-top: 10px;
+    }
+
+    /* Thin rule + meta row below title */
+    .masthead-divider {
+      border: none;
+      border-top: 1px solid var(--rule);
+      margin: 16px 0 10px;
     }
 
     .masthead-meta {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-top: 14px;
-      padding-top: 10px;
-      border-top: 1px solid var(--border);
+      padding-bottom: 14px;
+      border-bottom: 3px double var(--rule-strong);
       font-family: var(--sans);
-      font-size: 0.75rem;
-      color: var(--muted);
+      font-size: 0.7rem;
+      color: var(--ink-low);
+      letter-spacing: 0.03em;
+      gap: 12px;
     }
 
-    /* ─────────────────────────────────────────
-       LAYOUT
-    ───────────────────────────────────────── */
-    .paper {
-      max-width: 1080px;
-      margin: 0 auto;
-      padding: 32px 24px 80px;
+    .masthead-meta-center {
+      text-align: center;
+      font-style: italic;
     }
 
-    /* Section label */
-    .section-label {
+    /* ═══════════════════════════════════════════
+       GENERATE BUTTON  — subtle, top-right
+    ═══════════════════════════════════════════ */
+    #generateBtn {
       font-family: var(--sans);
       font-size: 0.65rem;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--accent);
-      border-bottom: 2px solid var(--accent);
-      padding-bottom: 4px;
-      margin-bottom: 18px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      color: var(--ink-low);
+      background: none;
+      border: 1px solid var(--rule);
+      border-radius: 3px;
+      padding: 3px 8px;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 0.15s, border-color 0.15s;
+    }
+    #generateBtn:hover:not(:disabled) { color: var(--ink); border-color: var(--ink-mid); }
+    #generateBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    #generateStatus {
+      font-family: var(--sans);
+      font-size: 0.63rem;
+      color: var(--ink-low);
+      margin-top: 3px;
+      text-align: right;
+      min-height: 1em;
+    }
+    #generateStatus.error { color: #b91c1c; }
+    #generateStatus.ok    { color: #166534; }
+
+    /* ═══════════════════════════════════════════
+       PAPER BODY
+    ═══════════════════════════════════════════ */
+    .paper {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 36px 24px 80px;
     }
 
-    /* ─────────────────────────────────────────
-       LEAD STORY
-    ───────────────────────────────────────── */
-    .lead-story {
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 32px;
-      margin-bottom: 32px;
+    /* ═══════════════════════════════════════════
+       LOADING / ERROR STATES
+    ═══════════════════════════════════════════ */
+    .briefing-loading {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      color: var(--ink-low);
+      text-align: center;
+      padding: 60px 0;
+      letter-spacing: 0.04em;
+    }
+    .briefing-error {
+      font-family: var(--sans);
+      font-size: 0.85rem;
+      color: #9b1c1c;
+      text-align: center;
+      padding: 60px 0;
     }
 
-    .lead-headline {
-      font-size: clamp(1.5rem, 4vw, 2.4rem);
+    /* ═══════════════════════════════════════════
+       BRIEFING BODY  — newspaper two-column layout
+    ═══════════════════════════════════════════ */
+    .briefing-body {
+      /* Two-column newspaper flow */
+      columns: 2;
+      column-gap: 52px;
+      column-rule: 1px solid var(--rule);
+    }
+
+    /* Section headings break across both columns */
+    .briefing-body h2 {
+      column-span: all;
+      font-family: var(--serif);
+      font-size: 1.45rem;
       font-weight: 700;
       line-height: 1.2;
-      margin-bottom: 12px;
-    }
-
-    .lead-deck {
-      font-family: var(--sans);
-      font-size: 1.05rem;
-      color: var(--muted);
-      line-height: 1.55;
-      margin-bottom: 16px;
-    }
-
-    .byline {
-      font-family: var(--sans);
-      font-size: 0.75rem;
-      color: var(--muted);
-      letter-spacing: 0.04em;
-      margin-bottom: 20px;
-      text-transform: uppercase;
-    }
-
-    .lead-body {
-      columns: 2;
-      column-gap: 40px;
-      font-size: 0.97rem;
-      line-height: 1.75;
-      text-align: justify;
-    }
-
-    .lead-body p { margin-bottom: 14px; break-inside: avoid; }
-
-    @media (max-width: 640px) {
-      .lead-body { columns: 1; }
-    }
-
-    /* ─────────────────────────────────────────
-       SECONDARY GRID
-    ───────────────────────────────────────── */
-    .secondary-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      gap: 28px;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 32px;
-      margin-bottom: 32px;
-    }
-
-    @media (max-width: 720px) {
-      .secondary-grid { grid-template-columns: 1fr; }
-    }
-
-    .story-card {
-      border-top: 2px solid var(--ink);
+      color: var(--ink);
+      /* Newspaper section divider style */
+      border-top: 3px solid var(--ink);
       padding-top: 14px;
+      margin-top: 44px;
+      margin-bottom: 20px;
     }
 
-    .story-card-label {
+    /* First section — no top margin, flush with masthead bottom */
+    .briefing-body h2:first-child {
+      margin-top: 0;
+      border-top-color: var(--rule);
+      border-top-width: 1px;
+    }
+
+    /* The section label span — styled as editorial category tag */
+    .briefing-section-label {
+      display: block;
       font-family: var(--sans);
-      font-size: 0.65rem;
+      font-size: 0.62rem;
       font-weight: 700;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.16em;
       text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 8px;
+      color: var(--ink-mid);
+      margin-bottom: 6px;
     }
 
-    .story-card h3 {
-      font-size: 1.05rem;
+    /* The actual heading text is the h2 itself — but since the span wraps it,
+       we use the h2 font as the display */
+    .briefing-body h2 .briefing-section-label {
+      /* Override: label is small, ink text below is the visible headline.
+         Since the markdown renders ## text as a single label, we show it
+         both as the label (uppercase small) and imply the heading via weight/size */
+    }
+
+    /* Sub-headings within a section — stay in column flow */
+    .briefing-body h3 {
+      font-family: var(--serif);
+      font-size: 1.08rem;
+      font-weight: 700;
       line-height: 1.3;
-      margin-bottom: 10px;
+      color: var(--ink);
+      margin-top: 22px;
+      margin-bottom: 8px;
+      break-inside: avoid;
     }
 
-    .story-card p {
-      font-family: var(--sans);
-      font-size: 0.82rem;
-      color: var(--muted);
-      line-height: 1.6;
+    /* Body paragraphs */
+    .briefing-body p {
+      font-family: var(--serif);
+      font-size: 1rem;
+      line-height: 1.78;
+      color: var(--ink);
+      margin-bottom: 15px;
+      text-align: justify;
+      hyphens: auto;
+      break-inside: avoid;
     }
 
-    /* ─────────────────────────────────────────
-       MARKET SNAPSHOT BAR
-    ───────────────────────────────────────── */
-    .market-bar {
-      background: var(--ink);
-      color: #fff;
-      padding: 10px 24px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 24px;
-      font-family: var(--sans);
-      font-size: 0.78rem;
+    /* First paragraph after h2 gets a drop-cap feel via larger first line */
+    .briefing-body h2 + p::first-line {
+      font-weight: 600;
     }
 
-    .market-bar-item {
-      display: flex;
-      gap: 8px;
-      align-items: center;
+    .briefing-body strong { font-weight: 700; }
+    .briefing-body em     { font-style: italic; }
+
+    .briefing-body ul {
+      margin: 6px 0 14px 18px;
+      padding: 0;
+      break-inside: avoid;
+    }
+    .briefing-body ul li {
+      font-size: 0.94rem;
+      line-height: 1.65;
+      margin-bottom: 4px;
+      list-style: disc;
     }
 
-    .market-bar-ticker { font-weight: 700; }
-    .market-bar-val    { color: rgba(255,255,255,0.7); }
-    .market-bar-chg.up   { color: #4ade80; }
-    .market-bar-chg.down { color: #f87171; }
+    .briefing-body hr {
+      column-span: all;
+      border: none;
+      border-top: 1px solid var(--rule);
+      margin: 32px 0;
+    }
 
-    /* ─────────────────────────────────────────
-       TOOL PROMO STRIP
-    ───────────────────────────────────────── */
+    /* Single-column on small screens */
+    @media (max-width: 640px) {
+      .briefing-body {
+        columns: 1;
+        column-rule: none;
+      }
+      .briefing-body h2 { column-span: unset; }
+      .briefing-body hr  { column-span: unset; }
+    }
+
+    /* ═══════════════════════════════════════════
+       TOOLS STRIP  — editorial, minimal
+    ═══════════════════════════════════════════ */
     .tools-strip {
-      background: #eef2ff;
-      border: 1px solid #c7d2fe;
-      border-radius: 10px;
-      padding: 24px 28px;
+      border-top: 2px solid var(--ink);
+      border-bottom: 1px solid var(--rule);
+      padding: 22px 0;
+      margin-top: 48px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -271,159 +333,52 @@
       gap: 16px;
     }
 
-    .tools-strip-copy h3 {
-      font-family: var(--sans);
-      font-size: 1rem;
-      font-weight: 700;
-      color: var(--ink);
-      margin-bottom: 4px;
-    }
-
     .tools-strip-copy p {
       font-family: var(--sans);
-      font-size: 0.82rem;
-      color: var(--muted);
+      font-size: 0.8rem;
+      font-weight: 400;
+      color: var(--ink-mid);
+      letter-spacing: 0.02em;
+    }
+    .tools-strip-copy strong {
+      font-family: var(--sans);
+      font-weight: 700;
+      color: var(--ink);
+      display: block;
+      font-size: 0.88rem;
+      margin-bottom: 3px;
     }
 
     .tools-strip-btn {
-      background: var(--accent);
-      color: #fff;
-      text-decoration: none;
-      font-family: var(--sans);
-      font-size: 0.87rem;
-      font-weight: 600;
-      padding: 11px 22px;
-      border-radius: 8px;
-      white-space: nowrap;
-      transition: background 0.15s;
-    }
-    .tools-strip-btn:hover { background: #4338ca; }
-
-    /* ─────────────────────────────────────────
-       BRIEFING STATES
-    ───────────────────────────────────────── */
-    .briefing-loading,
-    .briefing-error {
-      font-family: var(--sans);
-      font-size: 0.9rem;
-      padding: 32px 0;
-      color: var(--muted);
-      text-align: center;
-    }
-    .briefing-error { color: #dc2626; }
-
-    /* ─────────────────────────────────────────
-       RENDERED MARKDOWN STYLES
-    ───────────────────────────────────────── */
-    .briefing-body h2 {
-      font-family: var(--serif);
-      font-size: 1.55rem;
-      font-weight: 700;
-      line-height: 1.25;
-      margin: 36px 0 10px;
-      padding-top: 24px;
-      border-top: 2px solid var(--ink);
-      color: var(--ink);
-    }
-    /* First h2 gets no top margin so it's flush */
-    .briefing-body h2:first-child { margin-top: 0; padding-top: 0; border-top: none; }
-
-    .briefing-body h3 {
-      font-family: var(--serif);
-      font-size: 1.1rem;
-      font-weight: 700;
-      margin: 24px 0 8px;
-      color: var(--ink);
-    }
-
-    .briefing-body p {
-      font-size: 0.97rem;
-      line-height: 1.78;
-      margin-bottom: 14px;
-      text-align: justify;
-    }
-
-    .briefing-body strong { font-weight: 700; }
-    .briefing-body em     { font-style: italic; }
-
-    .briefing-body ul {
-      margin: 10px 0 14px 20px;
-      padding: 0;
-    }
-    .briefing-body ul li {
-      font-size: 0.93rem;
-      line-height: 1.65;
-      margin-bottom: 5px;
-      list-style: disc;
-    }
-
-    .briefing-body hr {
-      border: none;
-      border-top: 1px solid var(--border);
-      margin: 28px 0;
-    }
-
-    /* Section label extracted from ## headings */
-    .briefing-section-label {
-      font-family: var(--sans);
-      font-size: 0.65rem;
-      font-weight: 700;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: var(--accent);
-      border-bottom: 2px solid var(--accent);
-      padding-bottom: 4px;
-      margin-bottom: 10px;
-      display: block;
-    }
-
-    /* ─────────────────────────────────────────
-       FOOTER
-    ───────────────────────────────────────── */
-    footer {
-      border-top: 3px double var(--border);
-      margin-top: 48px;
-      padding: 24px;
-      text-align: center;
       font-family: var(--sans);
       font-size: 0.75rem;
-      color: var(--muted);
-    }
-
-    /* ─────────────────────────────────────────
-       GENERATE BUTTON
-    ───────────────────────────────────────── */
-    #generateBtn {
-      font-family: var(--sans);
-      font-size: 0.72rem;
-      font-weight: 600;
-      color: var(--muted);
-      background: none;
-      border: 1px solid var(--border);
-      border-radius: 5px;
-      padding: 4px 10px;
-      cursor: pointer;
-      letter-spacing: 0.03em;
-      transition: color 0.15s, border-color 0.15s, background 0.15s;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--ink);
+      text-decoration: none;
+      border: 1.5px solid var(--ink);
+      padding: 9px 18px;
+      border-radius: 2px;
       white-space: nowrap;
+      transition: background 0.15s, color 0.15s;
     }
-    #generateBtn:hover:not(:disabled) {
-      color: var(--accent);
-      border-color: var(--accent);
-      background: #eef2ff;
-    }
-    #generateBtn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .tools-strip-btn:hover { background: var(--ink); color: var(--paper); }
 
-    #generateStatus {
+    /* ═══════════════════════════════════════════
+       FOOTER
+    ═══════════════════════════════════════════ */
+    footer {
+      border-top: 1px solid var(--rule);
+      margin-top: 48px;
+      padding: 20px 24px;
+      text-align: center;
       font-family: var(--sans);
-      font-size: 0.72rem;
-      color: var(--muted);
-      margin-top: 4px;
-      text-align: right;
-      min-height: 1em;
+      font-size: 0.65rem;
+      letter-spacing: 0.06em;
+      color: var(--ink-low);
+      text-transform: uppercase;
     }
-    #generateStatus.error { color: #dc2626; }
-    #generateStatus.ok    { color: #16a34a; }
   </style>
 </head>
 <body>
@@ -433,49 +388,22 @@
   <a class="site-nav-brand" href="index.html">Market Tools</a>
   <a class="nav-link active" href="index.html">Home</a>
   <a class="nav-link" href="dashboard.html">Dashboard</a>
-  <div class="site-nav-right" id="todayDate"></div>
+  <div class="site-nav-date" id="todayDate"></div>
 </nav>
-
-<!-- ── Market Ticker Bar ── -->
-<div class="market-bar" id="marketBar">
-  <div class="market-bar-item">
-    <span class="market-bar-ticker">S&amp;P 500</span>
-    <span class="market-bar-val">—</span>
-    <span class="market-bar-chg" id="sp500Chg">—</span>
-  </div>
-  <div class="market-bar-item">
-    <span class="market-bar-ticker">NASDAQ</span>
-    <span class="market-bar-val">—</span>
-    <span class="market-bar-chg">—</span>
-  </div>
-  <div class="market-bar-item">
-    <span class="market-bar-ticker">EUR/USD</span>
-    <span class="market-bar-val">—</span>
-    <span class="market-bar-chg">—</span>
-  </div>
-  <div class="market-bar-item">
-    <span class="market-bar-ticker">Gold</span>
-    <span class="market-bar-val">—</span>
-    <span class="market-bar-chg">—</span>
-  </div>
-  <div class="market-bar-item">
-    <span class="market-bar-ticker">Brent</span>
-    <span class="market-bar-val">—</span>
-    <span class="market-bar-chg">—</span>
-  </div>
-</div>
 
 <!-- ── Masthead ── -->
 <div class="masthead">
-  <div class="masthead-rule"></div>
+  <hr class="masthead-top-rule" />
+  <hr class="masthead-top-rule-thin" />
   <h1 class="masthead-title">Daily Global Economic Briefing</h1>
-  <p class="masthead-subtitle">Markets · Commodities · Geopolitics · Analysis</p>
+  <p class="masthead-subtitle">Markets &middot; Commodities &middot; Geopolitics &middot; Analysis</p>
+  <hr class="masthead-divider" />
   <div class="masthead-meta">
     <span id="mastheadDate">—</span>
-    <span>Vol. 1 · Issue 1</span>
-    <span style="display:flex; flex-direction:column; align-items:flex-end; gap:3px;">
+    <span class="masthead-meta-center">Independent Market Intelligence</span>
+    <span style="display:flex; flex-direction:column; align-items:flex-end; gap:2px;">
       <button id="generateBtn" onclick="generateBriefing()" title="Generate today's briefing">
-        ↻ Generate briefing
+        ↻ Generate
       </button>
       <span id="generateStatus"></span>
     </span>
@@ -485,14 +413,14 @@
 <!-- ── Paper Body ── -->
 <div class="paper">
 
-  <!-- Live briefing content injected here -->
+  <!-- Live briefing content injected here by JS -->
   <div id="briefingContent" class="briefing-loading">Loading today's briefing…</div>
 
-  <!-- Tool Promo — always visible -->
-  <div class="tools-strip" style="margin-top:40px;">
+  <!-- Tools strip -->
+  <div class="tools-strip">
     <div class="tools-strip-copy">
-      <h3>Explore the Market Dashboard</h3>
-      <p>Analyze your portfolio, track hot stocks, and get deep technical analysis on any ticker.</p>
+      <strong>Market Dashboard</strong>
+      <p>Portfolio analysis, hot stocks screener, and deep technical analysis on any ticker.</p>
     </div>
     <a class="tools-strip-btn" href="dashboard.html">Open Dashboard →</a>
   </div>
@@ -501,7 +429,7 @@
 
 <!-- ── Footer ── -->
 <footer>
-  <p>Market Tools · Daily Global Economic Briefing · For informational purposes only. Not financial advice.</p>
+  <p>Market Tools &nbsp;·&nbsp; Daily Global Economic Briefing &nbsp;·&nbsp; For informational purposes only. Not financial advice.</p>
 </footer>
 
 <script>
@@ -645,7 +573,7 @@
       })
       .finally(() => {
         btn.disabled    = false;
-        btn.textContent = "↻ Generate briefing";
+        btn.textContent = "↻ Generate";
       });
   }
 
