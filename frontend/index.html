@@ -374,6 +374,52 @@
     }
     .briefing-error { color: var(--red-dk); }
 
+    /* ── Generate buttons ── */
+    .btn-orange {
+      background: #e07b20; color: #fff; border: none;
+      padding: 8px 16px; border-radius: 6px; font-size: 0.82rem;
+      font-weight: 600; cursor: pointer; min-height: 36px;
+      transition: background 0.15s;
+    }
+    .btn-orange:hover:not(:disabled) { background: #c96a10; }
+    .btn-orange:disabled { background: #c0905a; cursor: not-allowed; }
+
+    .btn-green {
+      background: #2d8a4e; color: #fff; border: none;
+      padding: 8px 16px; border-radius: 6px; font-size: 0.82rem;
+      font-weight: 600; cursor: pointer; min-height: 36px;
+      transition: background 0.15s;
+    }
+    .btn-green:hover:not(:disabled) { background: #1f6b3a; }
+    .btn-green:disabled { background: #5a9e72; cursor: not-allowed; }
+
+    /* ── Loading spinner ── */
+    .spinner {
+      display: inline-block; width: 16px; height: 16px;
+      border: 2.5px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .briefing-generating {
+      display: flex; align-items: center; justify-content: center;
+      padding: 48px 20px; color: var(--muted); font-size: 0.9rem;
+    }
+
+    /* ── Archive ── */
+    .archive-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
+    }
+    .archive-item:last-child { border-bottom: none; }
+    .archive-date { font-weight: 500; color: var(--ink); font-size: 0.85rem; min-width: 92px; }
+    .archive-pdf  { font-size: 0.75rem; color: var(--muted); text-decoration: none; }
+    .archive-pdf:hover { color: var(--accent); }
+
     .briefing-body {
       columns: 2;
       column-gap: 36px;
@@ -1036,13 +1082,21 @@
         <h1>Daily Briefing</h1>
         <p id="briefingSubtitle">Markets · Commodities · Geopolitics · Analysis</p>
       </div>
-      <div style="display:flex; flex-direction:column; align-items:flex-end; gap:5px;">
-        <button id="generateBtn" onclick="generateBriefing()">↻ Generate New</button>
-        <span id="generateStatus"></span>
+      <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
+        <div style="display:flex; gap:8px;">
+          <button id="generatePremiumBtn" class="btn-orange" onclick="generateBriefing('anthropic')">Generate Premium</button>
+          <button id="generateQuickBtn"   class="btn-green"  onclick="generateBriefing('openai')">Generate Quick</button>
+        </div>
+        <span id="generateStatus" style="font-size:0.75rem; color:var(--muted);"></span>
+        <span id="costCounter"    style="font-size:0.72rem; color:var(--faint);"></span>
       </div>
     </div>
     <div class="card">
       <div id="briefingContent" class="briefing-loading">Loading today's briefing…</div>
+    </div>
+    <div style="margin-top:20px;">
+      <div class="card-label" style="margin-bottom:10px;">Archive</div>
+      <div id="archiveList" style="font-size:0.85rem; color:var(--faint);">Loading archive…</div>
     </div>
   </section>
 
@@ -1612,32 +1666,105 @@ function loadBriefing() {
     });
 }
 
-function generateBriefing() {
-  const btn    = document.getElementById("generateBtn");
-  const status = document.getElementById("generateStatus");
-  btn.disabled    = true;
-  btn.textContent = "↻ Updating…";
-  status.className   = "";
-  status.textContent = "Updating…";
+async function generateBriefing(provider = 'anthropic') {
+  const premiumBtn = document.getElementById('generatePremiumBtn');
+  const quickBtn   = document.getElementById('generateQuickBtn');
+  const statusEl   = document.getElementById('generateStatus');
+  const contentEl  = document.getElementById('briefingContent');
 
-  fetch(`${API_BASE}/generate-briefing`, { method: "POST" })
-    .then(res => {
-      if (!res.ok) return res.json().then(e => { throw new Error(e.detail || `Error ${res.status}`); });
-      return res.json();
-    })
-    .then(data => {
-      status.className   = "ok";
-      status.textContent = `Done · ${data.words ?? "—"} words`;
-      loadBriefing();
-    })
-    .catch(err => {
-      status.className   = "error";
-      status.textContent = "Failed — " + err.message;
-    })
-    .finally(() => {
-      btn.disabled    = false;
-      btn.textContent = "↻ Generate New";
-    });
+  premiumBtn.disabled = true;
+  quickBtn.disabled   = true;
+  statusEl.textContent = 'Generating… ~60s, please wait';
+  contentEl.className = 'briefing-generating';
+  contentEl.innerHTML = '<span class="spinner"></span>Generating briefing…';
+
+  try {
+    const resp = await fetch(`${API_BASE}/briefing/generate?provider=${provider}`, { method: 'POST' });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
+      throw new Error(err.detail || resp.statusText);
+    }
+    const data = await resp.json();
+
+    contentEl.className = 'briefing-body';
+    contentEl.innerHTML = mdToHtml(data.markdown);
+    statusEl.textContent = `Generated · $${(data.cost_usd ?? 0).toFixed(4)} cost`;
+
+    const sub = document.getElementById('briefingSubtitle');
+    if (sub) sub.textContent = `${data.date} · Markets · Commodities · Geopolitics · Analysis`;
+
+    const previewEl = document.getElementById('dashBriefingPreview');
+    if (previewEl) {
+      previewEl.className = 'briefing-preview briefing-body';
+      previewEl.innerHTML = mdToHtml(data.markdown);
+    }
+
+    loadBriefingArchive();
+    loadCostSummary();
+  } catch (e) {
+    contentEl.className = 'briefing-error';
+    contentEl.textContent = `Generation failed: ${e.message}`;
+    statusEl.textContent = '';
+  } finally {
+    premiumBtn.disabled = false;
+    quickBtn.disabled   = false;
+  }
+}
+
+async function loadBriefingArchive() {
+  const archiveEl = document.getElementById('archiveList');
+  if (!archiveEl) return;
+  try {
+    const resp = await fetch(`${API_BASE}/briefing/list`);
+    if (!resp.ok) throw new Error('list failed');
+    const list = await resp.json();
+
+    if (!list.length) {
+      archiveEl.innerHTML = '<span style="color:var(--faint);">No archived briefings yet.</span>';
+      return;
+    }
+
+    archiveEl.innerHTML = list.map(item => `
+      <div class="archive-item">
+        <span class="archive-date">${item.date}</span>
+        <button class="btn-secondary" style="font-size:0.72rem; padding:3px 10px; min-height:28px;"
+          onclick="loadArchivedBriefing('${item.date}')">View</button>
+        ${item.has_pdf
+          ? `<a class="archive-pdf" href="${API_BASE}/briefing/${item.date}/pdf" target="_blank">📄 PDF</a>`
+          : ''}
+      </div>`).join('');
+  } catch {
+    if (archiveEl) archiveEl.innerHTML = '<span style="color:var(--faint);">Archive unavailable.</span>';
+  }
+}
+
+async function loadArchivedBriefing(date) {
+  const contentEl = document.getElementById('briefingContent');
+  contentEl.className = 'briefing-generating';
+  contentEl.innerHTML = '<span class="spinner"></span>Loading…';
+  try {
+    const resp = await fetch(`${API_BASE}/briefing/${date}`);
+    if (!resp.ok) throw new Error('not found');
+    const data = await resp.json();
+    contentEl.className = 'briefing-body';
+    contentEl.innerHTML = mdToHtml(data.markdown);
+    const sub = document.getElementById('briefingSubtitle');
+    if (sub) sub.textContent = `${date} · Markets · Commodities · Geopolitics · Analysis`;
+  } catch {
+    contentEl.className = 'briefing-error';
+    contentEl.textContent = `Could not load briefing for ${date}.`;
+  }
+}
+
+async function loadCostSummary() {
+  try {
+    const resp = await fetch(`${API_BASE}/briefing/cost-summary`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const month = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
+    const el = document.getElementById('costCounter');
+    if (el) el.textContent = `${month}: $${data.current_month_cost.toFixed(2)} of $${data.budget_usd.toFixed(2)}`;
+  } catch { /* non-critical */ }
 }
 
 /* ═══════════════════════════════════════
@@ -2094,6 +2221,8 @@ function drawStockChart(prices) {
 ═══════════════════════════════════════ */
 loadBriefing();
 loadMarketData();
+loadBriefingArchive();
+loadCostSummary();
 </script>
 
 </body>
