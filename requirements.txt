@@ -6,3 +6,8 @@ numpy
 requests
 python-dotenv
 anthropic
+openai
+feedparser
+weasyprint
+markdown
+pyyaml
