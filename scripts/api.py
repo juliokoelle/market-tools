@@ -270,3 +270,13 @@ def portfolio_analyze(request: PortfolioRequest):
     return analyze_portfolio(
         [{"ticker": h.ticker, "investment": h.investment} for h in request.holdings]
     )
+
+
+@app.get("/debug/env")
+def debug_env():
+    return {
+        "TWELVE_DATA_API_KEY": bool(os.getenv("TWELVE_DATA_API_KEY")),
+        "NEWS_API_KEY": bool(os.getenv("NEWS_API_KEY")),
+        "ANTHROPIC_API_KEY": bool(os.getenv("ANTHROPIC_API_KEY")),
+        "OPENAI_API_KEY": bool(os.getenv("OPENAI_API_KEY")),
+    }
