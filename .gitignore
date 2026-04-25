@@ -4,3 +4,10 @@ __pycache__/
 .pytest_cache/
 data/raw/*/
 data/processed/*/
+venv/
+data/cache/
+data/cost_log.json
+data/portfolio.json
+outputs/*.md
+outputs/latest-briefing.md
+outputs/pdf/
