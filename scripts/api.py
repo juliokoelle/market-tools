@@ -1,10 +1,13 @@
+import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
@@ -12,6 +15,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
 from scripts.data_service import get_multiple_prices, get_hot_stocks, get_historical_data
 from scripts.portfolio import analyze_portfolio
 from scripts.stock_analyzer import analyze_stock
+from scripts.generate_briefing import OUTPUT_LATEST
 
 app = FastAPI()
 
@@ -23,27 +27,38 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-OUTPUT_FILE = Path("outputs/latest-briefing.md")
+OUTPUT_LATEST.parent.mkdir(parents=True, exist_ok=True)
 
-# Ensure the outputs directory exists at startup so writes never fail
-OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 # ---------------------------------------------------------------------------
-# Models
+# Pydantic models
 # ---------------------------------------------------------------------------
 
 class Holding(BaseModel):
     ticker: str
-    investment: float   # USD amount invested in this position
+    investment: float
 
 
 class PortfolioRequest(BaseModel):
     holdings: list[Holding]
 
 
+class PortfolioHolding(BaseModel):
+    ticker: str
+    name: str
+    shares: float
+    investment: float
+    purchase_date: str | None = None
+
+
+class PortfolioHoldingsRequest(BaseModel):
+    holdings: list[PortfolioHolding]
+
+
 # ---------------------------------------------------------------------------
-# Endpoints
+# Root
 # ---------------------------------------------------------------------------
 
 @app.get("/")
@@ -51,116 +66,167 @@ def root():
     return {"message": "Daily Briefing API is running"}
 
 
-@app.get("/daily-briefing")
-def get_daily_briefing():
-    if not OUTPUT_FILE.exists() or OUTPUT_FILE.stat().st_size == 0:
-        raise HTTPException(status_code=404, detail="No daily briefing available yet")
+# ---------------------------------------------------------------------------
+# Briefing endpoints
+# IMPORTANT: specific string paths (/list, /cost-summary) MUST be registered
+# before the parameterised path (/{date}) or FastAPI will match them as dates.
+# ---------------------------------------------------------------------------
+
+@app.post("/briefing/generate")
+def briefing_generate(provider: str = Query("anthropic")):
+    if provider not in ("anthropic", "openai"):
+        raise HTTPException(status_code=400, detail="provider must be 'anthropic' or 'openai'")
+
+    from scripts.generate_briefing import generate
+    from scripts.utils import today
 
     try:
-        content = OUTPUT_FILE.read_text(encoding="utf-8")
-    except OSError as e:
-        raise HTTPException(status_code=500, detail=f"Could not read briefing: {e}")
+        result = generate(today(), provider=provider)
+        return {
+            "date": result["date"],
+            "markdown": result["markdown"],
+            "cost_usd": result["cost_usd"],
+        }
+    except EnvironmentError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except Exception as e:
+        logging.getLogger("briefing").error("generate failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"Generation failed: {e}")
 
-    last_modified = OUTPUT_FILE.stat().st_mtime
-    last_updated  = datetime.fromtimestamp(last_modified, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+@app.get("/briefing/list")
+def briefing_list():
+    outputs_dir = Path("outputs")
+    pdf_dir = Path("outputs/pdf")
+
+    briefings = []
+    for f in sorted(outputs_dir.glob("????-??-??-briefing.md"), reverse=True):
+        date_str = f.stem.replace("-briefing", "")
+        has_pdf = (pdf_dir / f"{date_str}-briefing.pdf").exists()
+        briefings.append({"date": date_str, "has_pdf": has_pdf})
+
+    return briefings[:30]
+
+
+@app.get("/briefing/cost-summary")
+def briefing_cost_summary():
+    log_path = Path("data/cost_log.json")
+
+    if not log_path.exists():
+        return {"current_month_cost": 0.0, "current_month_count": 0, "budget_usd": 15.00}
+
+    try:
+        entries = json.loads(log_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {"current_month_cost": 0.0, "current_month_count": 0, "budget_usd": 15.00}
+
+    current_month = datetime.now().strftime("%Y-%m")
+    monthly = [e for e in entries if e.get("date", "").startswith(current_month)]
 
     return {
-        "status": "success",
-        "briefing": content,
-        "last_updated": last_updated,
+        "current_month_cost": round(sum(e.get("cost_usd", 0) for e in monthly), 4),
+        "current_month_count": len(monthly),
+        "budget_usd": 15.00,
     }
+
+
+@app.get("/briefing/{date}")
+def briefing_get(date: str):
+    if not _DATE_RE.match(date):
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+
+    path = Path(f"outputs/{date}-briefing.md")
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"No briefing for {date}")
+
+    import markdown as md_lib
+    markdown_text = path.read_text(encoding="utf-8")
+    return {
+        "date": date,
+        "markdown": markdown_text,
+        "html_render": md_lib.markdown(markdown_text),
+    }
+
+
+@app.get("/briefing/{date}/pdf")
+def briefing_pdf(date: str):
+    if not _DATE_RE.match(date):
+        raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD.")
+
+    pdf_path = Path(f"outputs/pdf/{date}-briefing.pdf")
+    if not pdf_path.exists():
+        md_path = Path(f"outputs/{date}-briefing.md")
+        if not md_path.exists():
+            raise HTTPException(status_code=404, detail=f"No briefing for {date}")
+        from scripts.render_pdf import render_pdf
+        render_pdf(md_path.read_text(encoding="utf-8"), date)
+
+    return FileResponse(
+        str(pdf_path),
+        media_type="application/pdf",
+        filename=f"{date}-briefing.pdf",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Legacy briefing endpoints — kept for backwards compatibility
+# ---------------------------------------------------------------------------
+
+@app.get("/daily-briefing")
+def get_daily_briefing():
+    if not OUTPUT_LATEST.exists() or OUTPUT_LATEST.stat().st_size == 0:
+        raise HTTPException(status_code=404, detail="No daily briefing available yet")
+    content = OUTPUT_LATEST.read_text(encoding="utf-8")
+    last_modified = OUTPUT_LATEST.stat().st_mtime
+    last_updated = datetime.fromtimestamp(last_modified, tz=timezone.utc).strftime(
+        "%Y-%m-%dT%H:%M:%SZ"
+    )
+    return {"status": "success", "briefing": content, "last_updated": last_updated}
 
 
 @app.post("/generate-briefing")
-def generate_briefing():
-    """
-    Manually trigger a full briefing pipeline run:
-      1. Fetch fresh market data
-      2. Build prompt from fetched data
-      3. Generate briefing via Anthropic API
-      4. Overwrite outputs/latest-briefing.md
-    """
-    log = logging.getLogger("generate-briefing")
+def generate_briefing_legacy():
+    """Legacy endpoint — delegates to POST /briefing/generate?provider=anthropic."""
+    return briefing_generate(provider="anthropic")
 
-    api_key = os.getenv("ANTHROPIC_API_KEY")
-    if not api_key:
-        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY is not configured on the server.")
 
-    log.info("Starting manual briefing generation")
+# ---------------------------------------------------------------------------
+# Portfolio holdings persistence
+# ---------------------------------------------------------------------------
 
-    from scripts.utils import today, output_path
-    from scripts.fetch_data import run as fetch_run
-    from scripts.generate_briefing import build_prompt
+PORTFOLIO_JSON = Path("data/portfolio.json")
 
-    run_date = today()
 
-    # ── 1. Fetch data ──────────────────────────────────────────────────────
-    log.info("Fetching data…")
+@app.get("/portfolio/holdings")
+def portfolio_holdings_get():
+    if not PORTFOLIO_JSON.exists():
+        return {"holdings": []}
     try:
-        fetch_run(run_date)
-    except Exception as e:
-        log.error("Data fetch failed: %s", e)
-        raise HTTPException(status_code=500, detail=f"Data fetch failed: {e}")
+        return {"holdings": json.loads(PORTFOLIO_JSON.read_text(encoding="utf-8"))}
+    except (json.JSONDecodeError, OSError):
+        return {"holdings": []}
 
-    # ── 2. Build prompt ────────────────────────────────────────────────────
-    try:
-        prompt = build_prompt(run_date)
-    except Exception as e:
-        log.error("Prompt build failed: %s", e)
-        raise HTTPException(status_code=500, detail=f"Prompt build failed: {e}")
 
-    # ── 3. Generate via Anthropic ──────────────────────────────────────────
-    log.info("Generating briefing…")
-    try:
-        import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
-        message = client.messages.create(
-            model="claude-opus-4-6",
-            max_tokens=4096,
-            system=(
-                "You are a senior economic journalist producing the Daily Global Economic "
-                "Newspaper Briefing. Follow all editorial standards exactly as instructed. "
-                "Write in continuous journalistic prose. No bullet lists in the final output."
-            ),
-            messages=[{"role": "user", "content": prompt}],
-        )
-        briefing_text = message.content[0].text
-    except Exception as e:
-        log.error("Anthropic API call failed: %s", e)
-        raise HTTPException(status_code=500, detail=f"Briefing generation failed: {e}")
+@app.post("/portfolio/holdings")
+def portfolio_holdings_save(request: PortfolioHoldingsRequest):
+    PORTFOLIO_JSON.parent.mkdir(parents=True, exist_ok=True)
+    data = [h.model_dump() for h in request.holdings]
+    PORTFOLIO_JSON.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    return {"saved": len(data)}
 
-    # ── 4. Save ────────────────────────────────────────────────────────────
-    log.info("Saving latest briefing…")
-    header  = f"# Daily Global Economic Briefing — {run_date}\n\n"
-    content = header + briefing_text
 
-    try:
-        OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
-        OUTPUT_FILE.write_text(content, encoding="utf-8")
-
-        archive = Path(output_path(run_date))
-        archive.write_text(content, encoding="utf-8")
-    except OSError as e:
-        log.error("File write failed: %s", e)
-        raise HTTPException(status_code=500, detail=f"Could not save briefing: {e}")
-
-    log.info("Saved latest briefing → %s", OUTPUT_FILE)
-
-    return {
-        "status":   "success",
-        "message":  "Briefing generated successfully",
-        "date":     run_date,
-        "words":    len(briefing_text.split()),
-    }
-
+# ---------------------------------------------------------------------------
+# Market endpoints (unchanged)
+# ---------------------------------------------------------------------------
 
 @app.get("/market/prices")
-def market_prices(tickers: str = Query(..., description="Comma-separated list of tickers, e.g. AAPL,MSFT,TSLA")):
+def market_prices(
+    tickers: str = Query(..., description="Comma-separated list of tickers, e.g. AAPL,MSFT,TSLA")
+):
     ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
     if not ticker_list:
         raise HTTPException(status_code=400, detail="No tickers provided.")
-    prices = get_multiple_prices(ticker_list)
-    return {"prices": prices}
+    return {"prices": get_multiple_prices(ticker_list)}
 
 
 @app.get("/market/history")
@@ -173,9 +239,11 @@ def market_history(
         raise HTTPException(status_code=404, detail=f"No historical data for {ticker.upper()}.")
     close = df["Close"].dropna()
     return {
-        "ticker":  ticker.upper(),
-        "period":  period,
-        "prices": [{"date": str(d.date()), "close": round(float(v), 2)} for d, v in close.items()],
+        "ticker": ticker.upper(),
+        "period": period,
+        "prices": [
+            {"date": str(d.date()), "close": round(float(v), 2)} for d, v in close.items()
+        ],
     }
 
 
@@ -183,7 +251,9 @@ def market_history(
 def market_hot_stocks():
     stocks = get_hot_stocks(top_n=50)
     if not stocks:
-        raise HTTPException(status_code=503, detail="Could not fetch market data. Try again shortly.")
+        raise HTTPException(
+            status_code=503, detail="Could not fetch market data. Try again shortly."
+        )
     return {"stocks": stocks, "total": len(stocks)}
 
 
@@ -197,7 +267,6 @@ def stock_analyze(ticker: str = Query(..., description="Ticker symbol, e.g. AAPL
 
 @app.post("/portfolio/analyze")
 def portfolio_analyze(request: PortfolioRequest):
-    result = analyze_portfolio(
+    return analyze_portfolio(
         [{"ticker": h.ticker, "investment": h.investment} for h in request.holdings]
     )
-    return result
