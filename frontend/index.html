@@ -1400,14 +1400,54 @@ const SNAPSHOT_TICKERS = [
   { sym: "EURUSD=X", label: "EUR/USD"  },
 ];
 
-// Edit these to match your actual holdings
-const MY_PORTFOLIO = [
-  { ticker: "AAPL", name: "Apple",     shares: 10 },
-  { ticker: "MSFT", name: "Microsoft", shares: 5  },
-  { ticker: "NVDA", name: "NVIDIA",    shares: 8  },
-  { ticker: "TSLA", name: "Tesla",     shares: 4  },
-  { ticker: "AMZN", name: "Amazon",    shares: 3  },
-];
+// Portfolio loaded dynamically from /portfolio/holdings
+let MY_PORTFOLIO = [];
+
+async function loadPortfolioHoldings() {
+  try {
+    const resp = await fetch(`${API_BASE}/portfolio/holdings`);
+    if (!resp.ok) return;
+    const data = await resp.json();
+    MY_PORTFOLIO = data.holdings || [];
+    renderPortfolioSection();
+  } catch { /* fail silently — flip-cards stay empty */ }
+}
+
+async function savePortfolioHoldings(holdings) {
+  try {
+    await fetch(`${API_BASE}/portfolio/holdings`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ holdings }),
+    });
+  } catch { /* non-critical */ }
+}
+
+function renderPortfolioSection() {
+  const grid = document.getElementById('flipGrid');
+  if (!grid) return;
+
+  if (!MY_PORTFOLIO.length) {
+    grid.innerHTML = `
+      <div style="grid-column:1/-1; padding:32px 0; text-align:center; color:var(--faint);">
+        <div style="font-size:1.05rem; margin-bottom:8px;">No holdings yet</div>
+        <div style="font-size:0.82rem;">Add positions in the Portfolio Analyzer below to see them here.</div>
+      </div>`;
+    document.getElementById('portFlipTotal').textContent = '';
+    const dashSnap = document.getElementById('dashPortfolioSnap');
+    if (dashSnap) dashSnap.innerHTML = '';
+    return;
+  }
+
+  const tickers = MY_PORTFOLIO.map(p => p.ticker);
+  fetch(`${API_BASE}/market/prices?tickers=${tickers.join(',')}`)
+    .then(r => r.json())
+    .then(data => {
+      renderFlipCards(data.prices);
+      renderPortfolioMini(data.prices);
+    })
+    .catch(() => renderFlipCards({}));
+}
 
 /* ═══════════════════════════════════════
    NAVIGATION
@@ -1519,15 +1559,16 @@ function renderMarketSnapshot(prices) {
 function renderPortfolioMini(prices) {
   let total = 0;
   document.getElementById("dashPortfolio").innerHTML =
-    MY_PORTFOLIO.map(({ ticker, name, shares }) => {
+    MY_PORTFOLIO.map(({ ticker, name, shares, investment }) => {
       const p = prices[ticker];
-      const v = p != null ? p * shares : null;
+      const v = (p != null && shares) ? p * shares : null;
       if (v != null) total += v;
+      const subLabel = shares ? `${shares} sh` : (investment ? `$${investment} inv` : "");
       return `
         <div class="mkt-row">
           <div>
             <div class="mkt-name">${ticker}</div>
-            <div class="mkt-sub">${name} · ${shares} sh</div>
+            <div class="mkt-sub">${name || ticker}${subLabel ? " · " + subLabel : ""}</div>
           </div>
           <div class="mkt-right">
             <div class="mkt-price">${fmtPrice(p)}</div>
@@ -1542,42 +1583,52 @@ function renderPortfolioMini(prices) {
 }
 
 function renderFlipCards(prices) {
-  document.getElementById("flipGrid").innerHTML =
-    MY_PORTFOLIO.map(({ ticker, name, shares }) => {
-      const p = prices[ticker];
-      const v = p != null ? p * shares : null;
-      const vStr = v != null ? "$" + v.toLocaleString("en-US", {maximumFractionDigits:0}) : "—";
-      return `
-        <div class="flip-card" onclick="this.classList.toggle('flipped')">
-          <div class="flip-card-inner">
-            <div class="flip-card-front">
-              <div>
-                <div class="fc-ticker">${ticker}</div>
-                <div class="fc-name">${name}</div>
-              </div>
-              <div>
-                <div class="fc-price">${fmtPrice(p)}</div>
-                <div class="fc-val">${shares} shares · ${vStr}</div>
-              </div>
-              <div class="fc-hint">tap to flip</div>
+  const grid = document.getElementById("flipGrid");
+  if (!MY_PORTFOLIO.length) return;
+
+  grid.innerHTML = MY_PORTFOLIO.map(({ ticker, name, shares, investment }) => {
+    const p = prices[ticker];
+    const currentVal = (p != null && shares) ? p * shares : null;
+    const valStr = currentVal != null
+      ? "$" + currentVal.toLocaleString("en-US", {maximumFractionDigits: 0})
+      : "—";
+    const sharesStr = shares
+      ? `${shares} shares`
+      : investment
+        ? `$${investment.toLocaleString("en-US", {maximumFractionDigits: 0})} invested`
+        : "—";
+
+    return `
+      <div class="flip-card" onclick="this.classList.toggle('flipped')">
+        <div class="flip-card-inner">
+          <div class="flip-card-front">
+            <div>
+              <div class="fc-ticker">${ticker}</div>
+              <div class="fc-name">${name || ticker}</div>
             </div>
-            <div class="flip-card-back">
-              <div>
-                <div class="fcb-ticker">${ticker}</div>
-                <div class="fcb-shares">${shares} shares</div>
-              </div>
-              <div>
-                <div class="fcb-val">${vStr}</div>
-                <div class="fcb-sub">Portfolio value</div>
-              </div>
-              <div class="fcb-link"
-                onclick="event.stopPropagation(); analyzeStockFromCard('${ticker}')">
-                Analyze in detail →
-              </div>
+            <div>
+              <div class="fc-price">${fmtPrice(p)}</div>
+              <div class="fc-val">${sharesStr} · ${valStr}</div>
+            </div>
+            <div class="fc-hint">tap to flip</div>
+          </div>
+          <div class="flip-card-back">
+            <div>
+              <div class="fcb-ticker">${ticker}</div>
+              <div class="fcb-shares">${sharesStr}</div>
+            </div>
+            <div>
+              <div class="fcb-val">${valStr}</div>
+              <div class="fcb-sub">Current value</div>
+            </div>
+            <div class="fcb-link"
+              onclick="event.stopPropagation(); analyzeStockFromCard('${ticker}')">
+              Analyze in detail →
             </div>
           </div>
-        </div>`;
-    }).join("");
+        </div>
+      </div>`;
+  }).join("");
 }
 
 function analyzeStockFromCard(ticker) {
@@ -2220,9 +2271,10 @@ function drawStockChart(prices) {
    BOOT
 ═══════════════════════════════════════ */
 loadBriefing();
-loadMarketData();
 loadBriefingArchive();
 loadCostSummary();
+loadPortfolioHoldings();
+loadMarketData();
 </script>
 
 </body>
