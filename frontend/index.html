@@ -1731,11 +1731,17 @@ async function generateBriefing(provider = 'anthropic') {
 
   try {
     const resp = await fetch(`${API_BASE}/briefing/generate?provider=${provider}`, { method: 'POST' });
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({ detail: resp.statusText }));
-      throw new Error(err.detail || resp.statusText);
+    const text = await resp.text();
+    console.log(`[generateBriefing] status=${resp.status} body=${text.slice(0, 300)}`);
+    let data = {};
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      throw new Error(text || `HTTP ${resp.status}`);
     }
-    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.detail || data.error || `HTTP ${resp.status}`);
+    }
 
     contentEl.className = 'briefing-body';
     contentEl.innerHTML = mdToHtml(data.markdown);
