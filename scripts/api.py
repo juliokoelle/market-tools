@@ -39,8 +39,11 @@ _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 # ---------------------------------------------------------------------------
 
 _cache: dict[str, tuple[float, object]] = {}
-_TTL_SHORT = 60.0    # list + rate-limit check
-_TTL_LONG  = 300.0   # briefing content
+_TTL_SHORT      = 60.0    # list + rate-limit check
+_TTL_LONG       = 300.0   # briefing content
+_TTL_BULL_SCORE = 300.0   # watchlist items (5 min)
+_TTL_CHART      = 900.0   # OHLC chart data (15 min)
+_TTL_AI_SUMMARY = 21600.0 # Sonnet summary (6 h)
 
 
 def _cache_get(key: str, ttl: float) -> object | None:
@@ -408,6 +411,193 @@ def portfolio_analyze(request: PortfolioRequest):
     return analyze_portfolio(
         [{"ticker": h.ticker, "investment": h.investment} for h in request.holdings]
     )
+
+
+# ---------------------------------------------------------------------------
+# Stock Analyzer 2.0 — Watchlist + scoring endpoints
+# ---------------------------------------------------------------------------
+
+def _load_watchlist_categories() -> list[dict]:
+    import yaml
+    path = Path(__file__).parent.parent / "config" / "watchlist.yaml"
+    if not path.exists():
+        return []
+    with open(path, encoding="utf-8") as f:
+        data = yaml.safe_load(f)
+    return data.get("categories", [])
+
+
+def _score_one_ticker(ticker: str) -> dict:
+    """Bull score with API-level cache (5 min)."""
+    cache_key = f"bull:{ticker}"
+    cached = _cache_get(cache_key, _TTL_BULL_SCORE)
+    if cached is not None:
+        return cached
+    from scripts.scoring import bull_score
+    result = bull_score(ticker)
+    _cache_set(cache_key, result)
+    return result
+
+
+@app.get("/watchlist")
+def get_watchlist():
+    from concurrent.futures import ThreadPoolExecutor
+
+    categories = _load_watchlist_categories()
+    if not categories:
+        raise HTTPException(status_code=503, detail="Watchlist config not found.")
+
+    all_tickers = [t for cat in categories for t in cat["tickers"]]
+
+    with ThreadPoolExecutor(max_workers=12) as executor:
+        futures = {ticker: executor.submit(_score_one_ticker, ticker) for ticker in all_tickers}
+        scores = {ticker: fut.result() for ticker, fut in futures.items()}
+
+    result = []
+    for cat in categories:
+        items = [scores.get(t, {"ticker": t, "bull_score": 50, "components": {}, "is_crypto": False})
+                 for t in cat["tickers"]]
+        result.append({"name": cat["name"], "tickers": items})
+
+    return {"categories": result}
+
+
+@app.get("/stock/{ticker}/detail")
+def stock_detail(ticker: str):
+    ticker = ticker.upper()
+    cache_key = f"detail:{ticker}"
+    cached = _cache_get(cache_key, _TTL_BULL_SCORE)
+    if cached is not None:
+        return cached
+
+    from scripts.scoring import bull_score
+    import yfinance as yf
+
+    score_data = bull_score(ticker)
+
+    try:
+        info = yf.Ticker(ticker).info
+        detail = {
+            **score_data,
+            "company_name": info.get("longName") or info.get("shortName") or ticker,
+            "sector":       info.get("sector"),
+            "industry":     info.get("industry"),
+            "market_cap":   info.get("marketCap"),
+            "currency":     info.get("currency", "USD"),
+            "description":  (info.get("longBusinessSummary") or "")[:500],
+        }
+    except Exception:
+        detail = {**score_data, "company_name": ticker}
+
+    _cache_set(cache_key, detail)
+    return detail
+
+
+@app.get("/stock/{ticker}/chart")
+def stock_chart(
+    ticker: str,
+    period: str = Query("3mo", description="1mo, 3mo, 6mo, 1y"),
+):
+    ticker = ticker.upper()
+    if period not in ("1mo", "3mo", "6mo", "1y"):
+        period = "3mo"
+
+    cache_key = f"chart:{ticker}:{period}"
+    cached = _cache_get(cache_key, _TTL_CHART)
+    if cached is not None:
+        return cached
+
+    import yfinance as yf
+    df = yf.download(ticker, period=period, auto_adjust=True, progress=False)
+    if df is None or df.empty:
+        raise HTTPException(status_code=404, detail=f"No chart data for {ticker}")
+
+    if hasattr(df.columns, "levels"):
+        df.columns = df.columns.get_level_values(0)
+
+    rows = []
+    for dt, row in df.iterrows():
+        vol = row.get("Volume", 0)
+        rows.append({
+            "date":   str(dt.date()),
+            "open":   round(float(row["Open"]), 2),
+            "high":   round(float(row["High"]), 2),
+            "low":    round(float(row["Low"]), 2),
+            "close":  round(float(row["Close"]), 2),
+            "volume": int(vol) if vol == vol else 0,  # NaN guard
+        })
+
+    result = {"ticker": ticker, "period": period, "ohlcv": rows}
+    _cache_set(cache_key, result)
+    return result
+
+
+@app.get("/stock/{ticker}/ai-summary")
+def stock_ai_summary(ticker: str):
+    ticker = ticker.upper()
+    cache_key = f"ai_summary:{ticker}"
+    cached = _cache_get(cache_key, _TTL_AI_SUMMARY)
+    if cached is not None:
+        return cached
+
+    api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY not configured")
+
+    from scripts.scoring import bull_score
+    import anthropic
+    import yfinance as yf
+
+    score_data = bull_score(ticker)
+
+    try:
+        info = yf.Ticker(ticker).info
+        company_name = info.get("longName") or info.get("shortName") or ticker
+        sector       = info.get("sector", "N/A")
+        price        = info.get("currentPrice") or info.get("regularMarketPrice") or "N/A"
+    except Exception:
+        company_name, sector, price = ticker, "N/A", "N/A"
+
+    comp  = score_data.get("components", {})
+    mom   = comp.get("momentum",  {})
+    sent  = comp.get("sentiment", {})
+    val   = comp.get("valuation")
+    anal  = comp.get("analyst")
+
+    val_line  = (f"P/E {val['details'].get('trailing_pe')} / fwd {val['details'].get('forward_pe')} / P/B {val['details'].get('price_to_book')}"
+                 if val and val.get("details") else "N/A")
+    anal_line = (f"{anal['details'].get('recommendation')} (mean {anal['details'].get('recommendation_mean')}, "
+                 f"{anal['details'].get('analyst_count')} analysts)"
+                 if anal and anal.get("details") else "N/A")
+
+    prompt = (
+        f"Analyze {company_name} ({ticker}):\n"
+        f"Price: {price} | Bull Score: {score_data['bull_score']}/100 | Sector: {sector}\n"
+        f"Momentum {int(mom.get('weight',0)*100)}%: {mom.get('score',50):.0f}/100 | "
+        f"30d {mom.get('details',{}).get('return_30d')}% | 90d {mom.get('details',{}).get('return_90d')}% | "
+        f"Above MA50: {mom.get('details',{}).get('above_ma50')} / MA200: {mom.get('details',{}).get('above_ma200')}\n"
+        f"Sentiment {int(sent.get('weight',0)*100)}%: {sent.get('score',50):.0f}/100 ({sent.get('details',{}).get('label')})\n"
+        f"Valuation 20%: {val.get('score','N/A') if val else 'N/A'}/100 — {val_line}\n"
+        f"Analyst 20%: {anal.get('score','N/A') if anal else 'N/A'}/100 — {anal_line}\n\n"
+        "Write a 2-3 paragraph investment analysis in the style of a Bloomberg brief. "
+        "Be analytical, not promotional. Cover: current outlook, key risks, what to monitor."
+    )
+
+    client = anthropic.Anthropic(api_key=api_key)
+    response = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=600,
+        messages=[{"role": "user", "content": prompt}],
+    )
+
+    result = {
+        "ticker":       ticker,
+        "summary":      response.content[0].text.strip(),
+        "bull_score":   score_data["bull_score"],
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    _cache_set(cache_key, result)
+    return result
 
 
 # ---------------------------------------------------------------------------

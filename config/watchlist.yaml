@@ -1,0 +1,55 @@
+categories:
+  - name: Big Tech
+    tickers:
+      - AAPL
+      - MSFT
+      - GOOGL
+      - AMZN
+      - META
+
+  - name: Semiconductors
+    tickers:
+      - NVDA
+      - AMD
+      - TSM
+      - QCOM
+      - ASM.AS   # ASMI (ASM International, Euronext Amsterdam)
+
+  - name: Energy
+    tickers:
+      - XOM
+      - CVX
+      - BP
+      - SHEL
+      - TTE
+
+  - name: Clean Energy
+    tickers:
+      - NEE
+      - ENPH
+      - FSLR
+      - RUN
+      - BEP
+
+  - name: Luxury
+    tickers:
+      - MC.PA    # LVMH (Euronext Paris)
+      - RMS.PA   # Hermès
+      - CFR.SW   # Richemont (SIX Swiss)
+      - BRBY.L   # Burberry (London)
+      - EL       # Estée Lauder
+
+  - name: ETFs
+    tickers:
+      - SPY
+      - QQQ
+      - VTI
+      - EWZ      # Brazil (iShares MSCI Brazil)
+      - EWG      # Germany (iShares MSCI Germany)
+
+  - name: Crypto
+    tickers:
+      - BTC-USD
+      - ETH-USD
+      - SOL-USD
+      - BNB-USD

@@ -752,6 +752,63 @@
     ───────────────────────────────────────────── */
     @keyframes fadeIn  { from { opacity: 0; } to { opacity: 1; } }
     @keyframes slideUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    @keyframes pulse   { 0%,100% { opacity:.5; } 50% { opacity:.9; } }
+
+    /* ── Watchlist ── */
+    .watchlist-category { margin-bottom: 20px; }
+    .watchlist-category-title {
+      font-size: 0.72rem; text-transform: uppercase; letter-spacing: .06em;
+      color: var(--muted); margin-bottom: 8px; padding: 0 2px;
+    }
+    .watchlist-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 10px;
+    }
+    .ticker-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 12px 12px 10px;
+      cursor: pointer; transition: box-shadow .15s, transform .15s;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .ticker-card:hover { box-shadow: var(--shadow); transform: translateY(-1px); }
+    .ticker-card-symbol { font-size: 0.88rem; font-weight: 700; color: var(--ink); line-height: 1; }
+    .ticker-card-score {
+      font-size: 1.35rem; font-weight: 700; letter-spacing: -.03em; line-height: 1;
+    }
+    .ticker-card-bar { height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; }
+    .ticker-card-bar-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
+    .ticker-card-return { font-size: 0.72rem; color: var(--muted); }
+    .score-high   { color: #16a34a; }
+    .score-mid    { color: #ff9f0a; }
+    .score-low    { color: #dc2626; }
+    .bar-high     { background: #16a34a; }
+    .bar-mid      { background: #ff9f0a; }
+    .bar-low      { background: #dc2626; }
+
+    /* ── Component mini-bars in detail modal ── */
+    .breakdown-row { display: flex; align-items: center; gap: 8px; }
+    .breakdown-label { font-size: 0.78rem; color: var(--ink); width: 90px; flex-shrink: 0; }
+    .breakdown-track { flex: 1; height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; }
+    .breakdown-fill  { height: 100%; border-radius: 4px; background: var(--accent); transition: width .5s ease; }
+    .breakdown-score { font-size: 0.78rem; color: var(--muted); width: 36px; text-align: right; flex-shrink: 0; }
+
+    /* ── Period selector buttons ── */
+    .chart-period-btn {
+      background: none; border: 1px solid var(--border); border-radius: 6px;
+      padding: 3px 8px; font-size: 0.72rem; color: var(--muted); cursor: pointer;
+      transition: all .15s;
+    }
+    .chart-period-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .chart-period-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* ── Detail metric tiles ── */
+    .sd-metric-tile {
+      background: var(--bg); border-radius: var(--radius-sm); padding: 10px 10px 8px;
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .sd-metric-label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: .05em; color: var(--faint); }
+    .sd-metric-value { font-size: 1rem; font-weight: 700; color: var(--ink); }
 
     .modal-backdrop {
       display: none;
@@ -942,6 +999,8 @@
       .main { margin-left: 64px; }
     }
   </style>
+  <!-- Plotly for interactive OHLC charts -->
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" crossorigin="anonymous"></script>
 </head>
 <body>
 
@@ -1216,106 +1275,96 @@
     </div>
   </section>
 
-  <!-- ═══ VIEW: Stock Analyzer ═══ -->
+  <!-- ═══ VIEW: Stock Analyzer (Watchlist) ═══ -->
   <section id="view-analyzer" class="view">
-    <div class="view-header">
-      <h1>Stock Analyzer</h1>
-      <p>Technicals, moving averages, momentum, and news sentiment — last 6 months.</p>
+    <div class="view-header" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px;">
+      <div>
+        <h1>Stock Analyzer</h1>
+        <p>Bull Score = 30% Momentum + 30% Sentiment + 20% Valuation + 20% Analyst</p>
+      </div>
+      <button class="btn-secondary" id="watchlistRefreshBtn" onclick="loadWatchlist(true)" style="flex-shrink:0;">Refresh</button>
     </div>
 
-    <div class="card" style="margin-bottom:14px;">
-      <div class="card-label" style="margin-bottom:10px;">Ticker Symbol</div>
-      <div id="stockInputRow" style="display:flex; gap:10px; flex-wrap:wrap; align-items:stretch;">
-        <input type="text" id="stockInput" placeholder="e.g. AAPL"
-               style="max-width:220px; flex:1 1 120px;"
-               onkeydown="if(event.key==='Enter') analyzeStock()" />
-        <button class="btn-primary" id="stockBtn" onclick="analyzeStock()">Analyze</button>
-      </div>
+    <div class="error-banner" id="watchlistError" style="display:none;"></div>
+
+    <div id="watchlistSkeleton" style="display:flex; flex-direction:column; gap:14px;">
+      <div class="card" style="height:80px; background:var(--bg); border:none; animation:pulse 1.4s infinite;"></div>
+      <div class="card" style="height:80px; background:var(--bg); border:none; animation:pulse 1.4s infinite;"></div>
     </div>
 
-    <div class="error-banner" id="stockError"></div>
-
-    <div id="stockResults" style="display:none;">
-      <div class="insight-box" id="stockSummary" style="margin-bottom:14px;"></div>
-
-      <div class="card" style="margin-bottom:14px;">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
-          <div>
-            <div class="card-label">Current Price</div>
-            <div id="stockCurrentPrice" style="font-size:1.7rem; font-weight:700; color:var(--ink); letter-spacing:-0.02em; margin-top:4px; line-height:1;"></div>
-          </div>
-          <a id="stockYahooLink" href="#" target="_blank" rel="noopener" class="btn-secondary">Yahoo Finance ↗</a>
-        </div>
-        <canvas id="stockCanvas" style="width:100%; display:block; max-height:160px;"></canvas>
-        <div id="stockChartFallback" style="display:none; padding:12px 0 4px; border-top:1px solid var(--border);">
-          <p style="margin:0 0 8px; color:var(--faint); font-size:0.85rem;">Chart unavailable — insufficient data.</p>
-          <a id="stockFallbackLink" href="#" target="_blank" rel="noopener" class="btn-secondary" style="display:inline-flex;">View on Yahoo Finance ↗</a>
-        </div>
-        <div id="stockChartDates" style="display:none; justify-content:space-between; margin-top:6px;">
-          <span id="stockChartDateMin" style="font-size:0.68rem; color:var(--faint);"></span>
-          <span id="stockChartDateMax" style="font-size:0.68rem; color:var(--faint);"></span>
-        </div>
-      </div>
-
-      <div class="card" style="margin-bottom:14px;">
-        <div class="card-label" style="margin-bottom:10px;">Trend Analysis</div>
-        <div class="metrics-grid">
-          <div class="metric-card">
-            <div class="metric-label">Trend</div>
-            <div class="metric-value" id="stockTrend">—</div>
-            <div class="metric-sub" id="stockTrendSub"></div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">50d MA</div>
-            <div class="metric-value c-accent" id="stockMA50">—</div>
-            <div class="metric-sub">Medium-term avg.</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">200d MA</div>
-            <div class="metric-value c-accent" id="stockMA200">—</div>
-            <div class="metric-sub">Long-term avg.</div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card" style="margin-bottom:14px;">
-        <div class="card-label" style="margin-bottom:10px;">Risk Metrics</div>
-        <div class="metrics-grid">
-          <div class="metric-card">
-            <div class="metric-label">30d Return</div>
-            <div class="metric-value" id="stockReturn30">—</div>
-            <div class="metric-sub">≈ last month</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">90d Return</div>
-            <div class="metric-value" id="stockReturn90">—</div>
-            <div class="metric-sub">≈ last quarter</div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Volatility</div>
-            <div class="metric-value" id="stockVol">—</div>
-            <div class="metric-sub" id="stockRiskLevel"></div>
-          </div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-label" style="margin-bottom:10px;">News Sentiment</div>
-        <div class="metrics-grid-2">
-          <div class="metric-card">
-            <div class="metric-label">Sentiment</div>
-            <div class="metric-value" id="stockSentiment">—</div>
-            <div class="metric-sub" id="stockSentimentConf"></div>
-          </div>
-          <div class="metric-card">
-            <div class="metric-label">Articles Analysed</div>
-            <div class="metric-value c-accent" id="stockArticleCount">—</div>
-            <div class="metric-sub" id="stockSignalSplit"></div>
-          </div>
-        </div>
-      </div>
+    <div id="watchlistContent" style="display:none;">
+      <!-- Categories injected by JS -->
     </div>
   </section>
+
+  <!-- ═══ STOCK DETAIL MODAL ═══ -->
+  <div class="modal-backdrop" id="stockDetailBackdrop" onclick="if(event.target===this) closeStockDetail()" style="display:none;">
+    <div class="modal" role="dialog" aria-modal="true" style="max-width:700px; width:95vw; max-height:90vh; overflow-y:auto;">
+      <div class="modal-header">
+        <div>
+          <h3 id="sdTicker" style="font-size:1.3rem; font-weight:700;"></h3>
+          <div id="sdCompany" style="font-size:0.85rem; color:var(--muted); margin-top:2px;"></div>
+        </div>
+        <button class="modal-close" onclick="closeStockDetail()" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body" style="padding:16px;">
+
+        <!-- Bull Score headline -->
+        <div style="display:flex; align-items:center; gap:16px; margin-bottom:16px;">
+          <div id="sdScoreRing" style="width:64px; height:64px; flex-shrink:0; position:relative;">
+            <svg viewBox="0 0 64 64" style="width:64px; height:64px; transform:rotate(-90deg);">
+              <circle cx="32" cy="32" r="26" fill="none" stroke="var(--border)" stroke-width="6"/>
+              <circle id="sdScoreArc" cx="32" cy="32" r="26" fill="none" stroke="#5856d6" stroke-width="6"
+                      stroke-linecap="round" stroke-dasharray="163.36" stroke-dashoffset="163.36"/>
+            </svg>
+            <div id="sdScoreNum" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:1rem; font-weight:700; color:var(--ink);">—</div>
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:0.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:4px;">Bull Score</div>
+            <div id="sdScoreBar" style="height:8px; border-radius:4px; background:var(--bg); overflow:hidden;">
+              <div id="sdScoreBarFill" style="height:100%; border-radius:4px; background:#5856d6; width:0%; transition:width .5s ease;"></div>
+            </div>
+            <div id="sdScoreComponents" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; font-size:0.75rem; color:var(--muted);"></div>
+          </div>
+        </div>
+
+        <!-- Key metrics row -->
+        <div id="sdMetrics" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(100px,1fr)); gap:8px; margin-bottom:16px;"></div>
+
+        <!-- Chart -->
+        <div style="margin-bottom:16px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div style="font-size:0.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);">Price Chart (OHLC)</div>
+            <div style="display:flex; gap:6px;">
+              <button class="chart-period-btn active" data-period="1mo" onclick="switchChartPeriod(this,'1mo')">1M</button>
+              <button class="chart-period-btn" data-period="3mo" onclick="switchChartPeriod(this,'3mo')">3M</button>
+              <button class="chart-period-btn" data-period="6mo" onclick="switchChartPeriod(this,'6mo')">6M</button>
+              <button class="chart-period-btn" data-period="1y" onclick="switchChartPeriod(this,'1y')">1Y</button>
+            </div>
+          </div>
+          <div id="sdChartContainer" style="height:280px; border-radius:var(--radius-sm); overflow:hidden; background:var(--bg);">
+            <div id="sdChartPlaceholder" style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--faint); font-size:0.85rem;">Loading chart…</div>
+          </div>
+        </div>
+
+        <!-- Score breakdown -->
+        <div style="margin-bottom:16px;">
+          <div style="font-size:0.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:8px;">Score Breakdown</div>
+          <div id="sdBreakdown" style="display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+
+        <!-- AI Summary -->
+        <div>
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <div style="font-size:0.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted);">AI Analysis</div>
+            <button class="btn-secondary" id="sdAiBtn" onclick="loadAiSummary()" style="font-size:0.78rem; padding:4px 10px;">Generate</button>
+          </div>
+          <div id="sdAiSummary" style="font-size:0.88rem; line-height:1.6; color:var(--ink); padding:12px; background:var(--bg); border-radius:var(--radius-sm); min-height:40px;"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
 
   <!-- ═══ VIEW: Ideas Tracker ═══ -->
   <section id="view-ideas" class="view">
@@ -1458,6 +1507,7 @@ function showView(name) {
   document.querySelectorAll("[data-view]").forEach(el => {
     el.classList.toggle("active", el.dataset.view === name);
   });
+  if (name === 'analyzer') loadWatchlist();
 }
 
 /* ═══════════════════════════════════════
@@ -1632,9 +1682,8 @@ function renderFlipCards(prices) {
 }
 
 function analyzeStockFromCard(ticker) {
-  document.getElementById("stockInput").value = ticker;
   showView("analyzer");
-  analyzeStock();
+  openStockDetail(ticker);
 }
 
 /* ═══════════════════════════════════════
@@ -2150,10 +2199,288 @@ function renderHotPage() {
 }
 
 /* ═══════════════════════════════════════
-   STOCK ANALYZER
+   STOCK ANALYZER 2.0 — WATCHLIST
+═══════════════════════════════════════ */
+
+/* ── Score colour helpers ── */
+function scoreColor(s) { return s >= 65 ? 'score-high' : s >= 40 ? 'score-mid' : 'score-low'; }
+function barColor(s)   { return s >= 65 ? 'bar-high'   : s >= 40 ? 'bar-mid'   : 'bar-low'; }
+
+/* ── Watchlist loading ── */
+async function loadWatchlist(forceRefresh = false) {
+  const skeleton = document.getElementById('watchlistSkeleton');
+  const content  = document.getElementById('watchlistContent');
+  const errEl    = document.getElementById('watchlistError');
+  const btn      = document.getElementById('watchlistRefreshBtn');
+  errEl.style.display = 'none';
+
+  if (!forceRefresh && content.innerHTML.trim()) return; // already loaded
+
+  skeleton.style.display = 'flex';
+  content.style.display  = 'none';
+  if (btn) { btn.disabled = true; btn.textContent = 'Loading…'; }
+
+  try {
+    const resp = await fetch(`${API_BASE}/watchlist`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    renderWatchlist(data.categories || []);
+    skeleton.style.display = 'none';
+    content.style.display  = 'block';
+  } catch (e) {
+    skeleton.style.display = 'none';
+    errEl.textContent = 'Failed to load watchlist — ' + e.message;
+    errEl.style.display = 'block';
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Refresh'; }
+  }
+}
+
+function renderWatchlist(categories) {
+  const container = document.getElementById('watchlistContent');
+  container.innerHTML = categories.map(cat => {
+    const cards = cat.tickers.map(t => {
+      const score = t.bull_score ?? 50;
+      const cls   = scoreColor(score);
+      const bcls  = barColor(score);
+      const mom   = t.components?.momentum?.details || {};
+      const ret30 = mom.return_30d;
+      const retStr = ret30 != null
+        ? `<span class="${ret30 >= 0 ? 'c-green' : 'c-red'}">${ret30 >= 0 ? '+' : ''}${ret30}%</span>`
+        : '';
+      return `
+        <div class="ticker-card" onclick="openStockDetail('${t.ticker}')" title="Click for full analysis">
+          <div class="ticker-card-symbol">${t.ticker}</div>
+          <div class="ticker-card-score ${cls}">${score}</div>
+          <div class="ticker-card-bar">
+            <div class="ticker-card-bar-fill ${bcls}" style="width:${score}%;"></div>
+          </div>
+          <div class="ticker-card-return">${retStr || '<span style="color:var(--faint)">—</span>'}</div>
+        </div>`;
+    }).join('');
+    return `
+      <div class="watchlist-category">
+        <div class="watchlist-category-title">${cat.name}</div>
+        <div class="watchlist-grid">${cards}</div>
+      </div>`;
+  }).join('');
+}
+
+/* ── Stock Detail Modal ── */
+let _sdTicker = '';
+let _sdChartPeriod = '3mo';
+
+async function openStockDetail(ticker) {
+  _sdTicker = ticker.toUpperCase();
+  _sdChartPeriod = '3mo';
+
+  // Reset modal state
+  document.getElementById('sdTicker').textContent = _sdTicker;
+  document.getElementById('sdCompany').textContent = '';
+  document.getElementById('sdScoreNum').textContent = '—';
+  document.getElementById('sdScoreArc').style.strokeDashoffset = '163.36';
+  document.getElementById('sdScoreBarFill').style.width = '0%';
+  document.getElementById('sdScoreComponents').innerHTML = '';
+  document.getElementById('sdMetrics').innerHTML = '';
+  document.getElementById('sdBreakdown').innerHTML = '';
+  document.getElementById('sdAiSummary').innerHTML = '<span style="color:var(--faint)">Click Generate for an AI analysis.</span>';
+  document.getElementById('sdAiBtn').disabled = false;
+  document.getElementById('sdAiBtn').textContent = 'Generate';
+  document.getElementById('sdChartPlaceholder').textContent = 'Loading chart…';
+  document.getElementById('sdChartContainer').innerHTML = '<div id="sdChartPlaceholder" style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--faint); font-size:0.85rem;">Loading chart…</div>';
+
+  // Reset period buttons
+  document.querySelectorAll('.chart-period-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.period === _sdChartPeriod);
+  });
+
+  document.getElementById('stockDetailBackdrop').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+
+  // Load detail + chart in parallel
+  const [detailData, chartData] = await Promise.allSettled([
+    fetch(`${API_BASE}/stock/${encodeURIComponent(_sdTicker)}/detail`).then(r => r.ok ? r.json() : Promise.reject(r.status)),
+    fetch(`${API_BASE}/stock/${encodeURIComponent(_sdTicker)}/chart?period=${_sdChartPeriod}`).then(r => r.ok ? r.json() : Promise.reject(r.status)),
+  ]);
+
+  if (detailData.status === 'fulfilled') renderStockDetail(detailData.value);
+  if (chartData.status === 'fulfilled')  renderPlotlyChart(chartData.value.ohlcv, _sdTicker);
+  else document.getElementById('sdChartContainer').innerHTML = '<div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--faint); font-size:0.85rem;">Chart unavailable</div>';
+}
+
+function closeStockDetail() {
+  document.getElementById('stockDetailBackdrop').style.display = 'none';
+  document.body.style.overflow = '';
+  _sdTicker = '';
+}
+
+function renderStockDetail(d) {
+  document.getElementById('sdTicker').textContent   = d.ticker || _sdTicker;
+  document.getElementById('sdCompany').textContent  = [d.company_name, d.sector].filter(Boolean).join(' · ');
+
+  const score = d.bull_score ?? 50;
+  document.getElementById('sdScoreNum').textContent = score;
+  const offset = 163.36 * (1 - score / 100);
+  document.getElementById('sdScoreArc').style.strokeDashoffset = offset;
+  const arcColor = score >= 65 ? '#16a34a' : score >= 40 ? '#ff9f0a' : '#dc2626';
+  document.getElementById('sdScoreArc').style.stroke = arcColor;
+  document.getElementById('sdScoreBarFill').style.width = score + '%';
+  document.getElementById('sdScoreBarFill').style.background = arcColor;
+
+  // Component chips
+  const comp = d.components || {};
+  const chipHtml = Object.entries(comp).map(([k, v]) => {
+    const s = Math.round(v.score ?? 50);
+    const wPct = Math.round((v.weight ?? 0) * 100);
+    return `<span title="${k}: ${s}/100 (weight ${wPct}%)"
+              style="background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:2px 6px; font-size:0.7rem; color:var(--ink);">
+              ${k[0].toUpperCase()+k.slice(1)} <b style="color:${arcColor}">${s}</b>
+            </span>`;
+  }).join('');
+  document.getElementById('sdScoreComponents').innerHTML = chipHtml;
+
+  // Key metric tiles
+  const mom = comp.momentum?.details || {};
+  const val = comp.valuation?.details || {};
+  const anal = comp.analyst?.details || {};
+  const tiles = [
+    ['30d Return', mom.return_30d != null ? `${mom.return_30d >= 0 ? '+' : ''}${mom.return_30d}%` : '—'],
+    ['90d Return', mom.return_90d != null ? `${mom.return_90d >= 0 ? '+' : ''}${mom.return_90d}%` : '—'],
+    ['Above MA50',  mom.above_ma50  != null ? (mom.above_ma50  ? 'Yes' : 'No') : '—'],
+    ['Above MA200', mom.above_ma200 != null ? (mom.above_ma200 ? 'Yes' : 'No') : '—'],
+    ...(val.trailing_pe  != null ? [['Trailing P/E', val.trailing_pe]] : []),
+    ...(val.forward_pe   != null ? [['Forward P/E',  val.forward_pe]]  : []),
+    ...(val.price_to_book != null ? [['P/B',          val.price_to_book]] : []),
+    ...(anal.recommendation != null ? [['Consensus', anal.recommendation.replace(/_/g,' ')]] : []),
+    ...(anal.analyst_count  != null && anal.analyst_count > 0 ? [['Analysts', anal.analyst_count]] : []),
+  ];
+  const tileTooltips = {
+    '30d Return':  '30-day price change (≈ last month)',
+    '90d Return':  '90-day price change (≈ last quarter)',
+    'Above MA50':  'Is price above the 50-day moving average? Bullish signal when Yes.',
+    'Above MA200': 'Is price above the 200-day moving average? Golden-cross territory when both Yes.',
+    'Trailing P/E':'Trailing Price/Earnings. Lower = cheaper vs. earnings history.',
+    'Forward P/E': 'Forward P/E based on next-12m analyst estimates. < 20 is generally moderate.',
+    'P/B':         'Price-to-Book ratio. < 1 = trading below book value.',
+    'Consensus':   'Analyst consensus: strong_buy → buy → hold → underperform → sell.',
+    'Analysts':    'Number of sell-side analysts covering this stock.',
+  };
+  document.getElementById('sdMetrics').innerHTML = tiles.map(([label, val]) =>
+    `<div class="sd-metric-tile" title="${tileTooltips[label] || ''}">
+       <div class="sd-metric-label">${label}</div>
+       <div class="sd-metric-value">${val}</div>
+     </div>`
+  ).join('');
+
+  // Score breakdown bars
+  document.getElementById('sdBreakdown').innerHTML = Object.entries(comp).map(([k, v]) => {
+    const s   = Math.round(v.score ?? 50);
+    const wPct = Math.round((v.weight ?? 0) * 100);
+    const label = { momentum: 'Momentum', sentiment: 'Sentiment', valuation: 'Valuation', analyst: 'Analyst' }[k] || k;
+    const tooltipParts = Object.entries(v.details || {}).filter(([,dv]) => dv != null).map(([dk,dv]) => `${dk}: ${dv}`).join(', ');
+    return `<div class="breakdown-row" title="${tooltipParts}">
+      <div class="breakdown-label">${label} <span style="color:var(--faint);font-size:.68rem;">${wPct}%</span></div>
+      <div class="breakdown-track"><div class="breakdown-fill" style="width:${s}%;"></div></div>
+      <div class="breakdown-score">${s}</div>
+    </div>`;
+  }).join('');
+}
+
+function renderPlotlyChart(ohlcv, ticker) {
+  if (!ohlcv || ohlcv.length < 2) {
+    document.getElementById('sdChartContainer').innerHTML =
+      '<div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--faint); font-size:0.85rem;">Insufficient chart data</div>';
+    return;
+  }
+
+  const container = document.getElementById('sdChartContainer');
+  container.innerHTML = '<div id="sdPlotlyChart" style="height:100%;"></div>';
+
+  const trace = {
+    type: 'candlestick',
+    x:    ohlcv.map(r => r.date),
+    open: ohlcv.map(r => r.open),
+    high: ohlcv.map(r => r.high),
+    low:  ohlcv.map(r => r.low),
+    close: ohlcv.map(r => r.close),
+    name: ticker,
+    increasing: { line: { color: '#16a34a' }, fillcolor: 'rgba(22,163,74,0.15)' },
+    decreasing: { line: { color: '#dc2626' }, fillcolor: 'rgba(220,38,38,0.12)' },
+  };
+
+  const layout = {
+    paper_bgcolor: 'transparent',
+    plot_bgcolor:  '#f2f2f7',
+    margin: { t: 8, r: 12, b: 36, l: 52 },
+    xaxis: {
+      type: 'date',
+      rangeslider: { visible: false },
+      gridcolor: '#e5e7eb',
+      tickfont: { size: 10, color: '#8e8e93' },
+    },
+    yaxis: {
+      gridcolor: '#e5e7eb',
+      tickprefix: '',
+      tickfont: { size: 10, color: '#8e8e93' },
+      side: 'right',
+    },
+    showlegend: false,
+    font: { family: '-apple-system, BlinkMacSystemFont, sans-serif' },
+  };
+
+  if (typeof Plotly !== 'undefined') {
+    Plotly.newPlot('sdPlotlyChart', [trace], layout, { responsive: true, displayModeBar: false });
+  }
+}
+
+async function switchChartPeriod(btn, period) {
+  if (!_sdTicker) return;
+  _sdChartPeriod = period;
+  document.querySelectorAll('.chart-period-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+
+  document.getElementById('sdChartContainer').innerHTML =
+    '<div id="sdChartPlaceholder" style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--faint); font-size:0.85rem;">Loading chart…</div>';
+
+  try {
+    const resp = await fetch(`${API_BASE}/stock/${encodeURIComponent(_sdTicker)}/chart?period=${period}`);
+    if (!resp.ok) throw new Error(resp.status);
+    const data = await resp.json();
+    renderPlotlyChart(data.ohlcv, _sdTicker);
+  } catch (e) {
+    document.getElementById('sdChartContainer').innerHTML =
+      `<div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--faint); font-size:0.85rem;">Chart load failed</div>`;
+  }
+}
+
+async function loadAiSummary() {
+  if (!_sdTicker) return;
+  const btn  = document.getElementById('sdAiBtn');
+  const area = document.getElementById('sdAiSummary');
+  btn.disabled = true; btn.textContent = 'Generating…';
+  area.innerHTML = '<span style="color:var(--faint)">Calling Claude Sonnet…</span>';
+
+  try {
+    const resp = await fetch(`${API_BASE}/stock/${encodeURIComponent(_sdTicker)}/ai-summary`);
+    if (!resp.ok) { const e = await resp.json(); throw new Error(e.detail || resp.status); }
+    const data = await resp.json();
+    area.innerHTML = data.summary.replace(/\n/g, '<br>');
+    btn.textContent = 'Regenerate';
+  } catch (e) {
+    area.innerHTML = `<span style="color:var(--red-dk)">Failed: ${e.message}</span>`;
+    btn.textContent = 'Retry';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ═══════════════════════════════════════
+   [LEGACY stub — kept for hot-stocks card click compatibility]
 ═══════════════════════════════════════ */
 function analyzeStock() {
-  const ticker = document.getElementById("stockInput").value.trim().toUpperCase();
+  // Hot stocks card still calls analyzeStockFromCard which now opens the detail modal.
+  // This stub prevents "analyzeStock is not defined" errors from any stale references.
+}
   const errEl  = document.getElementById("stockError");
   errEl.style.display = "none";
 
@@ -2245,50 +2572,6 @@ function analyzeStock() {
     .finally(() => { btn.disabled = false; btn.textContent = "Analyze"; });
 }
 
-function drawStockChart(prices) {
-  const canvas = document.getElementById("stockCanvas");
-  const dpr    = window.devicePixelRatio || 1;
-  const W      = canvas.parentElement.clientWidth;
-  const H      = 160;
-  canvas.width  = W * dpr; canvas.height = H * dpr;
-  canvas.style.width = W + "px"; canvas.style.height = H + "px";
-
-  const ctx = canvas.getContext("2d");
-  ctx.scale(dpr, dpr);
-
-  const pad    = { top: 10, right: 10, bottom: 8, left: 52 };
-  const iW     = W - pad.left - pad.right;
-  const iH     = H - pad.top  - pad.bottom;
-  const closes = prices.map(p => p.close);
-  const minV   = Math.min(...closes), maxV = Math.max(...closes);
-  const range  = maxV - minV || 1;
-  const isUp   = closes[closes.length - 1] >= closes[0];
-  const lineColor = isUp ? "#34c759" : "#ff3b30";
-  const fillStart = isUp ? "rgba(52,199,89,0.15)" : "rgba(255,59,48,0.12)";
-
-  const xOf = i => pad.left + (i / (closes.length - 1)) * iW;
-  const yOf = v => pad.top  + iH - ((v - minV) / range) * iH;
-
-  ctx.fillStyle = "#f9fafb";
-  ctx.fillRect(0, 0, W, H);
-
-  const grad = ctx.createLinearGradient(0, pad.top, 0, pad.top + iH);
-  grad.addColorStop(0, fillStart);
-  grad.addColorStop(1, "rgba(255,255,255,0)");
-  ctx.beginPath(); ctx.moveTo(xOf(0), yOf(closes[0]));
-  closes.forEach((v, i) => i > 0 && ctx.lineTo(xOf(i), yOf(v)));
-  ctx.lineTo(xOf(closes.length - 1), pad.top + iH);
-  ctx.lineTo(xOf(0), pad.top + iH);
-  ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
-
-  ctx.beginPath(); ctx.moveTo(xOf(0), yOf(closes[0]));
-  closes.forEach((v, i) => i > 0 && ctx.lineTo(xOf(i), yOf(v)));
-  ctx.strokeStyle = lineColor; ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.stroke();
-
-  ctx.fillStyle = "#9ca3af"; ctx.font = "11px -apple-system, sans-serif"; ctx.textAlign = "right";
-  ctx.fillText("$" + maxV.toFixed(0), pad.left - 6, pad.top + 10);
-  ctx.fillText("$" + minV.toFixed(0), pad.left - 6, pad.top + iH);
-}
 
 /* ═══════════════════════════════════════
    BOOT
@@ -2298,6 +2581,7 @@ loadBriefingArchive();
 loadCostSummary();
 loadPortfolioHoldings();
 loadMarketData();
+loadWatchlist();
 </script>
 
 </body>
