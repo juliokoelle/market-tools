@@ -8,7 +8,9 @@ from scripts.scoring import (
     _pb_to_score,
     _keyword_sentiment,
     _is_crypto,
+    _is_no_valuation,
     _SENTIMENT_SCORE_MAP,
+    _NO_VALUATION_TICKERS,
 )
 
 
@@ -133,3 +135,34 @@ class TestIsCrypto:
     def test_european_ticker_is_not_crypto(self):
         assert _is_crypto("ASM.AS") is False
         assert _is_crypto("MC.PA") is False
+
+
+class TestIsNoValuation:
+    def test_crypto_is_no_valuation(self):
+        assert _is_no_valuation("BTC-USD") is True
+        assert _is_no_valuation("ETH-USD") is True
+
+    def test_gld_is_no_valuation(self):
+        assert _is_no_valuation("GLD") is True
+
+    def test_slv_is_no_valuation(self):
+        assert _is_no_valuation("SLV") is True
+
+    def test_vwce_is_no_valuation(self):
+        assert _is_no_valuation("VWCE.DE") is True
+
+    def test_stocks_are_not_no_valuation(self):
+        assert _is_no_valuation("AAPL")   is False
+        assert _is_no_valuation("NVDA")   is False
+        assert _is_no_valuation("MC.PA")  is False
+        assert _is_no_valuation("ASM.AS") is False
+        assert _is_no_valuation("BLDP")   is False
+
+    def test_case_insensitive(self):
+        assert _is_no_valuation("gld")     is True
+        assert _is_no_valuation("vwce.de") is True
+
+    def test_no_valuation_set_contains_expected_tickers(self):
+        assert "GLD"     in _NO_VALUATION_TICKERS
+        assert "SLV"     in _NO_VALUATION_TICKERS
+        assert "VWCE.DE" in _NO_VALUATION_TICKERS

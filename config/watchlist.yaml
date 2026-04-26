@@ -1,55 +1,41 @@
 categories:
   - name: Big Tech
     tickers:
-      - AAPL
-      - MSFT
       - GOOGL
       - AMZN
+      - AAPL
       - META
+      - MSFT
+      - TSLA
+      - PLTR
+      - PYPL
 
   - name: Semiconductors
     tickers:
       - NVDA
-      - AMD
-      - TSM
-      - QCOM
+      - ASML
+      - AVGO
       - ASM.AS   # ASMI (ASM International, Euronext Amsterdam)
 
   - name: Energy
     tickers:
-      - XOM
       - CVX
-      - BP
-      - SHEL
-      - TTE
+      - GLD      # SPDR Gold Shares ETF — no P/E, scored 50/50 Momentum+Sentiment
+      - SLV      # iShares Silver Trust ETF — no P/E, scored 50/50 Momentum+Sentiment
 
   - name: Clean Energy
     tickers:
-      - NEE
-      - ENPH
-      - FSLR
-      - RUN
-      - BEP
+      - BLDP     # Ballard Power Systems
 
   - name: Luxury
     tickers:
       - MC.PA    # LVMH (Euronext Paris)
-      - RMS.PA   # Hermès
-      - CFR.SW   # Richemont (SIX Swiss)
-      - BRBY.L   # Burberry (London)
-      - EL       # Estée Lauder
 
   - name: ETFs
     tickers:
-      - SPY
-      - QQQ
-      - VTI
-      - EWZ      # Brazil (iShares MSCI Brazil)
-      - EWG      # Germany (iShares MSCI Germany)
+      - VWCE.DE  # Vanguard FTSE All-World UCITS ETF — no P/E, scored 50/50 Momentum+Sentiment
 
   - name: Crypto
     tickers:
       - BTC-USD
       - ETH-USD
-      - SOL-USD
-      - BNB-USD

@@ -4,10 +4,10 @@ Bull score algorithm for Stock Analyzer 2.0.
 Score: 0–100 composite across four components:
   Price Momentum  30 %  — recent returns + MA position
   Sentiment       30 %  — Haiku LLM classification of news headlines
-  Valuation       20 %  — P/E, forward P/E, P/B (N/A for crypto)
-  Analyst         20 %  — consensus recommendation from yfinance (N/A for crypto)
+  Valuation       20 %  — P/E, forward P/E, P/B (omitted for crypto/ETFs)
+  Analyst         20 %  — consensus recommendation from yfinance (omitted for crypto/ETFs)
 
-Crypto (tickers ending in -USD):
+Crypto (tickers ending in -USD) and no-valuation tickers (ETFs, commodities):
   Momentum 50 %, Sentiment 50 %, Valuation and Analyst omitted.
 
 Public API:
@@ -22,9 +22,18 @@ import yfinance as yf
 
 _CRYPTO_SUFFIXES = ("-USD",)
 
+# ETFs and commodity trackers: P/E and analyst consensus don't apply.
+# Scored like crypto: Momentum 50 % + Sentiment 50 %.
+_NO_VALUATION_TICKERS = {"GLD", "SLV", "VWCE.DE"}
+
 
 def _is_crypto(ticker: str) -> bool:
     return any(ticker.upper().endswith(s) for s in _CRYPTO_SUFFIXES)
+
+
+def _is_no_valuation(ticker: str) -> bool:
+    """True for crypto and ETFs/commodities where P/E and analyst data don't apply."""
+    return _is_crypto(ticker) or ticker.upper() in _NO_VALUATION_TICKERS
 
 
 def _clamp(value: float, lo: float = 0.0, hi: float = 100.0) -> float:
@@ -284,25 +293,27 @@ def bull_score(ticker: str) -> dict:
     """
     Returns:
         {
-            "ticker":     str,
-            "bull_score": int (0-100),
-            "is_crypto":  bool,
+            "ticker":        str,
+            "bull_score":    int (0-100),
+            "is_crypto":     bool,
+            "no_valuation":  bool,  # True for crypto + ETFs/commodities (GLD, SLV, VWCE.DE…)
             "components": {
                 "momentum":  {"score": float, "weight": float, "details": dict},
                 "sentiment": {"score": float, "weight": float, "details": dict},
+                # valuation + analyst only present when no_valuation=False
                 "valuation": {"score": float, "weight": float, "details": dict},
                 "analyst":   {"score": float, "weight": float, "details": dict},
             }
         }
-    Valuation and Analyst are omitted (not present in dict) for crypto tickers.
     """
-    ticker = ticker.upper()
-    crypto = _is_crypto(ticker)
+    ticker  = ticker.upper()
+    crypto  = _is_crypto(ticker)
+    no_val  = _is_no_valuation(ticker)
 
     m_score, m_details = _momentum_score(ticker)
     s_score, s_details = _sentiment_score(ticker)
 
-    if crypto:
+    if no_val:
         composite = m_score * 0.50 + s_score * 0.50
         components = {
             "momentum":  {"score": m_score, "weight": 0.50, "details": m_details},
@@ -325,8 +336,9 @@ def bull_score(ticker: str) -> dict:
         }
 
     return {
-        "ticker":     ticker,
-        "bull_score": round(composite),
-        "is_crypto":  crypto,
-        "components": components,
+        "ticker":       ticker,
+        "bull_score":   round(composite),
+        "is_crypto":    crypto,
+        "no_valuation": no_val,
+        "components":   components,
     }
