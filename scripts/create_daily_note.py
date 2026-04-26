@@ -145,6 +145,12 @@ def main() -> None:
 
     elif args.mode == "append":
         existing = target.read_text(encoding="utf-8") if target.exists() else ""
+
+        # Guard: if today's date header is already in the file, skip to avoid duplicates.
+        if f"## {args.date}" in existing:
+            print(f"Daily Note für {args.date} bereits vorhanden — kein Append nötig.")
+            sys.exit(0)
+
         separator = "\n\n---\n\n" if existing.strip() else ""
         target.write_text(existing + separator + template, encoding="utf-8")
 
