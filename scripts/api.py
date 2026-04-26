@@ -517,15 +517,18 @@ def stock_chart(
 
     rows = []
     for dt, row in df.iterrows():
-        vol = row.get("Volume", 0)
-        rows.append({
-            "date":   str(dt.date()),
-            "open":   round(float(row["Open"]), 2),
-            "high":   round(float(row["High"]), 2),
-            "low":    round(float(row["Low"]), 2),
-            "close":  round(float(row["Close"]), 2),
-            "volume": int(vol) if vol == vol else 0,  # NaN guard
-        })
+        try:
+            vol = row.get("Volume", 0)
+            rows.append({
+                "date":   str(dt.date()),
+                "open":   round(float(row["Open"]), 2),
+                "high":   round(float(row["High"]), 2),
+                "low":    round(float(row["Low"]), 2),
+                "close":  round(float(row["Close"]), 2),
+                "volume": int(vol) if vol == vol else 0,
+            })
+        except (ValueError, TypeError):
+            continue  # skip rows with NaN OHLC values
 
     result = {"ticker": ticker, "period": period, "ohlcv": rows}
     _cache_set(cache_key, result)
