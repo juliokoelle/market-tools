@@ -65,11 +65,9 @@ def _build_template(date_str: str, calendar_events: list[str], has_briefing: boo
         cal_section = "_keine Termine heute_"
 
     if has_briefing:
-        briefing_line = f"[Briefing ansehen]({BACKEND_BASE}/briefing/{date_str})"
+        briefing_line = "_Briefing bereits im Dokument (oben)_"
     else:
-        briefing_line = "_noch nicht generiert — [jetzt generieren]({})_".format(
-            f"{BACKEND_BASE}/briefing/generate"
-        )
+        briefing_line = "_noch nicht generiert_"
 
     return f"""\
 ## {date_str} — {weekday}
@@ -83,20 +81,6 @@ def _build_template(date_str: str, calendar_events: list[str], has_briefing: boo
 {cal_section}
 
 ### Tag-Reflexion
-
-> _Per Wispr Flow eingesprochen oder hier tippen_
-
-**Was war wichtig?**
-
-**Welche Entscheidungen?**
-
-**Was habe ich gelernt?**
-
-### Offene Fragen / TODOs
-
-- [ ]
-
-### Verknüpfungen
 
 """
 

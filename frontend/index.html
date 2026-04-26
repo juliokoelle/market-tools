@@ -1094,18 +1094,13 @@
 
     <!-- Dashboard 2-col grid -->
     <div class="grid-dash">
-      <!-- Briefing preview -->
+      <!-- Briefing status -->
       <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:14px; flex-wrap:wrap;">
-          <div>
-            <div class="card-label">Today's Briefing</div>
-            <div id="dashBriefingDate" style="font-size:0.68rem; color:var(--faint); margin-top:3px;"></div>
-          </div>
-          <button class="btn-secondary" onclick="showView('briefing')">Read full →</button>
+        <div style="margin-bottom:10px;">
+          <div class="card-label">Today's Briefing</div>
+          <div id="dashBriefingDate" style="font-size:0.68rem; color:var(--faint); margin-top:3px;"></div>
         </div>
-        <div id="dashBriefingPreview" class="briefing-preview">
-          <div class="briefing-loading">Loading briefing…</div>
-        </div>
+        <div id="dashBriefingStatus" style="font-size:0.85rem; color:var(--muted);">Checking…</div>
       </div>
 
       <!-- Right column: Market snapshot + Portfolio widget -->
@@ -1151,7 +1146,7 @@
       </div>
     </div>
     <div class="card">
-      <div id="briefingContent" class="briefing-loading">Loading today's briefing…</div>
+      <div id="briefingContent" style="font-size:0.9rem; color:var(--muted);">Ready to generate. Briefings are saved to julio-brain.</div>
     </div>
     <div style="margin-top:20px;">
       <div class="card-label" style="margin-bottom:10px;">Archive</div>
@@ -1736,33 +1731,23 @@ function mdToHtml(md) {
    BRIEFING
 ═══════════════════════════════════════ */
 function loadBriefing() {
-  fetch(`${API_BASE}/daily-briefing`)
-    .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })
-    .then(data => {
-      if (!data.briefing) throw new Error("Empty briefing");
-      const html = mdToHtml(data.briefing);
-
-      const fullEl = document.getElementById("briefingContent");
-      fullEl.className = "briefing-body";
-      fullEl.innerHTML = html;
-
-      if (data.last_updated) {
-        const d   = new Date(data.last_updated);
-        const str = d.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-        document.getElementById("briefingSubtitle").textContent = str;
-        document.getElementById("dashBriefingDate").textContent = str;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  fetch(`${API_BASE}/briefing/list`)
+    .then(res => res.ok ? res.json() : [])
+    .then(list => {
+      const todayEntry = list.find(item => item.date === todayStr);
+      const statusEl   = document.getElementById("dashBriefingStatus");
+      const dateEl     = document.getElementById("dashBriefingDate");
+      if (todayEntry) {
+        if (statusEl) statusEl.textContent = `Briefing ready ✓ — saved to julio-brain`;
+        if (dateEl)   dateEl.textContent   = todayStr;
+      } else {
+        if (statusEl) statusEl.textContent = "Not yet generated today.";
       }
-
-      const previewEl = document.getElementById("dashBriefingPreview");
-      previewEl.className = "briefing-preview briefing-body";
-      previewEl.innerHTML = html;
     })
-    .catch(err => {
-      console.error("Briefing fetch failed:", err);
-      document.getElementById("briefingContent").className   = "briefing-error";
-      document.getElementById("briefingContent").textContent = "Today's briefing is currently unavailable. Please check back shortly.";
-      document.getElementById("dashBriefingPreview").innerHTML =
-        '<div class="mkt-loading">Briefing unavailable</div>';
+    .catch(() => {
+      const statusEl = document.getElementById("dashBriefingStatus");
+      if (statusEl) statusEl.textContent = "Status unavailable.";
     });
 }
 
@@ -1775,13 +1760,12 @@ async function generateBriefing(provider = 'anthropic') {
   premiumBtn.disabled = true;
   quickBtn.disabled   = true;
   statusEl.textContent = 'Generating… ~60s, please wait';
-  contentEl.className = 'briefing-generating';
-  contentEl.innerHTML = '<span class="spinner"></span>Generating briefing…';
+  contentEl.style.color = 'var(--muted)';
+  contentEl.textContent = 'Generating briefing…';
 
   try {
     const resp = await fetch(`${API_BASE}/briefing/generate?provider=${provider}`, { method: 'POST' });
     const text = await resp.text();
-    console.log(`[generateBriefing] status=${resp.status} body=${text.slice(0, 300)}`);
     let data = {};
     try {
       data = text ? JSON.parse(text) : {};
@@ -1792,23 +1776,23 @@ async function generateBriefing(provider = 'anthropic') {
       throw new Error(data.detail || data.error || `HTTP ${resp.status}`);
     }
 
-    contentEl.className = 'briefing-body';
-    contentEl.innerHTML = mdToHtml(data.markdown);
-    statusEl.textContent = `Generated · $${(data.cost_usd ?? 0).toFixed(4)} cost`;
+    const providerLabel = provider === 'anthropic' ? 'Premium (Claude)' : 'Quick (GPT)';
+    const costStr       = `$${(data.cost_usd ?? 0).toFixed(4)}`;
+    const dateStr       = data.date ?? new Date().toISOString().slice(0, 10);
 
-    const sub = document.getElementById('briefingSubtitle');
-    if (sub) sub.textContent = `${data.date} · Markets · Commodities · Geopolitics · Analysis`;
+    contentEl.style.color = 'var(--green-dk)';
+    contentEl.textContent = `Briefing generated and saved to julio-brain`;
+    statusEl.textContent  = `${dateStr} · ${providerLabel} · ${costStr}`;
 
-    const previewEl = document.getElementById('dashBriefingPreview');
-    if (previewEl) {
-      previewEl.className = 'briefing-preview briefing-body';
-      previewEl.innerHTML = mdToHtml(data.markdown);
-    }
+    const dashStatusEl = document.getElementById('dashBriefingStatus');
+    if (dashStatusEl) dashStatusEl.textContent = `Briefing ready ✓ — saved to julio-brain`;
+    const dashDateEl = document.getElementById('dashBriefingDate');
+    if (dashDateEl) dashDateEl.textContent = dateStr;
 
     loadBriefingArchive();
     loadCostSummary();
   } catch (e) {
-    contentEl.className = 'briefing-error';
+    contentEl.style.color = 'var(--red-dk)';
     contentEl.textContent = `Generation failed: ${e.message}`;
     statusEl.textContent = '';
   } finally {
@@ -1830,52 +1814,31 @@ async function loadBriefingArchive() {
       return;
     }
 
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayStr    = new Date().toISOString().slice(0, 10);
     const todayExists = list.some(item => item.date === todayStr);
 
-    const premiumBtn = document.getElementById('generatePremiumBtn');
-    const quickBtn   = document.getElementById('generateQuickBtn');
-    const statusEl   = document.getElementById('generateStatus');
-
     if (todayExists) {
-      if (premiumBtn) { premiumBtn.disabled = true; premiumBtn.style.opacity = '0.45'; }
-      if (quickBtn)   { quickBtn.disabled   = true; quickBtn.style.opacity   = '0.45'; }
-      if (statusEl)   {
-        statusEl.textContent = 'Heutiges Briefing bereits generiert ✓ — Lesen unten oder Archiv';
-        statusEl.className = 'ok';
+      const contentEl = document.getElementById('briefingContent');
+      if (contentEl && contentEl.style.color !== 'var(--green-dk)') {
+        contentEl.style.color = 'var(--green-dk)';
+        contentEl.textContent = 'Briefing generated and saved to julio-brain';
       }
-      loadArchivedBriefing(todayStr);
+      const statusEl = document.getElementById('generateStatus');
+      if (statusEl && !statusEl.textContent) {
+        statusEl.textContent = `${todayStr} · saved`;
+      }
     }
 
     archiveEl.innerHTML = list.map(item => `
       <div class="archive-item">
         <span class="archive-date">${item.date}</span>
-        <button class="btn-secondary" style="font-size:0.72rem; padding:3px 10px; min-height:28px;"
-          onclick="loadArchivedBriefing('${item.date}')">View</button>
+        ${item.cost_usd != null ? `<span style="font-size:0.72rem; color:var(--faint);">$${Number(item.cost_usd).toFixed(4)}</span>` : ''}
         ${item.has_pdf
-          ? `<a class="archive-pdf" href="${API_BASE}/briefing/${item.date}/pdf" target="_blank">📄 PDF</a>`
+          ? `<a class="archive-pdf" href="${API_BASE}/briefing/${item.date}/pdf" target="_blank">PDF</a>`
           : ''}
       </div>`).join('');
   } catch {
     if (archiveEl) archiveEl.innerHTML = '<span style="color:var(--faint);">Archive unavailable.</span>';
-  }
-}
-
-async function loadArchivedBriefing(date) {
-  const contentEl = document.getElementById('briefingContent');
-  contentEl.className = 'briefing-generating';
-  contentEl.innerHTML = '<span class="spinner"></span>Loading…';
-  try {
-    const resp = await fetch(`${API_BASE}/briefing/${date}`);
-    if (!resp.ok) throw new Error('not found');
-    const data = await resp.json();
-    contentEl.className = 'briefing-body';
-    contentEl.innerHTML = mdToHtml(data.markdown);
-    const sub = document.getElementById('briefingSubtitle');
-    if (sub) sub.textContent = `${date} · Markets · Commodities · Geopolitics · Analysis`;
-  } catch {
-    contentEl.className = 'briefing-error';
-    contentEl.textContent = `Could not load briefing for ${date}.`;
   }
 }
 
