@@ -80,8 +80,22 @@ def briefing_generate(provider: str = Query("anthropic")):
     from scripts.generate_briefing import generate
     from scripts.utils import today
 
+    today_str = today()
+    existing = Path(f"outputs/{today_str}-briefing.md")
+    if existing.exists():
+        from datetime import date, timedelta
+        tomorrow = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "rate_limit",
+                "message": "Heutiges Briefing bereits generiert. Nächste Generierung ab Mitternacht (lokale Zeit).",
+                "next_available": tomorrow.isoformat(),
+            },
+        )
+
     try:
-        result = generate(today(), provider=provider)
+        result = generate(today_str, provider=provider)
         return {
             "date": result["date"],
             "markdown": result["markdown"],

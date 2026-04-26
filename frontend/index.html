@@ -1781,6 +1781,23 @@ async function loadBriefingArchive() {
       return;
     }
 
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const todayExists = list.some(item => item.date === todayStr);
+
+    const premiumBtn = document.getElementById('generatePremiumBtn');
+    const quickBtn   = document.getElementById('generateQuickBtn');
+    const statusEl   = document.getElementById('generateStatus');
+
+    if (todayExists) {
+      if (premiumBtn) { premiumBtn.disabled = true; premiumBtn.style.opacity = '0.45'; }
+      if (quickBtn)   { quickBtn.disabled   = true; quickBtn.style.opacity   = '0.45'; }
+      if (statusEl)   {
+        statusEl.textContent = 'Heutiges Briefing bereits generiert ✓ — Lesen unten oder Archiv';
+        statusEl.className = 'ok';
+      }
+      loadArchivedBriefing(todayStr);
+    }
+
     archiveEl.innerHTML = list.map(item => `
       <div class="archive-item">
         <span class="archive-date">${item.date}</span>
