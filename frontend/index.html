@@ -1833,9 +1833,8 @@ async function loadBriefingArchive() {
       <div class="archive-item">
         <span class="archive-date">${item.date}</span>
         ${item.cost_usd != null ? `<span style="font-size:0.72rem; color:var(--faint);">$${Number(item.cost_usd).toFixed(4)}</span>` : ''}
-        ${item.has_pdf
-          ? `<a class="archive-pdf" href="${API_BASE}/briefing/${item.date}/pdf" target="_blank">PDF</a>`
-          : ''}
+        <button class="btn-secondary" style="font-size:0.72rem; padding:3px 10px; min-height:28px;"
+          onclick="window.open('${API_BASE}/briefing/${item.date}/pdf', '_blank')">View PDF</button>
       </div>`).join('');
   } catch {
     if (archiveEl) archiveEl.innerHTML = '<span style="color:var(--faint);">Archive unavailable.</span>';
