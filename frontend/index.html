@@ -1534,40 +1534,59 @@
 
   <!-- ═══ VIEW: Hot Stocks ═══ -->
   <section id="view-hotstocks" class="view">
-    <div class="view-header-row">
-      <div class="view-header" style="margin-bottom:0;">
-        <h1>Hot Stocks</h1>
-        <p>Top momentum picks — scored by 5-day return and average volume.</p>
-      </div>
-      <button class="btn-primary" id="hotBtn" onclick="loadHotStocks()">Find Hot Stocks</button>
+    <div class="view-header">
+      <h1>Hot Stocks</h1>
+      <p>Ranked from your watchlist. Use the tabs to filter by momentum or bull score.</p>
     </div>
 
-    <div class="error-banner" id="hotError"></div>
+    <!-- Watchlist-based tabs -->
+    <div class="tab-bar">
+      <button class="tab-btn active" id="hotTab-gainers" onclick="switchHotTab('gainers')">Top Gainers</button>
+      <button class="tab-btn" id="hotTab-losers" onclick="switchHotTab('losers')">Top Losers</button>
+      <button class="tab-btn" id="hotTab-bull" onclick="switchHotTab('bull')">Highest Bull</button>
+      <button class="tab-btn" id="hotTab-lowbull" onclick="switchHotTab('lowbull')">Lowest Bull</button>
+    </div>
 
-    <div id="hotResults" style="display:none;">
-      <div class="table-scroll card" style="padding:0;">
-        <table class="hot-table">
-          <thead>
-            <tr>
-              <th>Rank</th>
-              <th>Ticker</th>
-              <th class="r">5d Return</th>
-              <th class="r">Avg Volume</th>
-              <th class="r">Score</th>
-            </tr>
-          </thead>
-          <tbody id="hotBody"></tbody>
-        </table>
+    <div id="hotTabContent">
+      <div class="mkt-loading">Loading watchlist data…</div>
+    </div>
+
+    <!-- Legacy backend screener (secondary) -->
+    <div style="margin-top:28px; padding-top:20px; border-top:1px solid var(--border);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <div>
+          <div style="font-size:0.75rem; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:0.06em;">Momentum Screener</div>
+          <div style="font-size:0.72rem; color:var(--faint); margin-top:2px;">Score = return × 0.7 + volume × 0.3 · Last 5 trading days</div>
+        </div>
+        <button class="btn-secondary" id="hotBtn" onclick="loadHotStocks()" style="font-size:0.78rem;">Find Hot Stocks</button>
       </div>
-      <div class="pagination">
-        <span class="page-info" id="hotRangeLabel"></span>
-        <div class="page-btns">
-          <button class="page-nav-btn" id="hotPrev" onclick="hotChangePage(hotPage - 1)">← Prev</button>
-          <div id="hotPageNumbers" style="display:flex; gap:4px; flex-wrap:wrap;"></div>
-          <button class="page-nav-btn" id="hotNext" onclick="hotChangePage(hotPage + 1)">Next →</button>
+
+      <div class="error-banner" id="hotError"></div>
+
+      <div id="hotResults" style="display:none;">
+        <div class="table-scroll card" style="padding:0;">
+          <table class="hot-table">
+            <thead>
+              <tr>
+                <th>Rank</th>
+                <th>Ticker</th>
+                <th class="r">5d Return</th>
+                <th class="r">Avg Volume</th>
+                <th class="r">Score</th>
+              </tr>
+            </thead>
+            <tbody id="hotBody"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span class="page-info" id="hotRangeLabel"></span>
+          <div class="page-btns">
+            <button class="page-nav-btn" id="hotPrev" onclick="hotChangePage(hotPage - 1)">← Prev</button>
+            <div id="hotPageNumbers" style="display:flex; gap:4px; flex-wrap:wrap;"></div>
+            <button class="page-nav-btn" id="hotNext" onclick="hotChangePage(hotPage + 1)">Next →</button>
+          </div>
         </div>
       </div>
-      <p style="margin-top:8px; font-size:0.68rem; color:var(--faint);">Score = return × 0.7 + normalised volume × 0.3 · Last 5 trading days</p>
     </div>
   </section>
 
@@ -1839,6 +1858,7 @@ function showView(name) {
     el.classList.toggle("active", el.dataset.view === name);
   });
   if (name === 'analyzer') loadWatchlist();
+  if (name === 'hotstocks') loadHotTabData();
 }
 
 /* ═══════════════════════════════════════
@@ -2469,7 +2489,7 @@ function renderHotPage() {
         <td>
           <a href="https://finance.yahoo.com/quote/${s.ticker}" target="_blank" rel="noopener"
              style="font-weight:700; font-size:0.95rem; color:var(--ink); text-decoration:none; transition:color 0.14s;"
-             onmouseover="this.style.color='#5856d6'" onmouseout="this.style.color='var(--ink)'"
+             onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--ink)'"
           >${s.ticker} <span style="font-size:0.6rem; opacity:0.3;">↗</span></a>
         </td>
         <td class="r" style="font-weight:600; color:${retColor};">${retText}</td>
@@ -2491,6 +2511,82 @@ function renderHotPage() {
     b.onclick     = () => hotChangePage(p);
     numContainer.appendChild(b);
   }
+}
+
+/* ═══════════════════════════════════════
+   HOT STOCKS — WATCHLIST TABS
+═══════════════════════════════════════ */
+
+let _hotActiveTab = 'gainers';
+
+function switchHotTab(tabId) {
+  _hotActiveTab = tabId;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(`hotTab-${tabId}`);
+  if (btn) btn.classList.add('active');
+  loadHotTabData();
+}
+
+async function loadHotTabData() {
+  const content = document.getElementById('hotTabContent');
+  if (!content) return;
+
+  // If watchlist not loaded yet, trigger load (which calls renderWatchlist → caches _watchlistData)
+  if (!_watchlistData.length) {
+    content.innerHTML = '<div class="mkt-loading">Loading watchlist data…</div>';
+    await loadWatchlist();
+    if (!_watchlistData.length) {
+      content.innerHTML = '<div class="mkt-loading">Unable to load watchlist. Try visiting Stock Analyzer first.</div>';
+      return;
+    }
+  }
+
+  // Flatten all tickers
+  const tickers = _watchlistData.flatMap(cat => cat.tickers);
+
+  let sorted;
+  if (_hotActiveTab === 'gainers') {
+    sorted = tickers
+      .filter(t => (t.components?.momentum?.details?.return_30d ?? -Infinity) > 0)
+      .sort((a, b) => (b.components?.momentum?.details?.return_30d ?? 0) - (a.components?.momentum?.details?.return_30d ?? 0));
+  } else if (_hotActiveTab === 'losers') {
+    sorted = tickers
+      .filter(t => (t.components?.momentum?.details?.return_30d ?? Infinity) < 0)
+      .sort((a, b) => (a.components?.momentum?.details?.return_30d ?? 0) - (b.components?.momentum?.details?.return_30d ?? 0));
+  } else if (_hotActiveTab === 'bull') {
+    sorted = [...tickers].sort((a, b) => (b.bull_score ?? 0) - (a.bull_score ?? 0));
+  } else {
+    sorted = [...tickers].sort((a, b) => (a.bull_score ?? 100) - (b.bull_score ?? 100));
+  }
+
+  if (!sorted.length) {
+    content.innerHTML = '<div class="mkt-loading">No data for this tab.</div>';
+    return;
+  }
+
+  content.innerHTML = `<div class="hot-cards-grid">${sorted.map(t => {
+    const score  = t.bull_score ?? 50;
+    const bcls   = barColor(score);
+    const scls   = scoreColor(score);
+    const ret30  = t.components?.momentum?.details?.return_30d;
+    const retStr = ret30 != null
+      ? `<span class="hot-card-change ${ret30 >= 0 ? 'c-green' : 'c-red'}">${ret30 >= 0 ? '+' : ''}${ret30}%</span>`
+      : `<span class="hot-card-change" style="color:var(--faint)">—</span>`;
+    return `
+      <div class="hot-card" onclick="openStockDetail('${t.ticker}')">
+        <div class="hot-card-top">
+          <span class="hot-card-ticker">${t.ticker}</span>
+          ${retStr}
+        </div>
+        <div class="hot-card-score-row">
+          <span class="hot-card-score-label">Bull</span>
+          <div class="hot-card-score-bar">
+            <div class="hot-card-score-fill ${bcls}" style="width:${score}%;"></div>
+          </div>
+          <span class="hot-card-score-num ${scls}">${score}</span>
+        </div>
+      </div>`;
+  }).join('')}</div>`;
 }
 
 /* ═══════════════════════════════════════
