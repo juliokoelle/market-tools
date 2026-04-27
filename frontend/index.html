@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Market Tools</title>
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#5856d6" />
+  <meta name="theme-color" content="#6366f1" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Market Tools" />
   <style>
@@ -527,7 +527,7 @@
       white-space: nowrap;
       min-height: 40px;
     }
-    .btn-primary:hover:not(:disabled) { background: #4745c0; }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
     .btn-primary:active { transform: scale(0.98); }
     .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -568,7 +568,7 @@
       white-space: nowrap;
       min-height: 36px;
     }
-    #generateBtn:hover:not(:disabled) { background: #e0e7ff; }
+    #generateBtn:hover:not(:disabled) { background: var(--accent-lt); }
     #generateBtn:disabled { opacity: 0.5; cursor: not-allowed; }
     #generateStatus { font-size: 0.72rem; color: var(--faint); }
     #generateStatus.ok    { color: var(--green-dk); }
@@ -592,7 +592,7 @@
       min-height: 42px;
     }
     input[type="text"]:focus,
-    input[type="number"]:focus { border-color: var(--accent); background: #fff; }
+    input[type="number"]:focus { border-color: var(--accent); background: var(--bg-secondary); }
     input[type="number"]::-webkit-inner-spin-button { opacity: 0.4; }
 
     /* Holding row */
@@ -676,7 +676,7 @@
       margin-top: 4px;
       min-height: 42px;
     }
-    .add-holding-btn:hover { background: #e0e7ff; }
+    .add-holding-btn:hover { background: var(--accent-lt); }
 
     /* ─────────────────────────────────────────────
        METRIC CARDS
@@ -780,7 +780,7 @@
       font-size: 0.8rem;
       font-weight: 600;
       background: var(--surface);
-      color: #374151;
+      color: var(--ink);
       border: 1px solid var(--border);
       border-radius: 7px;
       cursor: pointer;
@@ -1634,7 +1634,7 @@
           <div id="sdScoreRing" style="width:64px; height:64px; flex-shrink:0; position:relative;">
             <svg viewBox="0 0 64 64" style="width:64px; height:64px; transform:rotate(-90deg);">
               <circle cx="32" cy="32" r="26" fill="none" stroke="var(--border)" stroke-width="6"/>
-              <circle id="sdScoreArc" cx="32" cy="32" r="26" fill="none" stroke="#5856d6" stroke-width="6"
+              <circle id="sdScoreArc" cx="32" cy="32" r="26" fill="none" stroke="var(--accent)" stroke-width="6"
                       stroke-linecap="round" stroke-dasharray="163.36" stroke-dashoffset="163.36"/>
             </svg>
             <div id="sdScoreNum" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:1rem; font-weight:700; color:var(--ink);">—</div>
@@ -1642,7 +1642,7 @@
           <div style="flex:1;">
             <div style="font-size:0.72rem; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin-bottom:4px;">Bull Score</div>
             <div id="sdScoreBar" style="height:8px; border-radius:4px; background:var(--bg); overflow:hidden;">
-              <div id="sdScoreBarFill" style="height:100%; border-radius:4px; background:#5856d6; width:0%; transition:width .5s ease;"></div>
+              <div id="sdScoreBarFill" style="height:100%; border-radius:4px; background:var(--accent); width:0%; transition:width .5s ease;"></div>
             </div>
             <div id="sdScoreComponents" style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; font-size:0.75rem; color:var(--muted);"></div>
           </div>
@@ -2468,7 +2468,7 @@ const EXPLAIN = {
 
 function renderBreakdown(assets) {
   document.getElementById("breakdownBody").innerHTML = assets.map(a => {
-    const retColor = a.annual_return >= 0 ? "#16a34a" : "#dc2626";
+    const retColor = a.annual_return >= 0 ? 'var(--positive)' : 'var(--negative)';
     const retText  = (a.annual_return >= 0 ? "+" : "") + (a.annual_return * 100).toFixed(2) + "%";
     return `<tr>
       <td>${a.ticker}</td>
@@ -2539,7 +2539,7 @@ function renderHotPage() {
   pageStocks.forEach((s, i) => {
     const rank     = start + i + 1;
     const isPos    = s.return >= 0;
-    const retColor = isPos ? "#16a34a" : "#dc2626";
+    const retColor = isPos ? 'var(--positive)' : 'var(--negative)';
     const retText  = (isPos ? "+" : "") + (s.return * 100).toFixed(2) + "%";
     const vol      = s.volume_avg >= 1_000_000
       ? (s.volume_avg / 1_000_000).toFixed(1) + "M"
@@ -2836,7 +2836,7 @@ function renderStockDetail(d) {
   document.getElementById('sdScoreNum').textContent = score;
   const offset = 163.36 * (1 - score / 100);
   document.getElementById('sdScoreArc').style.strokeDashoffset = offset;
-  const arcColor = score >= 65 ? '#16a34a' : score >= 40 ? '#ff9f0a' : '#dc2626';
+  const arcColor = score >= 65 ? 'var(--positive)' : score >= 40 ? 'var(--neutral)' : 'var(--negative)';
   document.getElementById('sdScoreArc').style.stroke = arcColor;
   document.getElementById('sdScoreBarFill').style.width = score + '%';
   document.getElementById('sdScoreBarFill').style.background = arcColor;
@@ -2910,6 +2910,13 @@ function renderPlotlyChart(ohlcv, ticker) {
   const container = document.getElementById('sdChartContainer');
   container.innerHTML = '<div id="sdPlotlyChart" style="height:100%;"></div>';
 
+  const isDark = document.documentElement.dataset.theme === 'dark';
+  const plotBg   = isDark ? '#1f1f24' : '#f2f2f7';
+  const gridColor = isDark ? '#252530' : '#e5e7eb';
+  const tickColor = isDark ? '#9898a6' : '#8e8e93';
+  const upColor   = isDark ? '#22c55e' : '#16a34a';
+  const downColor = isDark ? '#ef4444' : '#dc2626';
+
   const trace = {
     type: 'candlestick',
     x:    ohlcv.map(r => r.date),
@@ -2918,24 +2925,24 @@ function renderPlotlyChart(ohlcv, ticker) {
     low:  ohlcv.map(r => r.low),
     close: ohlcv.map(r => r.close),
     name: ticker,
-    increasing: { line: { color: '#16a34a' }, fillcolor: 'rgba(22,163,74,0.15)' },
-    decreasing: { line: { color: '#dc2626' }, fillcolor: 'rgba(220,38,38,0.12)' },
+    increasing: { line: { color: upColor },   fillcolor: isDark ? 'rgba(34,197,94,0.15)'  : 'rgba(22,163,74,0.15)' },
+    decreasing: { line: { color: downColor },  fillcolor: isDark ? 'rgba(239,68,68,0.12)'  : 'rgba(220,38,38,0.12)' },
   };
 
   const layout = {
     paper_bgcolor: 'transparent',
-    plot_bgcolor:  '#f2f2f7',
+    plot_bgcolor:  plotBg,
     margin: { t: 8, r: 12, b: 36, l: 52 },
     xaxis: {
       type: 'date',
       rangeslider: { visible: false },
-      gridcolor: '#e5e7eb',
-      tickfont: { size: 10, color: '#8e8e93' },
+      gridcolor: gridColor,
+      tickfont: { size: 10, color: tickColor },
     },
     yaxis: {
-      gridcolor: '#e5e7eb',
+      gridcolor: gridColor,
       tickprefix: '',
-      tickfont: { size: 10, color: '#8e8e93' },
+      tickfont: { size: 10, color: tickColor },
       side: 'right',
     },
     showlegend: false,
