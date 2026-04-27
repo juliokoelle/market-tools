@@ -961,6 +961,8 @@
 
       .view { padding: 22px 22px 50px; }
       .grid-3 { grid-template-columns: repeat(2, 1fr); }
+      .hero-cards { grid-template-columns: repeat(2, 1fr); }
+      .market-stats-row { grid-template-columns: repeat(3, 1fr); }
       .grid-dash { grid-template-columns: 1fr; }
       .sidebar-stack { display: grid; grid-template-columns: 1fr 1fr; }
       .briefing-body { columns: 1; column-rule: none; }
@@ -979,6 +981,8 @@
       .view        { padding: 16px 16px 78px; }
 
       .grid-3      { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+      .hero-cards  { grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 12px; }
+      .market-stats-row { grid-template-columns: repeat(3, 1fr); gap: 8px; }
       .grid-dash   { grid-template-columns: 1fr; gap: 14px; }
       .metrics-grid   { grid-template-columns: repeat(2, 1fr); gap: 10px; }
       .metrics-grid-2 { grid-template-columns: repeat(2, 1fr); gap: 10px; }
@@ -1003,6 +1007,8 @@
     ───────────────────────────────────────────── */
     @media (max-width: 480px) {
       .grid-3 { grid-template-columns: 1fr; }
+      .hero-cards { grid-template-columns: 1fr; gap: 8px; }
+      .market-stats-row { grid-template-columns: repeat(2, 1fr); gap: 6px; }
       .metrics-grid   { grid-template-columns: 1fr; }
       .metrics-grid-2 { grid-template-columns: 1fr; }
       .flip-grid { grid-template-columns: repeat(2, 1fr); }
@@ -1368,33 +1374,38 @@
 
   <!-- ═══ VIEW: Dashboard ═══ -->
   <section id="view-dashboard" class="view active">
-    <div class="view-header">
-      <h1 id="dashGreeting">Good morning.</h1>
-      <p id="dashDate"></p>
+    <!-- Hero greeting -->
+    <div style="margin-bottom:20px;">
+      <div class="hero-greeting" id="dashGreeting">Good morning.</div>
+      <div class="hero-time" id="dashDate"></div>
     </div>
 
-    <!-- Stat row -->
-    <div class="grid-3">
-      <div class="stat-card">
-        <div class="stat-label">S&amp;P 500</div>
-        <div class="stat-value" id="stat-sp500">—</div>
-        <div class="stat-sub">^GSPC · Live</div>
+    <!-- Hero cards: S&P, Gold, EUR/USD -->
+    <div class="hero-cards">
+      <div class="hero-card">
+        <div class="hero-card-label">S&amp;P 500</div>
+        <div class="hero-card-value" id="stat-sp500">—</div>
+        <div class="hero-card-sub">^GSPC · Live</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">Gold</div>
-        <div class="stat-value" id="stat-gold">—</div>
-        <div class="stat-sub">GC=F · Live</div>
+      <div class="hero-card">
+        <div class="hero-card-label">Gold</div>
+        <div class="hero-card-value" id="stat-gold">—</div>
+        <div class="hero-card-sub">GC=F · Live</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-label">EUR / USD</div>
-        <div class="stat-value" id="stat-eurusd">—</div>
-        <div class="stat-sub">EURUSD=X · Live</div>
+      <div class="hero-card">
+        <div class="hero-card-label">EUR / USD</div>
+        <div class="hero-card-value" id="stat-eurusd">—</div>
+        <div class="hero-card-sub">EURUSD=X · Live</div>
       </div>
     </div>
 
-    <!-- Dashboard 2-col grid -->
+    <!-- Market stats row (all 5 tickers) -->
+    <div class="market-stats-row" id="dashMarketSnapshot">
+      <div class="mkt-loading" style="grid-column:1/-1;">Fetching prices…</div>
+    </div>
+
+    <!-- Lower grid: briefing status + portfolio mini -->
     <div class="grid-dash">
-      <!-- Briefing status -->
       <div class="card">
         <div style="margin-bottom:10px;">
           <div class="card-label">Today's Briefing</div>
@@ -1403,27 +1414,17 @@
         <div id="dashBriefingStatus" style="font-size:0.85rem; color:var(--muted);">Checking…</div>
       </div>
 
-      <!-- Right column: Market snapshot + Portfolio widget -->
-      <div class="sidebar-stack">
-        <div class="card">
-          <div class="card-label" style="margin-bottom:10px;">Market Snapshot</div>
-          <div id="dashMarketSnapshot">
-            <div class="mkt-loading">Fetching prices…</div>
-          </div>
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <div class="card-label">My Portfolio</div>
+          <button class="btn-secondary" style="font-size:0.7rem; padding:5px 10px; min-height:30px;" onclick="showView('portfolio')">Analyze →</button>
         </div>
-
-        <div class="card">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-            <div class="card-label">My Portfolio</div>
-            <button class="btn-secondary" style="font-size:0.7rem; padding:5px 10px; min-height:30px;" onclick="showView('portfolio')">Analyze →</button>
-          </div>
-          <div id="dashPortfolio">
-            <div class="mkt-loading">Fetching positions…</div>
-          </div>
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
-            <span style="font-size:0.72rem; color:var(--muted); font-weight:600;">Total value</span>
-            <span style="font-size:0.82rem; color:var(--ink); font-weight:700;" id="dashPortTotal">—</span>
-          </div>
+        <div id="dashPortfolio">
+          <div class="mkt-loading">Fetching positions…</div>
+        </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);">
+          <span style="font-size:0.72rem; color:var(--muted); font-weight:600;">Total value</span>
+          <span style="font-size:0.82rem; color:var(--ink); font-weight:700;" id="dashPortTotal">—</span>
         </div>
       </div>
     </div>
@@ -1903,7 +1904,7 @@ function loadMarketData() {
     })
     .catch(err => {
       console.error("Market data error:", err);
-      document.getElementById("dashMarketSnapshot").innerHTML = '<div class="mkt-loading">Unavailable</div>';
+      document.getElementById("dashMarketSnapshot").innerHTML = '<div class="mkt-loading" style="grid-column:1/-1;">Unavailable</div>';
       document.getElementById("dashPortfolio").innerHTML      = '<div class="mkt-loading">Unavailable</div>';
     });
 }
@@ -1927,12 +1928,9 @@ function renderStatCards(prices) {
 function renderMarketSnapshot(prices) {
   document.getElementById("dashMarketSnapshot").innerHTML =
     SNAPSHOT_TICKERS.map(({ sym, label }) => `
-      <div class="mkt-row">
-        <span class="mkt-name">${label}</span>
-        <div class="mkt-right">
-          <div class="mkt-price">${fmtPrice(prices[sym])}</div>
-          <div class="mkt-sub">Live</div>
-        </div>
+      <div class="market-stat">
+        <div class="market-stat-label">${label}</div>
+        <div class="market-stat-value">${fmtPrice(prices[sym])}</div>
       </div>`).join("");
 }
 
