@@ -2232,13 +2232,20 @@ function renderWatchlist(categories) {
 /* ── Stock Detail Modal ── */
 let _sdTicker = '';
 let _sdChartPeriod = '3mo';
+let _sdOpenToken = 0; // incremented on each open; stale async continuations check this
 
 async function openStockDetail(ticker) {
-  _sdTicker = ticker.toUpperCase();
+  const requestTicker = ticker.toUpperCase();
+  const token = ++_sdOpenToken;
+  _sdTicker = requestTicker;
   _sdChartPeriod = '3mo';
 
+  // Purge any existing Plotly instance before replacing innerHTML
+  const chartEl = document.getElementById('sdPlotlyChart');
+  if (chartEl && typeof Plotly !== 'undefined') Plotly.purge(chartEl);
+
   // Reset modal state
-  document.getElementById('sdTicker').textContent = _sdTicker;
+  document.getElementById('sdTicker').textContent = requestTicker;
   document.getElementById('sdCompany').textContent = '';
   document.getElementById('sdScoreNum').textContent = '—';
   document.getElementById('sdScoreArc').style.strokeDashoffset = '163.36';
@@ -2249,7 +2256,6 @@ async function openStockDetail(ticker) {
   document.getElementById('sdAiSummary').innerHTML = '<span style="color:var(--faint)">Click Generate for an AI analysis.</span>';
   document.getElementById('sdAiBtn').disabled = false;
   document.getElementById('sdAiBtn').textContent = 'Generate';
-  document.getElementById('sdChartPlaceholder').textContent = 'Loading chart…';
   document.getElementById('sdChartContainer').innerHTML = '<div id="sdChartPlaceholder" style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--faint); font-size:0.85rem;">Loading chart…</div>';
 
   // Reset period buttons
@@ -2262,16 +2268,22 @@ async function openStockDetail(ticker) {
 
   // Load detail + chart in parallel
   const [detailData, chartData] = await Promise.allSettled([
-    fetch(`${API_BASE}/stock/${encodeURIComponent(_sdTicker)}/detail`).then(r => r.ok ? r.json() : Promise.reject(r.status)),
-    fetch(`${API_BASE}/stock/${encodeURIComponent(_sdTicker)}/chart?period=${_sdChartPeriod}`).then(r => r.ok ? r.json() : Promise.reject(r.status)),
+    fetch(`${API_BASE}/stock/${encodeURIComponent(requestTicker)}/detail`).then(r => r.ok ? r.json() : Promise.reject(r.status)),
+    fetch(`${API_BASE}/stock/${encodeURIComponent(requestTicker)}/chart?period=${_sdChartPeriod}`).then(r => r.ok ? r.json() : Promise.reject(r.status)),
   ]);
 
+  // Discard result if the modal was closed or a newer ticker was opened while fetching
+  if (token !== _sdOpenToken) return;
+
   if (detailData.status === 'fulfilled') renderStockDetail(detailData.value);
-  if (chartData.status === 'fulfilled')  renderPlotlyChart(chartData.value.ohlcv, _sdTicker);
+  if (chartData.status === 'fulfilled')  renderPlotlyChart(chartData.value.ohlcv, requestTicker);
   else document.getElementById('sdChartContainer').innerHTML = '<div style="height:100%; display:flex; align-items:center; justify-content:center; color:var(--faint); font-size:0.85rem;">Chart unavailable</div>';
 }
 
 function closeStockDetail() {
+  ++_sdOpenToken; // invalidate any in-flight openStockDetail continuation
+  const plotEl = document.getElementById('sdPlotlyChart');
+  if (plotEl && typeof Plotly !== 'undefined') Plotly.purge(plotEl);
   document.getElementById('stockDetailBackdrop').style.display = 'none';
   document.body.style.overflow = '';
   _sdTicker = '';
