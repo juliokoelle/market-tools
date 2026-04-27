@@ -455,10 +455,11 @@
     /* ── Archive ── */
     .archive-item {
       display: flex; align-items: center; gap: 12px;
-      padding: 8px 0; border-bottom: 1px solid var(--border);
+      padding: 10px 16px; border-bottom: 1px solid var(--border);
     }
     .archive-item:last-child { border-bottom: none; }
-    .archive-date { font-weight: 500; color: var(--ink); font-size: 0.85rem; min-width: 92px; }
+    .archive-date { font-weight: 600; color: var(--ink); font-size: 0.85rem; min-width: 92px; }
+    .archive-cost { font-size: 0.72rem; color: var(--faint); flex: 1; }
     .archive-pdf  { font-size: 0.75rem; color: var(--muted); text-decoration: none; }
     .archive-pdf:hover { color: var(--accent); }
 
@@ -1451,7 +1452,9 @@
     </div>
     <div style="margin-top:20px;">
       <div class="card-label" style="margin-bottom:10px;">Archive</div>
-      <div id="archiveList" style="font-size:0.85rem; color:var(--faint);">Loading archive…</div>
+      <div class="card" style="padding:0; overflow:hidden;">
+        <div id="archiveList"><div class="archive-item" style="border:none;"><span style="font-size:0.82rem; color:var(--faint);">Loading archive…</span></div></div>
+      </div>
     </div>
   </section>
 
@@ -2222,7 +2225,7 @@ async function loadBriefingArchive() {
     const list = await resp.json();
 
     if (!list.length) {
-      archiveEl.innerHTML = '<span style="color:var(--faint);">No archived briefings yet.</span>';
+      archiveEl.innerHTML = '<div class="archive-item" style="border:none;"><span style="color:var(--faint);">No archived briefings yet.</span></div>';
       return;
     }
 
@@ -2244,12 +2247,12 @@ async function loadBriefingArchive() {
     archiveEl.innerHTML = list.map(item => `
       <div class="archive-item">
         <span class="archive-date">${item.date}</span>
-        ${item.cost_usd != null ? `<span style="font-size:0.72rem; color:var(--faint);">$${Number(item.cost_usd).toFixed(4)}</span>` : ''}
+        ${item.cost_usd != null ? `<span class="archive-cost">$${Number(item.cost_usd).toFixed(4)}</span>` : '<span class="archive-cost"></span>'}
         <button class="btn-secondary" style="font-size:0.72rem; padding:3px 10px; min-height:28px;"
           onclick="window.open('${API_BASE}/briefing/${item.date}/pdf', '_blank')">View PDF</button>
       </div>`).join('');
   } catch {
-    if (archiveEl) archiveEl.innerHTML = '<span style="color:var(--faint);">Archive unavailable.</span>';
+    if (archiveEl) archiveEl.innerHTML = '<div class="archive-item" style="border:none;"><span style="color:var(--faint);">Archive unavailable.</span></div>';
   }
 }
 
