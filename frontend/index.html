@@ -821,12 +821,12 @@
     .ticker-card-bar { height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; }
     .ticker-card-bar-fill { height: 100%; border-radius: 3px; transition: width .4s ease; }
     .ticker-card-return { font-size: 0.72rem; color: var(--muted); }
-    .score-high   { color: #16a34a; }
-    .score-mid    { color: #ff9f0a; }
-    .score-low    { color: #dc2626; }
-    .bar-high     { background: #16a34a; }
-    .bar-mid      { background: #ff9f0a; }
-    .bar-low      { background: #dc2626; }
+    .score-high   { color: var(--positive); }
+    .score-mid    { color: var(--neutral); }
+    .score-low    { color: var(--negative); }
+    .bar-high     { background: var(--positive); }
+    .bar-mid      { background: var(--neutral); }
+    .bar-low      { background: var(--negative); }
 
     /* ── Component mini-bars in detail modal ── */
     .breakdown-row { display: flex; align-items: center; gap: 8px; }
@@ -2533,8 +2533,12 @@ async function loadWatchlist(forceRefresh = false) {
   }
 }
 
+let _watchlistData = [];
+
 function renderWatchlist(categories) {
+  _watchlistData = categories;
   const container = document.getElementById('watchlistContent');
+  const allTickers = [];
   container.innerHTML = categories.map(cat => {
     const cards = cat.tickers.map(t => {
       const score = t.bull_score ?? 50;
@@ -2542,17 +2546,25 @@ function renderWatchlist(categories) {
       const bcls  = barColor(score);
       const mom   = t.components?.momentum?.details || {};
       const ret30 = mom.return_30d;
-      const retStr = ret30 != null
-        ? `<span class="${ret30 >= 0 ? 'c-green' : 'c-red'}">${ret30 >= 0 ? '+' : ''}${ret30}%</span>`
-        : '';
+      const changeStr = ret30 != null
+        ? `<span class="ticker-card-change ${ret30 >= 0 ? 'c-green' : 'c-red'}">${ret30 >= 0 ? '+' : ''}${ret30}%</span>`
+        : `<span class="ticker-card-change" style="color:var(--faint)">—</span>`;
+      allTickers.push(t.ticker);
       return `
         <div class="ticker-card" onclick="openStockDetail('${t.ticker}')" title="Click for full analysis">
-          <div class="ticker-card-symbol">${t.ticker}</div>
-          <div class="ticker-card-score ${cls}">${score}</div>
-          <div class="ticker-card-bar">
-            <div class="ticker-card-bar-fill ${bcls}" style="width:${score}%;"></div>
+          <div class="ticker-card-row1">
+            <span class="ticker-card-symbol">${t.ticker}</span>
+            ${changeStr}
           </div>
-          <div class="ticker-card-return">${retStr || '<span style="color:var(--faint)">—</span>'}</div>
+          <div class="ticker-card-sparkline">
+            <div class="sparkline-placeholder" id="spark-${t.ticker}"></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:2px;">
+            <div class="ticker-card-bar" style="flex:1;">
+              <div class="ticker-card-bar-fill ${bcls}" style="width:${score}%;"></div>
+            </div>
+            <span class="ticker-card-score ${cls}" style="font-size:0.9rem;">${score}</span>
+          </div>
         </div>`;
     }).join('');
     return `
@@ -2561,6 +2573,43 @@ function renderWatchlist(categories) {
         <div class="watchlist-grid">${cards}</div>
       </div>`;
   }).join('');
+  loadSparklines(allTickers);
+}
+
+function _renderSparklineSVG(prices, isPositive) {
+  const W = 80, H = 28, pad = 2;
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  const range = max - min || 1;
+  const pts = prices.map((v, i) => {
+    const x = (pad + (i / (prices.length - 1)) * (W - 2 * pad)).toFixed(1);
+    const y = (pad + (1 - (v - min) / range) * (H - 2 * pad)).toFixed(1);
+    return `${x},${y}`;
+  }).join(' ');
+  const color = isPositive ? 'var(--positive)' : 'var(--negative)';
+  return `<svg class="sparkline-wrap" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+async function loadSparklines(tickers) {
+  const batchSize = 4;
+  const delay = ms => new Promise(r => setTimeout(r, ms));
+  for (let i = 0; i < tickers.length; i += batchSize) {
+    const batch = tickers.slice(i, i + batchSize);
+    await Promise.allSettled(batch.map(async ticker => {
+      try {
+        const resp = await fetch(`${API_BASE}/stock/${ticker}/chart?period=1mo`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const prices = (data.ohlcv || []).map(d => d.close).filter(v => v != null);
+        if (prices.length < 2) return;
+        const el = document.getElementById(`spark-${ticker}`);
+        if (!el) return;
+        const isPos = prices[prices.length - 1] >= prices[0];
+        el.outerHTML = _renderSparklineSVG(prices, isPos);
+      } catch { /* sparkline failure is non-fatal */ }
+    }));
+    if (i + batchSize < tickers.length) await delay(100);
+  }
 }
 
 /* ── Stock Detail Modal ── */
