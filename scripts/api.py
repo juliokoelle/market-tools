@@ -305,7 +305,7 @@ def briefing_pdf(date: str):
     return FileResponse(
         str(pdf_path),
         media_type="application/pdf",
-        filename=f"{date}-briefing.pdf",
+        headers={"Content-Disposition": f'inline; filename="briefing-{date}.pdf"'},
     )
 
 
