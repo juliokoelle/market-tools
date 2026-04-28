@@ -47,7 +47,7 @@ def test_fetch_feed_parses_mock_feed():
         "summary": "Gold reached $3,400 per ounce.",
         "link": "https://reuters.com/gold",
     }.get(k, d)
-    entry.published_parsed = (2026, 4, 25, 9, 0, 0, 5, 115, 0)
+    entry.published_parsed = (2026, 4, 28, 9, 0, 0, 1, 118, 0)
     entry.updated_parsed = None
     mock_parsed.entries = [entry]
 
