@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Market Tools</title>
   <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#6366f1" />
+  <meta name="theme-color" content="#8b2635" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Market Tools" />
   <style>
@@ -19,23 +19,24 @@
        TOKENS — LIGHT THEME (default)
     ───────────────────────────────────────────── */
     :root {
-      --bg-primary:    #f2f2f7;
-      --bg-secondary:  #ffffff;
-      --bg-tertiary:   #ebebf0;
-      --text-primary:  #1c1c1e;
-      --text-secondary:#8e8e93;
-      --text-muted:    #aeaeb2;
-      --accent:        #6366f1;
-      --accent-lt:     #eef2ff;
-      --accent-hover:  #4f46e5;
+      --bg-primary:    #ffffff;
+      --bg-secondary:  #fafafa;
+      --bg-tertiary:   #f5f5f5;
+      --text-primary:  #0a0a0a;
+      --text-secondary:#525252;
+      --text-muted:    #a3a3a3;
+      --accent:        #8b2635;
+      --accent-lt:     #fbf1f3;
+      --accent-hover:  #a53344;
       --positive:      #16a34a;
       --negative:      #dc2626;
-      --neutral:       #ff9f0a;
-      --border:        #e5e7eb;
+      --neutral:       #d97706;
+      --border:        #e5e5e5;
+      --ticker-bar-bg: #0a0a0a;
       --shadow-sm:     0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
       --shadow:        0 4px 20px rgba(0,0,0,0.09), 0 1px 4px rgba(0,0,0,0.05);
-      --radius:        14px;
-      --radius-sm:     9px;
+      --radius:        10px;
+      --radius-sm:     6px;
       --sidebar-w:     240px;
       --topbar-h:      44px;
       --sans:          -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
@@ -55,21 +56,21 @@
        TOKENS — DARK THEME
     ───────────────────────────────────────────── */
     [data-theme="dark"] {
-      --bg-primary:    #0d0d0f;
-      --bg-secondary:  #161618;
-      --bg-tertiary:   #1f1f24;
-      --text-primary:  #f4f4f6;
-      --text-secondary:#9898a6;
-      --text-muted:    #56566a;
-      --accent:        #6366f1;
-      --accent-lt:     rgba(99,102,241,0.14);
-      --accent-hover:  #818cf8;
+      --bg-primary:    #0a0a0a;
+      --bg-secondary:  #141414;
+      --bg-tertiary:   #1f1f1f;
+      --text-primary:  #ffffff;
+      --text-secondary:#a8a8a8;
+      --text-muted:    #6e6e6e;
+      --accent:        #8b2635;
+      --accent-lt:     #1e0f12;
+      --accent-hover:  #a53344;
       --positive:      #22c55e;
       --negative:      #ef4444;
       --neutral:       #f59e0b;
-      --border:        #252530;
-      --shadow-sm:     0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
-      --shadow:        0 4px 24px rgba(0,0,0,0.5), 0 1px 6px rgba(0,0,0,0.4);
+      --border:        #2a2a2a;
+      --shadow-sm:     0 1px 3px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.4);
+      --shadow:        0 4px 24px rgba(0,0,0,0.6), 0 1px 6px rgba(0,0,0,0.5);
       /* ── Legacy aliases ── */
       --bg:       var(--bg-primary);
       --surface:  var(--bg-secondary);
@@ -233,7 +234,7 @@
        TICKER BANNER
     ───────────────────────────────────────────── */
     .ticker-banner {
-      background: var(--ink);
+      background: var(--ticker-bar-bg);
       height: var(--topbar-h);
       display: flex;
       align-items: center;
@@ -291,10 +292,11 @@
        CARDS
     ───────────────────────────────────────────── */
     .card {
-      background: var(--surface);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 20px 22px;
-      box-shadow: var(--shadow-sm);
+      padding: 20px 24px;
+      box-shadow: none;
     }
     .card + .card { margin-top: 14px; }
 
@@ -550,7 +552,7 @@
       white-space: nowrap;
       min-height: 36px;
     }
-    .btn-secondary:hover { background: var(--accent-lt); border-color: #c7d2fe; }
+    .btn-secondary:hover { background: var(--accent-lt); border-color: var(--accent); }
     .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
 
     /* Generate button */
@@ -664,32 +666,32 @@
     .add-holding-btn {
       width: 100%;
       padding: 10px;
-      background: var(--accent-lt);
-      color: var(--accent);
+      background: transparent;
+      color: var(--muted);
       font-size: 0.875rem;
       font-weight: 600;
-      border: 1.5px dashed #c7d2fe;
+      border: 1px dashed var(--border);
       border-radius: var(--radius-sm);
       cursor: pointer;
-      transition: background 0.14s;
+      transition: border-color 0.2s, color 0.2s;
       margin-bottom: 12px;
       margin-top: 4px;
       min-height: 42px;
     }
-    .add-holding-btn:hover { background: var(--accent-lt); }
+    .add-holding-btn:hover { border-color: var(--ink); color: var(--ink); }
 
     /* ─────────────────────────────────────────────
        METRIC CARDS
     ───────────────────────────────────────────── */
     .metric-card {
-      background: var(--surface);
+      background: var(--bg-tertiary);
       border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      padding: 14px 16px;
+      border-radius: 8px;
+      padding: 20px 20px;
       text-align: center;
     }
-    .metric-label { font-size: 0.63rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 8px; }
-    .metric-value { font-size: 1.5rem; font-weight: 700; line-height: 1; }
+    .metric-label { font-size: 0.63rem; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em; display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 10px; }
+    .metric-value { font-size: 1.25rem; font-weight: 700; line-height: 1; color: var(--ink); }
     .metric-sub   { font-size: 0.68rem; color: var(--faint); margin-top: 6px; line-height: 1.4; }
 
     .c-green  { color: var(--green-dk); }
@@ -730,7 +732,7 @@
       flex-shrink: 0;
       line-height: 1;
     }
-    .info-icon:hover { background: rgba(99,102,241,0.2); }
+    .info-icon:hover { background: rgba(139,38,53,0.2); }
 
     .error-banner {
       display: none;
@@ -752,7 +754,7 @@
     .hot-table thead tr { background: var(--bg); border-bottom: 1px solid var(--border); }
     .hot-table th { padding: 10px 14px; text-align: left; font-size: 0.63rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); white-space: nowrap; }
     .hot-table th.r { text-align: right; }
-    .hot-table td { padding: 12px 14px; border-bottom: 1px solid #f9fafb; vertical-align: middle; }
+    .hot-table td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
     .hot-table td.r { text-align: right; }
     .hot-table tr:last-child td { border-bottom: none; }
 
@@ -772,7 +774,7 @@
       transition: background 0.14s;
       min-height: 36px;
     }
-    .page-nav-btn:hover:not(:disabled) { background: var(--accent-lt); border-color: #c7d2fe; }
+    .page-nav-btn:hover:not(:disabled) { background: var(--accent-lt); border-color: var(--accent); }
     .page-nav-btn:disabled { color: var(--faint); cursor: not-allowed; }
 
     .page-num-btn {
@@ -1499,7 +1501,7 @@
       <div class="metrics-grid-2">
         <div class="metric-card">
           <div class="metric-label">Total Portfolio Value</div>
-          <div class="metric-value c-accent" id="metricTotalValue">—</div>
+          <div class="metric-value" id="metricTotalValue">—</div>
           <div class="metric-sub">Sum of invested capital (USD)</div>
         </div>
         <div class="metric-card">
@@ -1521,7 +1523,7 @@
         </div>
         <div class="metric-card">
           <div class="metric-label">Diversification <button class="info-icon" onclick="openModal('diversification')">i</button></div>
-          <div class="metric-value c-accent" id="metricDiversification">—</div>
+          <div class="metric-value" id="metricDiversification">—</div>
           <div class="metric-sub">Score 0 → 1</div>
         </div>
       </div>
@@ -2420,7 +2422,7 @@ function analyze() {
       document.getElementById("metricTotalValue").textContent = usd(totalVal);
       const largestEl = document.getElementById("metricLargestUSD");
       largestEl.textContent = usd(largestUSD);
-      largestEl.className = "metric-value " + (largestUSD / totalVal > 0.4 ? "c-yellow" : "c-green");
+      largestEl.className = "metric-value";
       const retEl = document.getElementById("metricReturn");
       retEl.textContent = pct(ret);
       retEl.className   = "metric-value " + (ret >= 0 ? "c-green" : "c-red");
@@ -2911,9 +2913,9 @@ function renderPlotlyChart(ohlcv, ticker) {
   container.innerHTML = '<div id="sdPlotlyChart" style="height:100%;"></div>';
 
   const isDark = document.documentElement.dataset.theme === 'dark';
-  const plotBg   = isDark ? '#1f1f24' : '#f2f2f7';
-  const gridColor = isDark ? '#252530' : '#e5e7eb';
-  const tickColor = isDark ? '#9898a6' : '#8e8e93';
+  const plotBg    = isDark ? '#1f1f1f' : '#f5f5f5';
+  const gridColor = isDark ? '#2a2a2a' : '#e5e5e5';
+  const tickColor = isDark ? '#a8a8a8' : '#525252';
   const upColor   = isDark ? '#22c55e' : '#16a34a';
   const downColor = isDark ? '#ef4444' : '#dc2626';
 
