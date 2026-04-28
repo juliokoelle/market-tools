@@ -880,6 +880,16 @@ def ticker_profile(ticker: str):
         )
         description = (raw_desc[:800] if raw_desc else _TICKER_FALLBACK_DESC.get(ticker, ""))
 
+        raw_price = (
+            info.get("currentPrice")
+            or info.get("regularMarketPrice")
+            or info.get("navPrice")
+        )
+        prev_close = info.get("previousClose") or info.get("regularMarketPreviousClose")
+        change_pct = None
+        if raw_price and prev_close and prev_close != 0:
+            change_pct = (raw_price - prev_close) / prev_close * 100
+
         result = {
             "ticker":         ticker,
             "name":           info.get("longName") or info.get("shortName") or ticker,
@@ -887,19 +897,20 @@ def ticker_profile(ticker: str):
             "industry":       None if is_etf else (info.get("industry") or "—"),
             "description":    description,
             "country":        info.get("country") or "—",
+            "exchange":       info.get("exchange") or "—",
             "market_cap":     None if is_etf else info.get("marketCap"),
+            "total_assets":   info.get("totalAssets") if is_etf else None,
             "pe_ratio":       None if is_etf else info.get("trailingPE"),
             "forward_pe":     None if is_etf else info.get("forwardPE"),
             "dividend_yield": info.get("dividendYield"),
+            "beta":           None if is_etf else info.get("beta"),
+            "week52_high":    info.get("fiftyTwoWeekHigh"),
+            "week52_low":     info.get("fiftyTwoWeekLow"),
             "website":        info.get("website") or "—",
-            "current_price":  (
-                info.get("currentPrice")
-                or info.get("regularMarketPrice")
-                or info.get("navPrice")
-            ),
+            "price":          raw_price,
+            "change_pct":     change_pct,
             "currency":       info.get("currency", "USD"),
             "is_etf":         is_etf,
-            "total_assets":   info.get("totalAssets") if is_etf else None,
         }
         _cache_set(cache_key, result)
         return result

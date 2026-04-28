@@ -1417,6 +1417,49 @@
     .ticker-card-change { font-size: 0.72rem; font-weight: 600; }
     .ticker-card-sparkline { margin: 4px 0; }
 
+    /* ── Portfolio detail modal ── */
+    .port-detail-backdrop {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+      z-index: 1000; align-items: center; justify-content: center; padding: 16px;
+    }
+    .port-detail-backdrop.open { display: flex; }
+    .port-detail-modal {
+      background: var(--bg-primary); border-radius: var(--radius); width: 100%;
+      max-width: 520px; max-height: 88vh; display: flex; flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.22); overflow: hidden;
+    }
+    .port-detail-header {
+      display: flex; align-items: center; gap: 10px; padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .port-detail-ticker { font-size: 1.15rem; font-weight: 800; color: var(--ink); font-family: ui-monospace, monospace; }
+    .port-detail-name { font-size: 0.8rem; color: var(--text-muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .port-detail-close {
+      background: none; border: none; cursor: pointer; color: var(--text-muted);
+      padding: 4px; border-radius: 4px; line-height: 1;
+    }
+    .port-detail-close:hover { color: var(--ink); background: var(--bg-tertiary); }
+    .port-detail-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+    .tab-btn {
+      flex: 1; padding: 10px 0; font-size: 0.78rem; font-weight: 600; border: none;
+      background: none; cursor: pointer; color: var(--text-muted);
+      border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .port-detail-body { flex: 1; overflow-y: auto; padding: 20px; }
+    .port-detail-footer {
+      padding: 14px 20px; border-top: 1px solid var(--border);
+      display: flex; justify-content: flex-end; gap: 10px;
+    }
+    .pd-skeleton { height: 14px; border-radius: 4px; background: var(--border); margin-bottom: 10px; animation: shimmer 1.4s infinite; }
+    @keyframes shimmer { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+    .pd-info-row { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.84rem; }
+    .pd-info-row:last-child { border-bottom: none; }
+    .pd-info-label { color: var(--text-muted); }
+    .pd-info-value { font-weight: 600; color: var(--ink); }
+    .pd-desc { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.6; margin-top: 14px; }
+    .pd-desc-toggle { background: none; border: none; cursor: pointer; font-size: 0.78rem; color: var(--accent); padding: 0; margin-top: 4px; }
+
   </style>
   <!-- Plotly for interactive OHLC charts -->
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" crossorigin="anonymous"></script>
@@ -1926,6 +1969,38 @@
 <!-- Toast container -->
 <div id="toastContainer"></div>
 
+<!-- Portfolio detail modal -->
+<div class="port-detail-backdrop" id="portDetailBackdrop">
+  <div class="port-detail-modal">
+    <div class="port-detail-header">
+      <span class="port-detail-ticker" id="pdTicker">—</span>
+      <span id="pdBadge"></span>
+      <span class="port-detail-name" id="pdName">—</span>
+      <button class="port-detail-close" onclick="closePortfolioDetail()" title="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="port-detail-tabs">
+      <button class="tab-btn active" data-tab="overview"  onclick="_switchPortfolioTab('overview')">Overview</button>
+      <button class="tab-btn"        data-tab="position"  onclick="_switchPortfolioTab('position')">My Position</button>
+      <button class="tab-btn"        data-tab="stats"     onclick="_switchPortfolioTab('stats')">Stats</button>
+    </div>
+    <div class="port-detail-body">
+      <div id="pdTabOverview">
+        <div class="pd-skeleton" style="width:60%"></div>
+        <div class="pd-skeleton" style="width:80%"></div>
+        <div class="pd-skeleton" style="width:45%"></div>
+      </div>
+      <div id="pdTabPosition" style="display:none"></div>
+      <div id="pdTabStats"    style="display:none"></div>
+    </div>
+    <div class="port-detail-footer">
+      <button class="btn-secondary" onclick="closePortfolioDetail()">Close</button>
+      <button class="btn-primary" onclick="showView('analyzer'); openStockDetail(window._pdCurrentTicker); closePortfolioDetail()">Open in Analyzer</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ═══════════════════════════════════════
    CONFIG
@@ -2280,6 +2355,146 @@ function _restoreAmountDisplay(ticker, overrideAmount) {
   display.textContent = '€' + amount.toLocaleString('de-DE', { maximumFractionDigits: 0 });
   input.replaceWith(display);
 }
+
+/* ── Portfolio detail modal ── */
+let _portDetailEscHandler = null;
+window._pdCurrentTicker = null;
+
+function openPortfolioDetail(ticker) {
+  const pos = _localPortfolio.find(p => p.ticker === ticker);
+  if (!pos) return;
+  window._pdCurrentTicker = ticker;
+
+  document.getElementById('pdTicker').textContent = ticker;
+  document.getElementById('pdName').textContent = '';
+  const badge = _CATEGORY_BADGE[pos.category] || { label: pos.category, color: 'var(--muted)' };
+  document.getElementById('pdBadge').innerHTML =
+    `<span style="font-size:0.62rem;font-weight:700;background:${badge.color}22;color:${badge.color};border-radius:4px;padding:2px 6px;text-transform:uppercase;letter-spacing:0.06em;">${badge.label}</span>`;
+
+  _switchPortfolioTab('overview');
+  _renderPortfolioDetailPosition(pos);
+
+  document.getElementById('portDetailBackdrop').classList.add('open');
+
+  if (_portDetailEscHandler) document.removeEventListener('keydown', _portDetailEscHandler);
+  _portDetailEscHandler = e => { if (e.key === 'Escape') closePortfolioDetail(); };
+  document.addEventListener('keydown', _portDetailEscHandler);
+
+  _loadPortfolioDetailProfile(ticker, pos);
+}
+
+function closePortfolioDetail() {
+  document.getElementById('portDetailBackdrop').classList.remove('open');
+  if (_portDetailEscHandler) {
+    document.removeEventListener('keydown', _portDetailEscHandler);
+    _portDetailEscHandler = null;
+  }
+  window._pdCurrentTicker = null;
+}
+
+function _switchPortfolioTab(tab) {
+  document.querySelectorAll('.port-detail-tabs .tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  document.getElementById('pdTabOverview').style.display  = tab === 'overview'  ? '' : 'none';
+  document.getElementById('pdTabPosition').style.display  = tab === 'position'  ? '' : 'none';
+  document.getElementById('pdTabStats').style.display     = tab === 'stats'     ? '' : 'none';
+}
+
+function _renderPortfolioDetailPosition(pos) {
+  const el = document.getElementById('pdTabPosition');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="pd-info-row"><span class="pd-info-label">Amount (EUR)</span>
+      <span class="pd-info-value">€${pos.amount_eur.toLocaleString('de-DE', { maximumFractionDigits: 0 })}</span></div>
+    <div class="pd-info-row"><span class="pd-info-label">Category</span>
+      <span class="pd-info-value">${pos.category || '—'}</span></div>
+    <div class="pd-info-row"><span class="pd-info-label">Note</span>
+      <span class="pd-info-value">${pos.note || '—'}</span></div>`;
+}
+
+async function _loadPortfolioDetailProfile(ticker, pos) {
+  const overviewEl = document.getElementById('pdTabOverview');
+  const statsEl    = document.getElementById('pdTabStats');
+  if (!overviewEl || !statsEl) return;
+
+  overviewEl.innerHTML = `
+    <div class="pd-skeleton" style="width:60%"></div>
+    <div class="pd-skeleton" style="width:80%"></div>
+    <div class="pd-skeleton" style="width:45%"></div>`;
+  statsEl.innerHTML = `
+    <div class="pd-skeleton" style="width:55%"></div>
+    <div class="pd-skeleton" style="width:70%"></div>`;
+
+  try {
+    const resp = await fetch(`${API_BASE}/ticker/${encodeURIComponent(ticker)}/profile`);
+    if (!resp.ok) throw new Error('profile fetch failed');
+    const d = await resp.json();
+
+    document.getElementById('pdName').textContent = d.name || ticker;
+
+    const priceStr = d.price != null
+      ? d.price.toLocaleString('en-US', { style: 'currency', currency: d.currency || 'USD', maximumFractionDigits: 2 })
+      : '—';
+    const chgColor = (d.change_pct || 0) >= 0 ? 'var(--positive)' : 'var(--negative)';
+    const chgStr   = d.change_pct != null ? ((d.change_pct >= 0 ? '+' : '') + d.change_pct.toFixed(2) + '%') : '—';
+
+    overviewEl.innerHTML = `
+      <div class="pd-info-row">
+        <span class="pd-info-label">Price</span>
+        <span class="pd-info-value">${priceStr} <span style="color:${chgColor};font-size:0.78rem;">${chgStr}</span></span>
+      </div>
+      <div class="pd-info-row"><span class="pd-info-label">Exchange</span><span class="pd-info-value">${d.exchange || '—'}</span></div>
+      <div class="pd-info-row"><span class="pd-info-label">Sector</span><span class="pd-info-value">${d.sector || '—'}</span></div>
+      <div class="pd-info-row"><span class="pd-info-label">Industry</span><span class="pd-info-value">${d.industry || '—'}</span></div>
+      ${_buildDescHtml(d.description)}`;
+
+    statsEl.innerHTML = `
+      <div class="pd-info-row"><span class="pd-info-label">Market Cap</span><span class="pd-info-value">${_fmtMarketCap(d.market_cap)}</span></div>
+      <div class="pd-info-row"><span class="pd-info-label">52w High</span><span class="pd-info-value">${d.week52_high != null ? d.week52_high.toFixed(2) : '—'}</span></div>
+      <div class="pd-info-row"><span class="pd-info-label">52w Low</span><span class="pd-info-value">${d.week52_low != null ? d.week52_low.toFixed(2) : '—'}</span></div>
+      <div class="pd-info-row"><span class="pd-info-label">P/E Ratio</span><span class="pd-info-value">${d.pe_ratio != null ? d.pe_ratio.toFixed(2) : '—'}</span></div>
+      <div class="pd-info-row"><span class="pd-info-label">Dividend Yield</span><span class="pd-info-value">${d.dividend_yield != null ? (d.dividend_yield * 100).toFixed(2) + '%' : '—'}</span></div>
+      <div class="pd-info-row"><span class="pd-info-label">Beta</span><span class="pd-info-value">${d.beta != null ? d.beta.toFixed(2) : '—'}</span></div>`;
+
+  } catch {
+    overviewEl.innerHTML = '<p style="color:var(--text-muted);font-size:0.82rem;">Profile unavailable.</p>';
+    statsEl.innerHTML    = '<p style="color:var(--text-muted);font-size:0.82rem;">Stats unavailable.</p>';
+  }
+}
+
+function _buildDescHtml(desc) {
+  if (!desc) return '';
+  const SHORT = 180;
+  if (desc.length <= SHORT) return `<p class="pd-desc">${desc}</p>`;
+  window._pdDescFull  = desc;
+  window._pdDescShort = desc.slice(0, SHORT).trimEnd();
+  return `<p class="pd-desc" id="pdDescText">${window._pdDescShort}…
+    <button class="pd-desc-toggle" id="pdDescToggle" onclick="_toggleDesc()">More</button></p>`;
+}
+
+function _toggleDesc() {
+  const el   = document.getElementById('pdDescText');
+  const btn  = document.getElementById('pdDescToggle');
+  if (!el || !btn) return;
+  const expanded = btn.textContent === 'Less';
+  el.innerHTML = expanded
+    ? `${window._pdDescShort}… <button class="pd-desc-toggle" id="pdDescToggle" onclick="_toggleDesc()">More</button>`
+    : `${window._pdDescFull} <button class="pd-desc-toggle" id="pdDescToggle" onclick="_toggleDesc()">Less</button>`;
+}
+
+function _fmtMarketCap(n) {
+  if (n == null) return '—';
+  if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
+  if (n >= 1e9)  return (n / 1e9).toFixed(2) + 'B';
+  if (n >= 1e6)  return (n / 1e6).toFixed(2) + 'M';
+  return n.toLocaleString();
+}
+
+// Close on backdrop click
+document.getElementById('portDetailBackdrop').addEventListener('click', function(e) {
+  if (e.target === this) closePortfolioDetail();
+});
 
 /* ═══════════════════════════════════════
    NAVIGATION
