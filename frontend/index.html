@@ -309,6 +309,17 @@
       letter-spacing: 0.09em;
       color: var(--muted);
     }
+    .briefing-preview-card { transition: border-color 0.15s; }
+    .briefing-preview-card:hover { border-color: var(--accent); }
+    .briefing-preview-text {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      line-height: 1.55;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
 
     /* ─────────────────────────────────────────────
        GRIDS
@@ -1497,12 +1508,12 @@
 
     <!-- Lower grid: briefing status + portfolio mini -->
     <div class="grid-dash">
-      <div class="card">
-        <div style="margin-bottom:10px;">
+      <div class="card briefing-preview-card" onclick="showView('briefing')" style="cursor:pointer;" title="Open Daily Briefing">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
           <div class="card-label">Today's Briefing</div>
-          <div id="dashBriefingDate" style="font-size:0.68rem; color:var(--faint); margin-top:3px;"></div>
+          <div id="dashBriefingDate" style="font-size:0.68rem; color:var(--faint);"></div>
         </div>
-        <div id="dashBriefingStatus" style="font-size:0.85rem; color:var(--muted);">Checking…</div>
+        <div id="dashBriefingPreview" class="briefing-preview-text">Checking…</div>
       </div>
 
       <div class="card">
@@ -2384,25 +2395,22 @@ function mdToHtml(md) {
 /* ═══════════════════════════════════════
    BRIEFING
 ═══════════════════════════════════════ */
-function loadBriefing() {
-  const todayStr = new Date().toISOString().slice(0, 10);
-  fetch(`${API_BASE}/briefing/list`)
-    .then(res => res.ok ? res.json() : [])
-    .then(list => {
-      const todayEntry = list.find(item => item.date === todayStr);
-      const statusEl   = document.getElementById("dashBriefingStatus");
-      const dateEl     = document.getElementById("dashBriefingDate");
-      if (todayEntry) {
-        if (statusEl) statusEl.textContent = `Briefing ready ✓ — saved to julio-brain`;
-        if (dateEl)   dateEl.textContent   = todayStr;
-      } else {
-        if (statusEl) statusEl.textContent = "Not yet generated today.";
-      }
-    })
-    .catch(() => {
-      const statusEl = document.getElementById("dashBriefingStatus");
-      if (statusEl) statusEl.textContent = "Status unavailable.";
-    });
+async function loadBriefingPreview() {
+  const previewEl = document.getElementById('dashBriefingPreview');
+  const dateEl    = document.getElementById('dashBriefingDate');
+  try {
+    const resp = await fetch(`${API_BASE}/briefing/today/preview`);
+    const data = await resp.json();
+    if (data.has_briefing && data.preview_text) {
+      if (previewEl) previewEl.textContent = data.preview_text;
+      if (dateEl)    dateEl.textContent    = data.date || '';
+    } else {
+      if (previewEl) previewEl.innerHTML =
+        '<span style="color:var(--text-muted);">No briefing yet — generate one →</span>';
+    }
+  } catch {
+    if (previewEl) previewEl.textContent = 'Preview unavailable.';
+  }
 }
 
 async function generateBriefing(provider = 'anthropic') {
@@ -2438,11 +2446,7 @@ async function generateBriefing(provider = 'anthropic') {
     contentEl.textContent = `Briefing generated and saved to julio-brain`;
     statusEl.textContent  = `${dateStr} · ${providerLabel} · ${costStr}`;
 
-    const dashStatusEl = document.getElementById('dashBriefingStatus');
-    if (dashStatusEl) dashStatusEl.textContent = `Briefing ready ✓ — saved to julio-brain`;
-    const dashDateEl = document.getElementById('dashBriefingDate');
-    if (dashDateEl) dashDateEl.textContent = dateStr;
-
+    loadBriefingPreview();
     loadBriefingArchive();
     loadCostSummary();
   } catch (e) {
@@ -3242,7 +3246,7 @@ function analyzeStock() {
 /* ═══════════════════════════════════════
    BOOT
 ═══════════════════════════════════════ */
-loadBriefing();
+loadBriefingPreview();
 loadBriefingArchive();
 loadCostSummary();
 loadPortfolioFromGH();
