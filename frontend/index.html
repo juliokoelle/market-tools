@@ -1271,6 +1271,82 @@
     .modal-actions { display: flex; gap: 8px; margin-top: 20px; }
     .modal-actions .btn-primary { flex: 1; }
 
+    /* ─────────────────────────────────────────────
+       TOAST NOTIFICATIONS
+    ───────────────────────────────────────────── */
+    #toastContainer {
+      position: fixed; bottom: 72px; right: 16px;
+      z-index: 9999;
+      display: flex; flex-direction: column; gap: 8px;
+      pointer-events: none;
+    }
+    @media (min-width: 769px) { #toastContainer { bottom: 16px; } }
+    .toast {
+      padding: 12px 16px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #fff;
+      pointer-events: auto;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      max-width: 260px;
+      line-height: 1.4;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast-success { background: #16a34a; }
+    .toast-error   { background: #dc2626; }
+    .toast-info    { background: var(--accent); }
+
+    /* ─────────────────────────────────────────────
+       PORTFOLIO LAST-SAVED INDICATOR
+    ───────────────────────────────────────────── */
+    .portfolio-sync-bar {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 0.72rem; color: var(--muted);
+      margin-bottom: 10px;
+    }
+    .portfolio-sync-bar .sync-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--positive); flex-shrink: 0;
+    }
+    .portfolio-sync-bar.unsaved .sync-dot {
+      background: var(--accent);
+      animation: pulse 1.2s ease-in-out infinite;
+    }
+    .portfolio-sync-bar.unsaved .sync-label { color: var(--accent); font-weight: 600; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; } 50% { opacity: 0.35; }
+    }
+
+    /* ─────────────────────────────────────────────
+       SEED MODAL
+    ───────────────────────────────────────────── */
+    .seed-modal-backdrop {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 400;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .seed-modal-backdrop.open { display: flex; animation: fadeIn 0.15s ease; }
+    .seed-modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 28px 24px 24px;
+      width: 100%; max-width: 420px;
+      animation: slideUp 0.18s ease;
+    }
+    .seed-modal h3 { font-size: 1rem; font-weight: 700; color: var(--ink); margin-bottom: 8px; }
+    .seed-modal p  { font-size: 0.875rem; color: var(--muted); line-height: 1.6; margin-bottom: 20px; }
+    .seed-positions { font-size: 0.78rem; color: var(--ink); margin-bottom: 18px; display: flex; flex-direction: column; gap: 4px; }
+    .seed-positions span { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid var(--border); }
+    .seed-positions span:last-child { border-bottom: none; }
+
     /* Dashboard Hero */
     .hero-greeting { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.025em; color: var(--ink); line-height: 1.2; }
     .hero-time { font-size: 0.875rem; color: var(--muted); margin-top: 3px; }
@@ -1476,14 +1552,21 @@
   <section id="view-portfolio" class="view">
     <div class="portfolio-header">
       <div>
-        <div class="portfolio-total-label">Portfolio Value</div>
+        <div class="portfolio-total-label">Total Invested</div>
         <div class="portfolio-total-value" id="portTotalValue">—</div>
-        <div class="portfolio-total-pl" id="portTotalPL"></div>
       </div>
-      <button class="btn-primary" onclick="showAddPositionModal()">+ Add Position</button>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button class="btn-secondary" id="savePortfolioBtn" onclick="savePortfolioToGH()" style="font-size:0.78rem; padding:6px 12px; min-height:34px;">Save</button>
+        <button class="btn-primary" onclick="showAddPositionModal()">+ Add Position</button>
+      </div>
     </div>
 
-    <div class="portfolio-disclaimer">Prices are live market data. P/L is calculated from your average cost basis. Data is stored locally in your browser only.</div>
+    <div class="portfolio-sync-bar" id="portfolioSyncBar">
+      <span class="sync-dot"></span>
+      <span class="sync-label" id="portfolioSyncLabel">Loading from cloud…</span>
+    </div>
+
+    <div class="portfolio-disclaimer">Invested amounts in EUR. Positions are synced to GitHub and persist across devices and browsers.</div>
 
     <div class="position-cards" id="positionCards">
       <div class="mkt-loading">Loading positions…</div>
@@ -1775,22 +1858,46 @@
     <h3>Add Position</h3>
     <div class="form-group">
       <label>Ticker</label>
-      <input type="text" id="addPosTicker" placeholder="e.g. AAPL" style="text-transform:uppercase;" autocomplete="off">
+      <input type="text" id="addPosTicker" placeholder="e.g. VWCE.DE" style="text-transform:uppercase;" autocomplete="off">
     </div>
     <div class="form-group">
-      <label>Quantity (shares)</label>
-      <input type="number" id="addPosQty" placeholder="e.g. 10" min="0.001" step="any">
+      <label>Amount Invested (EUR)</label>
+      <input type="number" id="addPosAmount" placeholder="e.g. 500" min="0.01" step="any">
     </div>
     <div class="form-group">
-      <label>Avg. Cost per Share (USD)</label>
-      <input type="number" id="addPosCost" placeholder="e.g. 150.00" min="0.01" step="any">
+      <label>Category</label>
+      <select id="addPosCategory" style="font-family:var(--sans); font-size:0.9rem; color:var(--ink); background:var(--bg); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 12px; width:100%; outline:none; min-height:42px; cursor:pointer;">
+        <option value="stock">Stock</option>
+        <option value="etf">ETF</option>
+        <option value="commodity">Commodity</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Note <span style="font-weight:400; text-transform:none; letter-spacing:0;">(optional)</span></label>
+      <input type="text" id="addPosNote" placeholder="e.g. AI Infrastructure play">
     </div>
     <div class="modal-actions">
       <button class="btn-secondary" onclick="closeAddPositionModal()">Cancel</button>
-      <button class="btn-primary" onclick="savePosition()">Save Position</button>
+      <button class="btn-primary" onclick="savePosition()">Add Position</button>
     </div>
   </div>
 </div>
+
+<!-- Initial Seed Modal -->
+<div class="seed-modal-backdrop" id="seedModalBackdrop">
+  <div class="seed-modal">
+    <h3>Load Portfolio v1?</h3>
+    <p>No portfolio found in the cloud. Load 7 positions (€2.000) from your investment strategy note, or start with a blank portfolio?</p>
+    <div class="seed-positions" id="seedPositionsList"></div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="declineSeed()">Start blank</button>
+      <button class="btn-primary" onclick="acceptSeed()">Yes, load portfolio</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toastContainer"></div>
 
 <script>
 /* ═══════════════════════════════════════
@@ -1841,26 +1948,153 @@ const SNAPSHOT_TICKERS = [
   { sym: "EURUSD=X", label: "EUR/USD"  },
 ];
 
-// Portfolio loaded dynamically from /portfolio/holdings
-/* ─── localStorage portfolio ─── */
-const PORTFOLIO_KEY = 'mt_portfolio_v1';
-let _localPortfolio = [];
+/* ═══════════════════════════════════════
+   PORTFOLIO — GitHub-backed persistence
+═══════════════════════════════════════ */
+const PORTFOLIO_SEED_KEY = 'mt_portfolio_seed_seen';
+let _localPortfolio = [];   // [{ticker, amount_eur, category, note}]
+let _portfolioLastUpdated = null;
+let _portfolioUnsaved = false;
+let _saveDebounceTimer = null;
 
-function _loadLocalPortfolio() {
+const PORTFOLIO_SEED = [
+  { ticker: "VWCE.DE", amount_eur: 650, category: "etf",       note: "Welt-ETF Foundation" },
+  { ticker: "NVDA",    amount_eur: 180, category: "stock",     note: "AI Infrastructure" },
+  { ticker: "ASML",    amount_eur: 180, category: "stock",     note: "EUV Lithography" },
+  { ticker: "MSFT",    amount_eur: 150, category: "stock",     note: "Cloud + AI" },
+  { ticker: "GOOGL",   amount_eur: 120, category: "stock",     note: "Search + Gemini" },
+  { ticker: "PLTR",    amount_eur: 150, category: "stock",     note: "Government AI" },
+  { ticker: "4GLD.DE", amount_eur: 570, category: "commodity", note: "Xetra-Gold Hedge" },
+];
+
+/* ── Toast ── */
+function showToast(msg, type = 'info') {
+  const container = document.getElementById('toastContainer');
+  if (!container) return;
+  const el = document.createElement('div');
+  el.className = `toast toast-${type}`;
+  el.textContent = msg;
+  container.appendChild(el);
+  requestAnimationFrame(() => { requestAnimationFrame(() => el.classList.add('show')); });
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 250);
+  }, 3000);
+}
+
+/* ── Sync bar ── */
+function _setSyncBar(state, label) {
+  const bar = document.getElementById('portfolioSyncBar');
+  const lbl = document.getElementById('portfolioSyncLabel');
+  if (!bar || !lbl) return;
+  bar.classList.toggle('unsaved', state === 'unsaved');
+  lbl.textContent = label;
+}
+
+function _updateLastSaved(isoTs) {
+  _portfolioLastUpdated = isoTs;
+  _portfolioUnsaved = false;
+  if (!isoTs) { _setSyncBar('saved', 'Not yet saved'); return; }
+  const d = new Date(isoTs);
+  const hhmm = d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  _setSyncBar('saved', `Last saved: ${hhmm}`);
+}
+
+function _markUnsaved() {
+  _portfolioUnsaved = true;
+  _setSyncBar('unsaved', 'Unsaved changes');
+}
+
+/* ── Load from GitHub ── */
+async function loadPortfolioFromGH() {
+  _setSyncBar('saved', 'Loading from cloud…');
   try {
-    const raw = localStorage.getItem(PORTFOLIO_KEY);
-    _localPortfolio = raw ? JSON.parse(raw) : [];
-  } catch { _localPortfolio = []; }
+    const resp = await fetch(`${API_BASE}/portfolio`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    if (data.positions && data.positions.length > 0) {
+      _localPortfolio = data.positions;
+      _updateLastSaved(data.last_updated);
+      refreshPortfolioCards();
+    } else {
+      // Empty portfolio from GitHub
+      _localPortfolio = [];
+      _updateLastSaved(null);
+      _maybeShowSeedModal();
+      refreshPortfolioCards();
+    }
+  } catch (e) {
+    _setSyncBar('unsaved', 'Cloud unavailable — local only');
+    refreshPortfolioCards();
+  }
 }
 
-function _saveLocalPortfolio() {
-  localStorage.setItem(PORTFOLIO_KEY, JSON.stringify(_localPortfolio));
+/* ── Save to GitHub ── */
+async function savePortfolioToGH() {
+  const btn = document.getElementById('savePortfolioBtn');
+  if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+  _setSyncBar('unsaved', 'Saving…');
+  try {
+    const resp = await fetch(`${API_BASE}/portfolio`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ positions: _localPortfolio }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.detail || `HTTP ${resp.status}`);
+    }
+    const result = await resp.json();
+    _updateLastSaved(result.last_updated);
+    showToast('Portfolio saved', 'success');
+  } catch (e) {
+    showToast(`Save failed: ${e.message}`, 'error');
+    _markUnsaved();
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+  }
 }
 
+/* ── Auto-save (debounced 2 s) ── */
+function _scheduleAutoSave(immediate = false) {
+  clearTimeout(_saveDebounceTimer);
+  _markUnsaved();
+  _saveDebounceTimer = setTimeout(savePortfolioToGH, immediate ? 0 : 2000);
+}
+
+/* ── Seed modal ── */
+function _maybeShowSeedModal() {
+  if (localStorage.getItem(PORTFOLIO_SEED_KEY)) return;
+  // Populate preview list
+  const list = document.getElementById('seedPositionsList');
+  if (list) {
+    list.innerHTML = PORTFOLIO_SEED.map(p =>
+      `<span><b>${p.ticker}</b> <span style="color:var(--muted)">${p.note}</span> <b>€${p.amount_eur}</b></span>`
+    ).join('');
+  }
+  document.getElementById('seedModalBackdrop').classList.add('open');
+}
+
+function declineSeed() {
+  localStorage.setItem(PORTFOLIO_SEED_KEY, '1');
+  document.getElementById('seedModalBackdrop').classList.remove('open');
+  _setSyncBar('saved', 'Portfolio empty — add a position to start');
+}
+
+async function acceptSeed() {
+  localStorage.setItem(PORTFOLIO_SEED_KEY, '1');
+  document.getElementById('seedModalBackdrop').classList.remove('open');
+  _localPortfolio = PORTFOLIO_SEED.map(p => ({ ...p }));
+  refreshPortfolioCards();
+  await savePortfolioToGH();
+}
+
+/* ── Add / Remove position ── */
 function showAddPositionModal() {
   document.getElementById('addPosTicker').value = '';
-  document.getElementById('addPosQty').value = '';
-  document.getElementById('addPosCost').value = '';
+  document.getElementById('addPosAmount').value = '';
+  document.getElementById('addPosCategory').value = 'stock';
+  document.getElementById('addPosNote').value = '';
   document.getElementById('addPosModalBackdrop').classList.add('open');
   setTimeout(() => document.getElementById('addPosTicker').focus(), 50);
 }
@@ -1870,43 +2104,42 @@ function closeAddPositionModal() {
 }
 
 function savePosition() {
-  const ticker   = document.getElementById('addPosTicker').value.trim().toUpperCase();
-  const quantity = parseFloat(document.getElementById('addPosQty').value);
-  const avg_cost = parseFloat(document.getElementById('addPosCost').value);
-  if (!ticker || isNaN(quantity) || quantity <= 0 || isNaN(avg_cost) || avg_cost <= 0) {
-    alert('Please fill in all fields with valid values.');
+  const ticker     = document.getElementById('addPosTicker').value.trim().toUpperCase();
+  const amount_eur = parseFloat(document.getElementById('addPosAmount').value);
+  const category   = document.getElementById('addPosCategory').value;
+  const note       = document.getElementById('addPosNote').value.trim();
+  if (!ticker || isNaN(amount_eur) || amount_eur <= 0) {
+    alert('Please enter a ticker and a valid amount.');
     return;
   }
   const idx = _localPortfolio.findIndex(p => p.ticker === ticker);
   if (idx >= 0) {
-    const p = _localPortfolio[idx];
-    const totalQty  = p.quantity + quantity;
-    const blendCost = (p.quantity * p.avg_cost + quantity * avg_cost) / totalQty;
-    _localPortfolio[idx] = { ...p, quantity: totalQty, avg_cost: blendCost };
+    _localPortfolio[idx] = { ticker, amount_eur, category, note };
   } else {
-    _localPortfolio.push({ ticker, quantity, avg_cost, added_date: new Date().toISOString().slice(0, 10) });
+    _localPortfolio.push({ ticker, amount_eur, category, note });
   }
-  _saveLocalPortfolio();
   closeAddPositionModal();
   refreshPortfolioCards();
+  _scheduleAutoSave();
 }
 
 function removePosition(ticker) {
   _localPortfolio = _localPortfolio.filter(p => p.ticker !== ticker);
-  _saveLocalPortfolio();
   refreshPortfolioCards();
+  _scheduleAutoSave(true);
 }
 
+/* ── Render ── */
 function refreshPortfolioCards() {
   const el = document.getElementById('positionCards');
   if (!el) return;
   if (!_localPortfolio.length) {
     document.getElementById('portTotalValue').textContent = '—';
-    document.getElementById('portTotalPL').innerHTML = '';
     el.innerHTML = `<div style="padding:32px 0; text-align:center; color:var(--faint);">
       <div style="font-size:1.05rem; margin-bottom:8px;">No positions yet</div>
-      <div style="font-size:0.82rem;">Click "+ Add Position" to start tracking your holdings.</div>
+      <div style="font-size:0.82rem;">Click "+ Add Position" to start tracking.</div>
     </div>`;
+    renderPortfolioMini({});
     return;
   }
   el.innerHTML = '<div class="mkt-loading">Fetching prices…</div>';
@@ -1917,35 +2150,38 @@ function refreshPortfolioCards() {
     .catch(() => renderPortfolioCards({}));
 }
 
+const _CATEGORY_BADGE = {
+  etf:       { label: 'ETF',       color: '#6366f1' },
+  stock:     { label: 'Stock',     color: '#0ea5e9' },
+  commodity: { label: 'Commodity', color: '#d97706' },
+};
+
 function renderPortfolioCards(prices) {
   const el = document.getElementById('positionCards');
   if (!el) return;
   if (!_localPortfolio.length) { refreshPortfolioCards(); return; }
 
-  let totalValue = 0, totalCostBasis = 0;
-  const cards = _localPortfolio.map(({ ticker, quantity, avg_cost }) => {
+  const totalEur = _localPortfolio.reduce((s, p) => s + (p.amount_eur || 0), 0);
+  document.getElementById('portTotalValue').textContent =
+    '€' + totalEur.toLocaleString('de-DE', { maximumFractionDigits: 0 });
+
+  const cards = _localPortfolio.map(({ ticker, amount_eur, category, note }) => {
     const price = prices[ticker];
-    const curVal = price != null ? price * quantity : null;
-    const costBasis = avg_cost * quantity;
-    const pl    = curVal != null ? curVal - costBasis : null;
-    const plPct = price  != null ? ((price - avg_cost) / avg_cost) * 100 : null;
-    if (curVal != null) totalValue += curVal;
-    totalCostBasis += costBasis;
-
-    const priceStr = price != null ? '$' + price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
-    const plStr = pl != null
-      ? `<span class="${pl >= 0 ? 'c-green' : 'c-red'}">${pl >= 0 ? '+' : '−'}$${Math.abs(pl).toLocaleString('en-US', { maximumFractionDigits: 0 })} (${plPct >= 0 ? '+' : ''}${plPct.toFixed(2)}%)</span>`
-      : '<span style="color:var(--faint)">—</span>';
-
+    const badge = _CATEGORY_BADGE[category] || { label: category, color: 'var(--muted)' };
+    const priceStr = price != null
+      ? price.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
+      : '—';
     return `
       <div class="position-card">
         <div>
-          <div class="position-ticker">${ticker}</div>
-          <div class="position-meta">${quantity} sh · avg $${avg_cost.toFixed(2)}</div>
+          <div class="position-ticker">${ticker}
+            <span style="font-size:0.62rem; font-weight:700; background:${badge.color}22; color:${badge.color}; border-radius:4px; padding:2px 6px; margin-left:6px; vertical-align:middle; text-transform:uppercase; letter-spacing:0.06em;">${badge.label}</span>
+          </div>
+          <div class="position-meta" style="margin-top:3px;">${note || '—'}</div>
         </div>
-        <div>
-          <div class="position-price">${priceStr}</div>
-          <div class="position-pl">${plStr}</div>
+        <div style="text-align:right;">
+          <div class="position-price">€${(amount_eur).toLocaleString('de-DE', { maximumFractionDigits: 0 })}</div>
+          <div class="position-meta" style="margin-top:2px;">${priceStr}</div>
         </div>
         <div class="position-actions" style="grid-column:1/-1; justify-content:flex-end;">
           <button class="icon-btn" onclick="openStockDetail('${ticker}')" title="Analyze">
@@ -1959,14 +2195,6 @@ function renderPortfolioCards(prices) {
   }).join('');
 
   el.innerHTML = cards;
-
-  const totalPL    = totalValue - totalCostBasis;
-  const totalPLPct = totalCostBasis > 0 ? (totalPL / totalCostBasis) * 100 : 0;
-  document.getElementById('portTotalValue').textContent = totalValue > 0
-    ? '$' + totalValue.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '—';
-  document.getElementById('portTotalPL').innerHTML = totalValue > 0
-    ? `<span class="${totalPL >= 0 ? 'c-green' : 'c-red'}">${totalPL >= 0 ? '+' : '−'}$${Math.abs(totalPL).toLocaleString('en-US', { maximumFractionDigits: 0 })} (${totalPLPct >= 0 ? '+' : ''}${totalPLPct.toFixed(2)}%)</span>` : '';
-
   renderPortfolioMini(prices);
 }
 
@@ -2081,27 +2309,24 @@ function renderPortfolioMini(prices) {
     document.getElementById("dashPortTotal").textContent = "—";
     return;
   }
-  let total = 0;
+  const totalEur = _localPortfolio.reduce((s, p) => s + (p.amount_eur || 0), 0);
   document.getElementById("dashPortfolio").innerHTML =
-    _localPortfolio.map(({ ticker, quantity }) => {
+    _localPortfolio.map(({ ticker, amount_eur }) => {
       const p = prices[ticker];
-      const v = p != null ? p * quantity : null;
-      if (v != null) total += v;
       return `
         <div class="mkt-row">
           <div>
             <div class="mkt-name">${ticker}</div>
-            <div class="mkt-sub">${quantity} sh</div>
+            <div class="mkt-sub">€${(amount_eur||0).toLocaleString('de-DE', {maximumFractionDigits:0})}</div>
           </div>
           <div class="mkt-right">
             <div class="mkt-price">${fmtPrice(p)}</div>
-            <div class="mkt-sub">${v != null ? "$" + v.toLocaleString("en-US", {maximumFractionDigits:0}) : "—"}</div>
           </div>
         </div>`;
     }).join("");
 
-  const totalStr = total > 0 ? `$${total.toLocaleString("en-US", {maximumFractionDigits:0})}` : "—";
-  document.getElementById("dashPortTotal").textContent = totalStr;
+  document.getElementById("dashPortTotal").textContent =
+    '€' + totalEur.toLocaleString('de-DE', { maximumFractionDigits: 0 });
 }
 
 
@@ -3017,13 +3242,20 @@ function analyzeStock() {
 /* ═══════════════════════════════════════
    BOOT
 ═══════════════════════════════════════ */
-_loadLocalPortfolio();
 loadBriefing();
 loadBriefingArchive();
 loadCostSummary();
-refreshPortfolioCards();
+loadPortfolioFromGH();
 loadMarketData();
 loadWatchlist();
+
+/* Cmd+S / Ctrl+S → save portfolio */
+document.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+    e.preventDefault();
+    if (_portfolioUnsaved) savePortfolioToGH();
+  }
+});
 </script>
 
 </body>

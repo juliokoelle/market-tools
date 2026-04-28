@@ -1,3 +1,4 @@
+import base64
 import json
 import logging
 import os
@@ -44,6 +45,9 @@ _TTL_LONG       = 300.0   # briefing content
 _TTL_BULL_SCORE = 300.0   # watchlist items (5 min)
 _TTL_CHART      = 900.0   # OHLC chart data (15 min)
 _TTL_AI_SUMMARY = 21600.0 # Sonnet summary (6 h)
+_TTL_PORTFOLIO  = 30.0    # portfolio positions (30 s)
+
+_PORTFOLIO_GH_PATH = "20_Career/investments/portfolio-current.json"
 
 
 def _cache_get(key: str, ttl: float) -> object | None:
@@ -126,6 +130,90 @@ class PortfolioHolding(BaseModel):
 
 class PortfolioHoldingsRequest(BaseModel):
     holdings: list[PortfolioHolding]
+
+
+class PortfolioPosition(BaseModel):
+    ticker: str
+    amount_eur: float
+    category: str  # "stock" | "etf" | "commodity"
+    note: str = ""
+
+
+class GHPortfolioWrite(BaseModel):
+    positions: list[PortfolioPosition]
+
+
+# ---------------------------------------------------------------------------
+# GitHub portfolio helpers
+# ---------------------------------------------------------------------------
+
+_log_portfolio = logging.getLogger("portfolio")
+
+
+def _gh_portfolio_read() -> tuple[dict | None, str | None]:
+    """Read portfolio JSON from GitHub. Returns (data, sha) or (None, None)."""
+    token = os.getenv("GITHUB_TOKEN", "").strip()
+    if not token:
+        return None, None
+    url = (
+        f"https://api.github.com/repos/{_gh_owner()}/{_gh_repo()}"
+        f"/contents/{_PORTFOLIO_GH_PATH}"
+    )
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    try:
+        resp = http_client.get(url, headers=headers, timeout=10)
+        if resp.status_code == 404:
+            return None, None
+        if resp.status_code != 200:
+            _log_portfolio.warning("GitHub portfolio GET returned %s", resp.status_code)
+            return None, None
+        body = resp.json()
+        sha = body.get("sha")
+        raw = base64.b64decode(body["content"]).decode("utf-8")
+        return json.loads(raw), sha
+    except Exception as e:
+        _log_portfolio.warning("GitHub portfolio read failed: %s", e)
+        return None, None
+
+
+def _gh_portfolio_write(data: dict, sha: str | None) -> bool:
+    """Write portfolio JSON to GitHub. Returns True on success."""
+    token = os.getenv("GITHUB_TOKEN", "").strip()
+    if not token:
+        return False
+    url = (
+        f"https://api.github.com/repos/{_gh_owner()}/{_gh_repo()}"
+        f"/contents/{_PORTFOLIO_GH_PATH}"
+    )
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    content_b64 = base64.b64encode(
+        json.dumps(data, indent=2, ensure_ascii=False).encode("utf-8")
+    ).decode("ascii")
+    date_str = data.get("last_updated", "")[:10]
+    body: dict = {
+        "message": f"portfolio: update positions {date_str}",
+        "content": content_b64,
+        "branch": "main",
+    }
+    if sha:
+        body["sha"] = sha
+    try:
+        resp = http_client.put(url, headers=headers, json=body, timeout=20)
+        if resp.status_code in (200, 201):
+            return True
+        _log_portfolio.warning(
+            "GitHub portfolio PUT returned %s: %s", resp.status_code, resp.text[:200]
+        )
+        return False
+    except Exception as e:
+        _log_portfolio.error("GitHub portfolio write failed: %s", e)
+        return False
 
 
 # ---------------------------------------------------------------------------
@@ -354,6 +442,89 @@ def portfolio_holdings_save(request: PortfolioHoldingsRequest):
     data = [h.model_dump() for h in request.holdings]
     PORTFOLIO_JSON.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     return {"saved": len(data)}
+
+
+# ---------------------------------------------------------------------------
+# Portfolio persistence (GitHub-backed)
+# ---------------------------------------------------------------------------
+
+@app.get("/portfolio")
+def portfolio_get():
+    cached = _cache_get("portfolio", _TTL_PORTFOLIO)
+    if cached is not None:
+        return cached
+    data, _ = _gh_portfolio_read()
+    if data is None:
+        result = {"positions": [], "last_updated": None, "total_eur": 0}
+    else:
+        positions = data.get("positions", [])
+        result = {
+            "positions": positions,
+            "last_updated": data.get("last_updated"),
+            "total_eur": round(sum(p.get("amount_eur", 0) for p in positions), 2),
+        }
+    _cache_set("portfolio", result)
+    return result
+
+
+@app.post("/portfolio")
+def portfolio_save(request: GHPortfolioWrite):
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    positions = [p.model_dump() for p in request.positions]
+    data = {
+        "positions": positions,
+        "last_updated": now,
+        "total_eur": round(sum(p.get("amount_eur", 0) for p in positions), 2),
+    }
+    _, sha = _gh_portfolio_read()
+    if not _gh_portfolio_write(data, sha):
+        raise HTTPException(
+            status_code=503,
+            detail="Could not write to GitHub. Check GITHUB_TOKEN or try again shortly.",
+        )
+    _cache_del("portfolio")
+    return {"saved": len(positions), "last_updated": now}
+
+
+@app.post("/portfolio/position")
+def portfolio_position_add(position: PortfolioPosition):
+    data, sha = _gh_portfolio_read()
+    positions: list[dict] = list(data.get("positions", [])) if data else []
+    idx = next((i for i, p in enumerate(positions) if p.get("ticker") == position.ticker), -1)
+    pos_dict = position.model_dump()
+    if idx >= 0:
+        positions[idx] = pos_dict
+    else:
+        positions.append(pos_dict)
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    new_data = {
+        "positions": positions,
+        "last_updated": now,
+        "total_eur": round(sum(p.get("amount_eur", 0) for p in positions), 2),
+    }
+    if not _gh_portfolio_write(new_data, sha):
+        raise HTTPException(status_code=503, detail="Could not write to GitHub.")
+    _cache_del("portfolio")
+    return {"saved": True, "positions": len(positions), "last_updated": now}
+
+
+@app.delete("/portfolio/position/{ticker}")
+def portfolio_position_delete(ticker: str):
+    data, sha = _gh_portfolio_read()
+    if data is None:
+        raise HTTPException(status_code=404, detail="Portfolio not found.")
+    upper = ticker.upper()
+    positions = [p for p in data.get("positions", []) if p.get("ticker") != upper]
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    new_data = {
+        "positions": positions,
+        "last_updated": now,
+        "total_eur": round(sum(p.get("amount_eur", 0) for p in positions), 2),
+    }
+    if not _gh_portfolio_write(new_data, sha):
+        raise HTTPException(status_code=503, detail="Could not write to GitHub.")
+    _cache_del("portfolio")
+    return {"deleted": upper, "positions": len(positions)}
 
 
 # ---------------------------------------------------------------------------
