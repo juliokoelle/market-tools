@@ -126,6 +126,23 @@ RSS_FEEDS = [
         "category": "tech",
         "priority": 2,
     },
+    # ── Priority 2 · Tech & VC ────────────────────────────────────────────
+    {
+        "url": "https://techcrunch.com/feed/",
+        "source": "TechCrunch",
+        "language": "en",
+        "region": "us",
+        "category": "tech",
+        "priority": 2,
+    },
+    {
+        "url": "https://www.theinformation.com/feed",
+        "source": "The Information",
+        "language": "en",
+        "region": "us",
+        "category": "tech",
+        "priority": 2,
+    },
     # ── Priority 2 · Brazil ───────────────────────────────────────────────
     {
         "url": "https://feeds.folha.uol.com.br/mercado/rss091.xml",
@@ -134,6 +151,15 @@ RSS_FEEDS = [
         "region": "brazil",
         "category": "macro",
         "priority": 2,
+    },
+    # ── Priority 3 · Optional / Fallback ─────────────────────────────────
+    {
+        "url": "https://stratechery.com/feed/",
+        "source": "Stratechery",
+        "language": "en",
+        "region": "us",
+        "category": "tech",
+        "priority": 3,
     },
 ]
 
