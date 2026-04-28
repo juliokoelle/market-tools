@@ -331,6 +331,61 @@ def briefing_cost_summary():
     }
 
 
+def _extract_preview(text: str, max_chars: int = 250) -> str:
+    """Strip YAML frontmatter and Markdown headers; truncate at word boundary."""
+    s = text.strip()
+    if s.startswith("---"):
+        end = s.find("---", 3)
+        if end != -1:
+            s = s[end + 3:].strip()
+    s = re.sub(r"^#{1,6}\s+.*$", "", s, flags=re.MULTILINE)
+    s = re.sub(r"\*\*(.+?)\*\*", r"\1", s)
+    s = re.sub(r"\*(.+?)\*", r"\1", s)
+    s = re.sub(r"\[(.+?)\]\(.+?\)", r"\1", s)
+    s = re.sub(r"\n{2,}", " ", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    if len(s) <= max_chars:
+        return s
+    cut = s[:max_chars]
+    last = cut.rfind(" ")
+    if last > max_chars // 2:
+        cut = cut[:last]
+    return cut + "…"
+
+
+@app.get("/briefing/today/preview")
+def briefing_today_preview():
+    cache_key = "briefing_today_preview"
+    cached = _cache_get(cache_key, _TTL_SHORT)
+    if cached is not None:
+        return cached
+
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    markdown_text = _fetch_markdown_for_date(today_str)
+    date_used = today_str
+
+    if markdown_text is None:
+        try:
+            recent_list = briefing_list()
+            if recent_list:
+                date_used = recent_list[0]["date"]
+                markdown_text = _fetch_markdown_for_date(date_used)
+        except Exception:
+            pass
+
+    if markdown_text is None:
+        result = {"date": None, "preview_text": None, "has_briefing": False}
+    else:
+        result = {
+            "date": date_used,
+            "preview_text": _extract_preview(markdown_text),
+            "has_briefing": True,
+        }
+
+    _cache_set(cache_key, result)
+    return result
+
+
 def _fetch_markdown_for_date(date: str) -> str | None:
     """Fetch briefing markdown from GitHub, fall back to local outputs/."""
     try:
