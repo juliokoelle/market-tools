@@ -418,24 +418,7 @@
     }
     .briefing-error { color: var(--red-dk); }
 
-    /* ── Generate buttons ── */
-    .btn-orange {
-      background: #e07b20; color: #fff; border: none;
-      padding: 8px 16px; border-radius: 6px; font-size: 0.82rem;
-      font-weight: 600; cursor: pointer; min-height: 36px;
-      transition: background 0.15s;
-    }
-    .btn-orange:hover:not(:disabled) { background: #c96a10; }
-    .btn-orange:disabled { background: #c0905a; cursor: not-allowed; }
-
-    .btn-green {
-      background: #2d8a4e; color: #fff; border: none;
-      padding: 8px 16px; border-radius: 6px; font-size: 0.82rem;
-      font-weight: 600; cursor: pointer; min-height: 36px;
-      transition: background 0.15s;
-    }
-    .btn-green:hover:not(:disabled) { background: #1f6b3a; }
-    .btn-green:disabled { background: #5a9e72; cursor: not-allowed; }
+    /* btn-orange / btn-green removed — now use .btn-primary / .btn-secondary */
 
     /* ── Loading spinner ── */
     .spinner {
@@ -539,9 +522,9 @@
       justify-content: center;
       gap: 5px;
       padding: 7px 13px;
-      background: var(--bg);
+      background: transparent;
       color: var(--accent);
-      border: 1px solid var(--border);
+      border: 1px solid var(--accent);
       border-radius: var(--radius-sm);
       font-family: var(--sans);
       font-size: 0.8rem;
@@ -552,7 +535,7 @@
       white-space: nowrap;
       min-height: 36px;
     }
-    .btn-secondary:hover { background: var(--accent-lt); border-color: var(--accent); }
+    .btn-secondary:hover { background: rgba(139,38,53,0.08); border-color: var(--accent-hover); }
     .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
 
     /* Generate button */
@@ -600,25 +583,54 @@
     /* Holding row */
     .form-labels {
       display: grid;
-      grid-template-columns: 1fr 1fr auto;
-      gap: 10px;
-      margin-bottom: 6px;
+      grid-template-columns: 1fr 1fr 40px;
+      margin-bottom: 4px;
+      padding-left: 10px;
     }
     .form-labels span {
       font-size: 0.63rem;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.07em;
-      color: var(--faint);
-      padding-left: 2px;
+      color: var(--text-muted);
+    }
+
+    #holdingsForm {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      margin-bottom: 8px;
     }
 
     .holding-row {
       display: grid;
-      grid-template-columns: 1fr 1fr auto;
-      gap: 10px;
+      grid-template-columns: 1fr 1fr 40px;
       align-items: center;
-      margin-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .holding-row:last-of-type { border-bottom: none; }
+
+    #holdingsForm input[type="text"],
+    #holdingsForm input[type="number"] {
+      border: none;
+      border-radius: 0;
+      background: transparent;
+      height: 40px;
+      min-height: 40px;
+      padding: 0 12px;
+    }
+    #holdingsForm input[type="text"]:focus,
+    #holdingsForm input[type="number"]:focus {
+      background: var(--bg-tertiary);
+      border-color: transparent;
+    }
+    #holdingsForm .ticker-input {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Monaco, Menlo, monospace;
+      font-weight: 500;
+    }
+    #holdingsForm input[type="number"] {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
     }
     .ticker-wrap { position: relative; }
     .ticker-suggestions {
@@ -646,22 +658,21 @@
     .ticker-suggestions li.active { background: var(--accent-lt); color: var(--accent); }
 
     .remove-btn {
-      background: rgba(220,38,38,0.1);
-      color: var(--negative);
+      background: transparent;
+      color: var(--text-muted);
       border: none;
-      border-radius: var(--radius-sm);
       width: 40px; height: 40px;
-      font-size: 0.9rem;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
       padding: 0;
-      transition: background 0.14s;
-      margin-top: 1px;
+      opacity: 0;
+      transition: opacity 0.14s, color 0.14s;
     }
-    .remove-btn:hover { background: rgba(220,38,38,0.2); }
+    .holding-row:hover .remove-btn { opacity: 1; }
+    .remove-btn:hover { color: var(--accent); }
 
     .add-holding-btn {
       width: 100%;
@@ -675,8 +686,8 @@
       cursor: pointer;
       transition: border-color 0.2s, color 0.2s;
       margin-bottom: 12px;
-      margin-top: 4px;
-      min-height: 42px;
+      margin-top: 8px;
+      min-height: 40px;
     }
     .add-holding-btn:hover { border-color: var(--ink); color: var(--ink); }
 
@@ -1017,10 +1028,9 @@
       .flip-grid { grid-template-columns: repeat(2, 1fr); }
 
       /* Holding row: ticker full width, then investment + delete */
-      .form-labels { grid-template-columns: 1fr auto; }
+      .form-labels { grid-template-columns: 1fr 40px; }
       .form-labels span:nth-child(2) { display: none; }
-      .form-labels span:nth-child(3) { display: none; }
-      .holding-row { grid-template-columns: 1fr auto; }
+      .holding-row { grid-template-columns: 1fr 40px; }
       .holding-row .ticker-wrap { grid-column: 1 / -1; }
 
       .view-header h1 { font-size: 1.15rem; }
@@ -1442,8 +1452,8 @@
       </div>
       <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
         <div style="display:flex; gap:8px;">
-          <button id="generatePremiumBtn" class="btn-orange" onclick="generateBriefing('anthropic')">Generate Premium</button>
-          <button id="generateQuickBtn"   class="btn-green"  onclick="generateBriefing('openai')">Generate Quick</button>
+          <button id="generatePremiumBtn" class="btn-primary" onclick="generateBriefing('anthropic')">Generate Premium</button>
+          <button id="generateQuickBtn"   class="btn-secondary" onclick="generateBriefing('openai')">Generate Quick</button>
         </div>
         <span id="generateStatus" style="font-size:0.75rem; color:var(--muted);"></span>
         <span id="costCounter"    style="font-size:0.72rem; color:var(--faint);"></span>
@@ -2296,7 +2306,7 @@ function addHoldingRow(ticker = "", investment = "") {
       <ul class="ticker-suggestions"></ul>
     </div>
     <input type="number" min="1" step="1" placeholder="e.g. 5000" value="${investment || ""}" />
-    <button class="remove-btn" onclick="removeRow(this)" title="Remove">✕</button>
+    <button class="remove-btn" onclick="removeRow(this)" title="Remove"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
   `;
   form.appendChild(row);
 
