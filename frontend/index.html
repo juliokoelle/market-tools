@@ -1271,67 +1271,6 @@
     .modal-actions { display: flex; gap: 8px; margin-top: 20px; }
     .modal-actions .btn-primary { flex: 1; }
 
-    /* ─────────────────────────────────────────────
-       PDF PREVIEW MODAL
-    ───────────────────────────────────────────── */
-    .pdf-modal {
-      position: fixed; inset: 0;
-      z-index: 500;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 1;
-      transition: opacity 0.15s ease;
-    }
-    .pdf-modal.hidden { opacity: 0; pointer-events: none; }
-    .pdf-modal-backdrop {
-      position: absolute; inset: 0;
-      background: rgba(0,0,0,0.7);
-      backdrop-filter: blur(4px);
-    }
-    .pdf-modal-content {
-      position: relative; z-index: 1;
-      width: 90vw; max-width: 1200px;
-      height: 90vh;
-      background: var(--bg-elevated);
-      border-radius: 8px;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      box-shadow: 0 24px 64px rgba(0,0,0,0.35);
-    }
-    .pdf-modal-header {
-      padding: 14px 20px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      flex-shrink: 0;
-    }
-    .pdf-modal-title {
-      font-size: 0.95rem;
-      font-weight: 600;
-      color: var(--ink);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .pdf-modal-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-    .pdf-modal-close {
-      background: transparent;
-      border: none;
-      color: var(--muted);
-      width: 32px; height: 32px;
-      border-radius: 6px;
-      cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: background 0.12s, color 0.12s;
-    }
-    .pdf-modal-close:hover { background: var(--bg-tertiary); color: var(--ink); }
-    .pdf-modal-body { flex: 1; overflow: hidden; }
-    .pdf-modal-body iframe { width: 100%; height: 100%; border: none; display: block; }
-
     /* Dashboard Hero */
     .hero-greeting { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.025em; color: var(--ink); line-height: 1.2; }
     .hero-time { font-size: 0.875rem; color: var(--muted); margin-top: 3px; }
@@ -1853,29 +1792,6 @@
   </div>
 </div>
 
-<!-- PDF Preview Modal -->
-<div id="pdfModal" class="pdf-modal hidden" role="dialog" aria-modal="true" aria-labelledby="pdfModalTitle">
-  <div class="pdf-modal-backdrop" onclick="closePdfModal()"></div>
-  <div class="pdf-modal-content">
-    <div class="pdf-modal-header">
-      <span class="pdf-modal-title" id="pdfModalTitle">Daily Briefing</span>
-      <div class="pdf-modal-actions">
-        <button class="btn-secondary" style="font-size:0.78rem; padding:5px 10px; min-height:32px; gap:5px;"
-          onclick="window.open(_currentPdfUrl,'_blank')">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          Open in New Tab
-        </button>
-        <button class="pdf-modal-close" id="pdfModalClose" onclick="closePdfModal()" aria-label="Close PDF preview">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-    </div>
-    <div class="pdf-modal-body">
-      <iframe id="pdfFrame" src="" title="PDF Preview"></iframe>
-    </div>
-  </div>
-</div>
-
 <script>
 /* ═══════════════════════════════════════
    CONFIG
@@ -2347,8 +2263,7 @@ async function loadBriefingArchive() {
         <span class="archive-date">${item.date}</span>
         ${item.cost_usd != null ? `<span class="archive-cost">$${Number(item.cost_usd).toFixed(4)}</span>` : '<span class="archive-cost"></span>'}
         <a href="${API_BASE}/briefing/${item.date}/pdf" target="_blank" rel="noopener"
-           class="btn-secondary" style="font-size:0.72rem; padding:3px 10px; min-height:28px; text-decoration:none;"
-           onclick="event.preventDefault(); openPdfModal('${API_BASE}/briefing/${item.date}/pdf', '${item.date}', this)">View PDF</a>
+           class="btn-secondary" style="font-size:0.72rem; padding:3px 10px; min-height:28px; text-decoration:none;">View PDF</a>
       </div>`).join('');
   } catch {
     if (archiveEl) archiveEl.innerHTML = '<div class="archive-item" style="border:none;"><span style="color:var(--faint);">Archive unavailable.</span></div>';
@@ -2595,33 +2510,6 @@ function closeModal() {
 }
 function handleBackdropClick(e) { if (e.target === document.getElementById("modalBackdrop")) closeModal(); }
 function handleEsc(e) { if (e.key === "Escape") closeModal(); }
-
-/* ═══════════════════════════════════════
-   PDF MODAL
-═══════════════════════════════════════ */
-let _currentPdfUrl = '';
-let _pdfTriggerBtn = null;
-
-function openPdfModal(pdfUrl, dateLabel, triggerEl) {
-  _currentPdfUrl = pdfUrl;
-  _pdfTriggerBtn = triggerEl || null;
-  document.getElementById('pdfFrame').src = pdfUrl;
-  document.getElementById('pdfModalTitle').textContent = `Daily Briefing — ${dateLabel}`;
-  document.getElementById('pdfModal').classList.remove('hidden');
-  document.body.style.overflow = 'hidden';
-  document.getElementById('pdfModalClose').focus();
-  document.addEventListener('keydown', _pdfEscHandler);
-}
-
-function closePdfModal() {
-  document.getElementById('pdfModal').classList.add('hidden');
-  document.getElementById('pdfFrame').src = '';
-  document.body.style.overflow = '';
-  document.removeEventListener('keydown', _pdfEscHandler);
-  if (_pdfTriggerBtn) { _pdfTriggerBtn.focus(); _pdfTriggerBtn = null; }
-}
-
-function _pdfEscHandler(e) { if (e.key === 'Escape') closePdfModal(); }
 
 /* ═══════════════════════════════════════
    HOT STOCKS
