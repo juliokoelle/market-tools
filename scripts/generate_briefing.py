@@ -418,6 +418,64 @@ def interpret_eurusd(rate: float | None) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# News section routing
+# ---------------------------------------------------------------------------
+
+_SECTION_ORDER = [
+    "Global Markets",
+    "European Markets",
+    "German Markets & Companies",
+    "Tech & VC Pulse",
+    "Macro & Geopolitics",
+]
+
+
+def _section_for(item: dict) -> str:
+    cat = item.get("category", "general")
+    region = item.get("region", "global")
+    lang = item.get("language", "en")
+    if cat in ("tech", "vc"):
+        return "Tech & VC Pulse"
+    if lang == "de" or region == "de":
+        return "German Markets & Companies"
+    if region in ("eu", "europe"):
+        return "European Markets"
+    if cat == "macro":
+        return "Macro & Geopolitics"
+    return "Global Markets"
+
+
+def format_news_sections(articles: list) -> str:
+    if not articles:
+        return "[no news data]"
+
+    buckets: dict[str, list] = {s: [] for s in _SECTION_ORDER}
+    for a in articles:
+        section = _section_for(a) if isinstance(a, dict) else "Global Markets"
+        buckets.setdefault(section, []).append(a)
+
+    lines = []
+    for section in _SECTION_ORDER:
+        items = buckets.get(section, [])
+        if not items:
+            continue
+        lines.append(f"### {section}")
+        for i, a in enumerate(items, 1):
+            source = a.get("source", "Unknown")
+            title = a.get("title", "No title")
+            desc = a.get("description") or a.get("lead") or ""
+            pub = (a.get("published_at") or a.get("publishedAt") or "")[:10]
+            lang = a.get("language", "en")
+            lang_tag = f" [{lang.upper()}]" if lang != "en" else ""
+            lines.append(f"{i}. [{source}]{lang_tag} {title} ({pub})")
+            if desc:
+                lines.append(f"   {desc[:200]}")
+        lines.append("")
+
+    return "\n".join(lines).strip()
+
+
+# ---------------------------------------------------------------------------
 # Prompt assembly
 # ---------------------------------------------------------------------------
 
@@ -460,6 +518,9 @@ def build_prompt(run_date: str, extra_news: list | None = None) -> str:
                 "published_at": item.published_at,
                 "url": item.url,
                 "description": item.lead,
+                "language": getattr(item, "language", "en"),
+                "region": getattr(item, "region", "global"),
+                "category": getattr(item, "category", "general"),
             })
 
     gold   = commodities.get("gold_usd_oz")
@@ -481,7 +542,7 @@ def build_prompt(run_date: str, extra_news: list | None = None) -> str:
         _render_interpretation("EUR/USD",     interpret_eurusd(eurusd)),
     ])
 
-    news_block = format_news(news if isinstance(news, list) else [])
+    news_block = format_news_sections(news if isinstance(news, list) else [])
 
     return f"""
 --- DAILY BRIEFING PROMPT ({run_date}) ---
@@ -509,7 +570,7 @@ EUR/USD: {_fmt(eurusd)}
 
 ---
 
-## Top News Headlines for {run_date}
+## News Input — Organized by Section
 
 {news_block}
 
@@ -518,6 +579,7 @@ EUR/USD: {_fmt(eurusd)}
 Generate the full briefing now. Follow the seven mandatory sections.
 Focus on Germany, US, and Brazil. Explain all cross-regional linkages.
 Integrate the market interpretation signals into the narrative.
+For news items tagged [DE] or [PT], translate and synthesize key points naturally into English.
 Maintain journalistic prose throughout — no bullet lists in the final output.
 """.strip()
 
