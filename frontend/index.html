@@ -309,6 +309,17 @@
       letter-spacing: 0.09em;
       color: var(--muted);
     }
+    .briefing-preview-card { transition: border-color 0.15s; }
+    .briefing-preview-card:hover { border-color: var(--accent); }
+    .briefing-preview-text {
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      line-height: 1.55;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
 
     /* ─────────────────────────────────────────────
        GRIDS
@@ -1227,8 +1238,24 @@
       transition: all 0.14s;
       padding: 0;
     }
-    .icon-btn:hover { color: var(--negative); border-color: var(--negative); background: rgba(220,38,38,0.08); }
+    .icon-btn:hover         { color: var(--text-secondary); border-color: var(--border); background: var(--bg-tertiary); }
+    .icon-btn-edit:hover   { color: var(--accent); border-color: var(--accent); background: var(--accent-lt); }
+    .icon-btn-delete:hover { color: var(--negative); border-color: var(--negative); background: rgba(220,38,38,0.08); }
     .icon-btn svg { width: 14px; height: 14px; }
+
+    .inline-edit-input {
+      font-family: var(--sans);
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--ink);
+      background: var(--bg-tertiary);
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      padding: 2px 6px;
+      width: 80px;
+      text-align: right;
+      outline: none;
+    }
     .portfolio-sort-bar { display: flex; gap: 6px; margin-bottom: 12px; align-items: center; }
     .sort-label { font-size: 0.68rem; color: var(--faint); }
     .sort-btn {
@@ -1390,6 +1417,49 @@
     .ticker-card-change { font-size: 0.72rem; font-weight: 600; }
     .ticker-card-sparkline { margin: 4px 0; }
 
+    /* ── Portfolio detail modal ── */
+    .port-detail-backdrop {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45);
+      z-index: 1000; align-items: center; justify-content: center; padding: 16px;
+    }
+    .port-detail-backdrop.open { display: flex; }
+    .port-detail-modal {
+      background: var(--bg-primary); border-radius: var(--radius); width: 100%;
+      max-width: 520px; max-height: 88vh; display: flex; flex-direction: column;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.22); overflow: hidden;
+    }
+    .port-detail-header {
+      display: flex; align-items: center; gap: 10px; padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--border);
+    }
+    .port-detail-ticker { font-size: 1.15rem; font-weight: 800; color: var(--ink); font-family: ui-monospace, monospace; }
+    .port-detail-name { font-size: 0.8rem; color: var(--text-muted); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .port-detail-close {
+      background: none; border: none; cursor: pointer; color: var(--text-muted);
+      padding: 4px; border-radius: 4px; line-height: 1;
+    }
+    .port-detail-close:hover { color: var(--ink); background: var(--bg-tertiary); }
+    .port-detail-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); }
+    .tab-btn {
+      flex: 1; padding: 10px 0; font-size: 0.78rem; font-weight: 600; border: none;
+      background: none; cursor: pointer; color: var(--text-muted);
+      border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s;
+    }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .port-detail-body { flex: 1; overflow-y: auto; padding: 20px; }
+    .port-detail-footer {
+      padding: 14px 20px; border-top: 1px solid var(--border);
+      display: flex; justify-content: flex-end; gap: 10px;
+    }
+    .pd-skeleton { height: 14px; border-radius: 4px; background: var(--border); margin-bottom: 10px; animation: shimmer 1.4s infinite; }
+    @keyframes shimmer { 0%,100% { opacity: 0.5; } 50% { opacity: 1; } }
+    .pd-info-row { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.84rem; }
+    .pd-info-row:last-child { border-bottom: none; }
+    .pd-info-label { color: var(--text-muted); }
+    .pd-info-value { font-weight: 600; color: var(--ink); }
+    .pd-desc { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.6; margin-top: 14px; }
+    .pd-desc-toggle { background: none; border: none; cursor: pointer; font-size: 0.78rem; color: var(--accent); padding: 0; margin-top: 4px; }
+
   </style>
   <!-- Plotly for interactive OHLC charts -->
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js" crossorigin="anonymous"></script>
@@ -1497,12 +1567,12 @@
 
     <!-- Lower grid: briefing status + portfolio mini -->
     <div class="grid-dash">
-      <div class="card">
-        <div style="margin-bottom:10px;">
+      <div class="card briefing-preview-card" onclick="showView('briefing')" style="cursor:pointer;" title="Open Daily Briefing">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
           <div class="card-label">Today's Briefing</div>
-          <div id="dashBriefingDate" style="font-size:0.68rem; color:var(--faint); margin-top:3px;"></div>
+          <div id="dashBriefingDate" style="font-size:0.68rem; color:var(--faint);"></div>
         </div>
-        <div id="dashBriefingStatus" style="font-size:0.85rem; color:var(--muted);">Checking…</div>
+        <div id="dashBriefingPreview" class="briefing-preview-text">Checking…</div>
       </div>
 
       <div class="card">
@@ -1899,6 +1969,38 @@
 <!-- Toast container -->
 <div id="toastContainer"></div>
 
+<!-- Portfolio detail modal -->
+<div class="port-detail-backdrop" id="portDetailBackdrop">
+  <div class="port-detail-modal">
+    <div class="port-detail-header">
+      <span class="port-detail-ticker" id="pdTicker">—</span>
+      <span id="pdBadge"></span>
+      <span class="port-detail-name" id="pdName">—</span>
+      <button class="port-detail-close" onclick="closePortfolioDetail()" title="Close">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="port-detail-tabs">
+      <button class="tab-btn active" data-tab="overview"  onclick="_switchPortfolioTab('overview')">Overview</button>
+      <button class="tab-btn"        data-tab="position"  onclick="_switchPortfolioTab('position')">My Position</button>
+      <button class="tab-btn"        data-tab="stats"     onclick="_switchPortfolioTab('stats')">Stats</button>
+    </div>
+    <div class="port-detail-body">
+      <div id="pdTabOverview">
+        <div class="pd-skeleton" style="width:60%"></div>
+        <div class="pd-skeleton" style="width:80%"></div>
+        <div class="pd-skeleton" style="width:45%"></div>
+      </div>
+      <div id="pdTabPosition" style="display:none"></div>
+      <div id="pdTabStats"    style="display:none"></div>
+    </div>
+    <div class="port-detail-footer">
+      <button class="btn-secondary" onclick="closePortfolioDetail()">Close</button>
+      <button class="btn-primary" onclick="showView('analyzer'); openStockDetail(window._pdCurrentTicker); closePortfolioDetail()">Open in Analyzer</button>
+    </div>
+  </div>
+</div>
+
 <script>
 /* ═══════════════════════════════════════
    CONFIG
@@ -2172,7 +2274,7 @@ function renderPortfolioCards(prices) {
       ? price.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 })
       : '—';
     return `
-      <div class="position-card">
+      <div class="position-card" onclick="openPortfolioDetail('${ticker}')" style="cursor:pointer;">
         <div>
           <div class="position-ticker">${ticker}
             <span style="font-size:0.62rem; font-weight:700; background:${badge.color}22; color:${badge.color}; border-radius:4px; padding:2px 6px; margin-left:6px; vertical-align:middle; text-transform:uppercase; letter-spacing:0.06em;">${badge.label}</span>
@@ -2180,14 +2282,17 @@ function renderPortfolioCards(prices) {
           <div class="position-meta" style="margin-top:3px;">${note || '—'}</div>
         </div>
         <div style="text-align:right;">
-          <div class="position-price">€${(amount_eur).toLocaleString('de-DE', { maximumFractionDigits: 0 })}</div>
+          <div class="position-amount-display" id="pad-${ticker}">€${amount_eur.toLocaleString('de-DE', { maximumFractionDigits: 0 })}</div>
           <div class="position-meta" style="margin-top:2px;">${priceStr}</div>
         </div>
-        <div class="position-actions" style="grid-column:1/-1; justify-content:flex-end;">
-          <button class="icon-btn" onclick="openStockDetail('${ticker}')" title="Analyze">
+        <div class="position-actions" style="grid-column:1/-1; justify-content:flex-end;" onclick="event.stopPropagation()">
+          <button class="icon-btn" onclick="event.stopPropagation(); showView('analyzer'); openStockDetail('${ticker}')" title="Analyze in Analyzer">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           </button>
-          <button class="icon-btn" onclick="removePosition('${ticker}')" title="Remove">
+          <button class="icon-btn icon-btn-edit" onclick="event.stopPropagation(); startInlineEdit('${ticker}')" title="Edit amount">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </button>
+          <button class="icon-btn icon-btn-delete" onclick="event.stopPropagation(); removePosition('${ticker}')" title="Remove position">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
           </button>
         </div>
@@ -2197,6 +2302,199 @@ function renderPortfolioCards(prices) {
   el.innerHTML = cards;
   renderPortfolioMini(prices);
 }
+
+/* ── Inline amount edit ── */
+function startInlineEdit(ticker) {
+  const display = document.getElementById(`pad-${ticker}`);
+  if (!display || display.tagName === 'INPUT') return;
+  const pos = _localPortfolio.find(p => p.ticker === ticker);
+  if (!pos) return;
+  const originalAmount = pos.amount_eur;
+  const input = document.createElement('input');
+  input.type = 'number';
+  input.className = 'inline-edit-input';
+  input.value = originalAmount;
+  input.min = '0';
+  input.step = '1';
+  input.setAttribute('data-ticker', ticker);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter')  { e.preventDefault(); _commitInlineEdit(ticker); }
+    if (e.key === 'Escape') { e.preventDefault(); _cancelInlineEdit(ticker, originalAmount); }
+  });
+  input.addEventListener('blur', () => _commitInlineEdit(ticker));
+  display.replaceWith(input);
+  input.focus();
+  input.select();
+}
+
+function _commitInlineEdit(ticker) {
+  const input = document.querySelector(`.inline-edit-input[data-ticker="${ticker}"]`);
+  if (!input) return;
+  const newAmount = parseFloat(input.value);
+  if (!isNaN(newAmount) && newAmount >= 0) {
+    const pos = _localPortfolio.find(p => p.ticker === ticker);
+    if (pos) pos.amount_eur = newAmount;
+  }
+  _restoreAmountDisplay(ticker);
+  _scheduleAutoSave();
+}
+
+function _cancelInlineEdit(ticker, originalAmount) {
+  _restoreAmountDisplay(ticker, originalAmount);
+  // blur fires after ESC keydown; _commitInlineEdit will no-op because input is gone
+}
+
+function _restoreAmountDisplay(ticker, overrideAmount) {
+  const input = document.querySelector(`.inline-edit-input[data-ticker="${ticker}"]`);
+  if (!input) return;
+  const pos = _localPortfolio.find(p => p.ticker === ticker);
+  const amount = overrideAmount !== undefined ? overrideAmount : (pos ? pos.amount_eur : 0);
+  const display = document.createElement('div');
+  display.className = 'position-amount-display';
+  display.id = `pad-${ticker}`;
+  display.textContent = '€' + amount.toLocaleString('de-DE', { maximumFractionDigits: 0 });
+  input.replaceWith(display);
+}
+
+/* ── Portfolio detail modal ── */
+let _portDetailEscHandler = null;
+window._pdCurrentTicker = null;
+
+function openPortfolioDetail(ticker) {
+  const pos = _localPortfolio.find(p => p.ticker === ticker);
+  if (!pos) return;
+  window._pdCurrentTicker = ticker;
+
+  document.getElementById('pdTicker').textContent = ticker;
+  document.getElementById('pdName').textContent = '';
+  const badge = _CATEGORY_BADGE[pos.category] || { label: pos.category, color: 'var(--muted)' };
+  document.getElementById('pdBadge').innerHTML =
+    `<span style="font-size:0.62rem;font-weight:700;background:${badge.color}22;color:${badge.color};border-radius:4px;padding:2px 6px;text-transform:uppercase;letter-spacing:0.06em;">${badge.label}</span>`;
+
+  _switchPortfolioTab('overview');
+  _renderPortfolioDetailPosition(pos);
+
+  document.getElementById('portDetailBackdrop').classList.add('open');
+
+  if (_portDetailEscHandler) document.removeEventListener('keydown', _portDetailEscHandler);
+  _portDetailEscHandler = e => { if (e.key === 'Escape') closePortfolioDetail(); };
+  document.addEventListener('keydown', _portDetailEscHandler);
+
+  _loadPortfolioDetailProfile(ticker, pos);
+}
+
+function closePortfolioDetail() {
+  document.getElementById('portDetailBackdrop').classList.remove('open');
+  if (_portDetailEscHandler) {
+    document.removeEventListener('keydown', _portDetailEscHandler);
+    _portDetailEscHandler = null;
+  }
+  window._pdCurrentTicker = null;
+}
+
+function _switchPortfolioTab(tab) {
+  document.querySelectorAll('.port-detail-tabs .tab-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+  document.getElementById('pdTabOverview').style.display  = tab === 'overview'  ? '' : 'none';
+  document.getElementById('pdTabPosition').style.display  = tab === 'position'  ? '' : 'none';
+  document.getElementById('pdTabStats').style.display     = tab === 'stats'     ? '' : 'none';
+}
+
+function _renderPortfolioDetailPosition(pos) {
+  const el = document.getElementById('pdTabPosition');
+  if (!el) return;
+  el.innerHTML = `
+    <div class="pd-info-row"><span class="pd-info-label">Amount (EUR)</span>
+      <span class="pd-info-value">€${pos.amount_eur.toLocaleString('de-DE', { maximumFractionDigits: 0 })}</span></div>
+    <div class="pd-info-row"><span class="pd-info-label">Category</span>
+      <span class="pd-info-value">${pos.category || '—'}</span></div>
+    <div class="pd-info-row"><span class="pd-info-label">Note</span>
+      <span class="pd-info-value">${pos.note || '—'}</span></div>`;
+}
+
+async function _loadPortfolioDetailProfile(ticker, pos) {
+  const overviewEl = document.getElementById('pdTabOverview');
+  const statsEl    = document.getElementById('pdTabStats');
+  if (!overviewEl || !statsEl) return;
+
+  overviewEl.innerHTML = `
+    <div class="pd-skeleton" style="width:60%"></div>
+    <div class="pd-skeleton" style="width:80%"></div>
+    <div class="pd-skeleton" style="width:45%"></div>`;
+  statsEl.innerHTML = `
+    <div class="pd-skeleton" style="width:55%"></div>
+    <div class="pd-skeleton" style="width:70%"></div>`;
+
+  try {
+    const resp = await fetch(`${API_BASE}/ticker/${encodeURIComponent(ticker)}/profile`);
+    if (!resp.ok) throw new Error('profile fetch failed');
+    const d = await resp.json();
+
+    document.getElementById('pdName').textContent = d.name || ticker;
+
+    const priceStr = d.price != null
+      ? d.price.toLocaleString('en-US', { style: 'currency', currency: d.currency || 'USD', maximumFractionDigits: 2 })
+      : '—';
+    const chgColor = (d.change_pct || 0) >= 0 ? 'var(--positive)' : 'var(--negative)';
+    const chgStr   = d.change_pct != null ? ((d.change_pct >= 0 ? '+' : '') + d.change_pct.toFixed(2) + '%') : '—';
+
+    overviewEl.innerHTML = `
+      <div class="pd-info-row">
+        <span class="pd-info-label">Price</span>
+        <span class="pd-info-value">${priceStr} <span style="color:${chgColor};font-size:0.78rem;">${chgStr}</span></span>
+      </div>
+      <div class="pd-info-row"><span class="pd-info-label">Exchange</span><span class="pd-info-value">${d.exchange || '—'}</span></div>
+      <div class="pd-info-row"><span class="pd-info-label">Sector</span><span class="pd-info-value">${d.sector || '—'}</span></div>
+      <div class="pd-info-row"><span class="pd-info-label">Industry</span><span class="pd-info-value">${d.industry || '—'}</span></div>
+      ${_buildDescHtml(d.description)}`;
+
+    statsEl.innerHTML = `
+      <div class="pd-info-row"><span class="pd-info-label">Market Cap</span><span class="pd-info-value">${_fmtMarketCap(d.market_cap)}</span></div>
+      <div class="pd-info-row"><span class="pd-info-label">52w High</span><span class="pd-info-value">${d.week52_high != null ? d.week52_high.toFixed(2) : '—'}</span></div>
+      <div class="pd-info-row"><span class="pd-info-label">52w Low</span><span class="pd-info-value">${d.week52_low != null ? d.week52_low.toFixed(2) : '—'}</span></div>
+      <div class="pd-info-row"><span class="pd-info-label">P/E Ratio</span><span class="pd-info-value">${d.pe_ratio != null ? d.pe_ratio.toFixed(2) : '—'}</span></div>
+      <div class="pd-info-row"><span class="pd-info-label">Dividend Yield</span><span class="pd-info-value">${d.dividend_yield != null ? (d.dividend_yield * 100).toFixed(2) + '%' : '—'}</span></div>
+      <div class="pd-info-row"><span class="pd-info-label">Beta</span><span class="pd-info-value">${d.beta != null ? d.beta.toFixed(2) : '—'}</span></div>`;
+
+  } catch {
+    overviewEl.innerHTML = '<p style="color:var(--text-muted);font-size:0.82rem;">Profile unavailable.</p>';
+    statsEl.innerHTML    = '<p style="color:var(--text-muted);font-size:0.82rem;">Stats unavailable.</p>';
+  }
+}
+
+function _buildDescHtml(desc) {
+  if (!desc) return '';
+  const SHORT = 180;
+  if (desc.length <= SHORT) return `<p class="pd-desc">${desc}</p>`;
+  window._pdDescFull  = desc;
+  window._pdDescShort = desc.slice(0, SHORT).trimEnd();
+  return `<p class="pd-desc" id="pdDescText">${window._pdDescShort}…
+    <button class="pd-desc-toggle" id="pdDescToggle" onclick="_toggleDesc()">More</button></p>`;
+}
+
+function _toggleDesc() {
+  const el   = document.getElementById('pdDescText');
+  const btn  = document.getElementById('pdDescToggle');
+  if (!el || !btn) return;
+  const expanded = btn.textContent === 'Less';
+  el.innerHTML = expanded
+    ? `${window._pdDescShort}… <button class="pd-desc-toggle" id="pdDescToggle" onclick="_toggleDesc()">More</button>`
+    : `${window._pdDescFull} <button class="pd-desc-toggle" id="pdDescToggle" onclick="_toggleDesc()">Less</button>`;
+}
+
+function _fmtMarketCap(n) {
+  if (n == null) return '—';
+  if (n >= 1e12) return (n / 1e12).toFixed(2) + 'T';
+  if (n >= 1e9)  return (n / 1e9).toFixed(2) + 'B';
+  if (n >= 1e6)  return (n / 1e6).toFixed(2) + 'M';
+  return n.toLocaleString();
+}
+
+// Close on backdrop click
+document.getElementById('portDetailBackdrop').addEventListener('click', function(e) {
+  if (e.target === this) closePortfolioDetail();
+});
 
 /* ═══════════════════════════════════════
    NAVIGATION
@@ -2384,25 +2682,22 @@ function mdToHtml(md) {
 /* ═══════════════════════════════════════
    BRIEFING
 ═══════════════════════════════════════ */
-function loadBriefing() {
-  const todayStr = new Date().toISOString().slice(0, 10);
-  fetch(`${API_BASE}/briefing/list`)
-    .then(res => res.ok ? res.json() : [])
-    .then(list => {
-      const todayEntry = list.find(item => item.date === todayStr);
-      const statusEl   = document.getElementById("dashBriefingStatus");
-      const dateEl     = document.getElementById("dashBriefingDate");
-      if (todayEntry) {
-        if (statusEl) statusEl.textContent = `Briefing ready ✓ — saved to julio-brain`;
-        if (dateEl)   dateEl.textContent   = todayStr;
-      } else {
-        if (statusEl) statusEl.textContent = "Not yet generated today.";
-      }
-    })
-    .catch(() => {
-      const statusEl = document.getElementById("dashBriefingStatus");
-      if (statusEl) statusEl.textContent = "Status unavailable.";
-    });
+async function loadBriefingPreview() {
+  const previewEl = document.getElementById('dashBriefingPreview');
+  const dateEl    = document.getElementById('dashBriefingDate');
+  try {
+    const resp = await fetch(`${API_BASE}/briefing/today/preview`);
+    const data = await resp.json();
+    if (data.has_briefing && data.preview_text) {
+      if (previewEl) previewEl.textContent = data.preview_text;
+      if (dateEl)    dateEl.textContent    = data.date || '';
+    } else {
+      if (previewEl) previewEl.innerHTML =
+        '<span style="color:var(--text-muted);">No briefing yet — generate one →</span>';
+    }
+  } catch {
+    if (previewEl) previewEl.textContent = 'Preview unavailable.';
+  }
 }
 
 async function generateBriefing(provider = 'anthropic') {
@@ -2438,11 +2733,7 @@ async function generateBriefing(provider = 'anthropic') {
     contentEl.textContent = `Briefing generated and saved to julio-brain`;
     statusEl.textContent  = `${dateStr} · ${providerLabel} · ${costStr}`;
 
-    const dashStatusEl = document.getElementById('dashBriefingStatus');
-    if (dashStatusEl) dashStatusEl.textContent = `Briefing ready ✓ — saved to julio-brain`;
-    const dashDateEl = document.getElementById('dashBriefingDate');
-    if (dashDateEl) dashDateEl.textContent = dateStr;
-
+    loadBriefingPreview();
     loadBriefingArchive();
     loadCostSummary();
   } catch (e) {
@@ -3242,7 +3533,7 @@ function analyzeStock() {
 /* ═══════════════════════════════════════
    BOOT
 ═══════════════════════════════════════ */
-loadBriefing();
+loadBriefingPreview();
 loadBriefingArchive();
 loadCostSummary();
 loadPortfolioFromGH();
