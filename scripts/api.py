@@ -830,6 +830,91 @@ def stock_ai_summary(ticker: str):
 
 
 # ---------------------------------------------------------------------------
+# Ticker profile
+# ---------------------------------------------------------------------------
+
+_TTL_TICKER_PROFILE = 86400.0  # 24 h
+
+_TICKER_FALLBACK_DESC: dict[str, str] = {
+    "VWCE.DE": (
+        "Vanguard FTSE All-World UCITS ETF — tracks ~4,000 large/mid-cap stocks worldwide "
+        "across 49 countries. TER 0.19%. Single-instrument exposure to global equities, "
+        "market-cap weighted. Domiciled in Ireland, distributing variant available as VWRL."
+    ),
+    "4GLD.DE": (
+        "Xetra-Gold — physically backed gold ETC. Each unit represents 1 gram of gold stored "
+        "in Deutsche Börse Commodities' vaults in Frankfurt. Physical delivery possible. "
+        "Tax-free after 1-year holding period under German law (§23 EStG). TER ~0.36% p.a."
+    ),
+}
+
+_log_ticker = logging.getLogger("ticker")
+
+
+@app.get("/ticker/{ticker}/profile")
+def ticker_profile(ticker: str):
+    ticker = ticker.upper()
+    cache_key = f"profile:{ticker}"
+    cached = _cache_get(cache_key, _TTL_TICKER_PROFILE)
+    if cached is not None:
+        return cached
+
+    import yfinance as yf
+
+    try:
+        info = yf.Ticker(ticker).info
+        if not info or not (info.get("symbol") or info.get("shortName")):
+            raise HTTPException(status_code=404, detail=f"Ticker '{ticker}' not found.")
+
+        quote_type = info.get("quoteType", "")
+        is_etf = (
+            quote_type in ("ETF", "MUTUALFUND")
+            or bool(info.get("fundFamily"))
+            or bool(info.get("categoryName"))
+        )
+
+        raw_desc = (
+            info.get("longBusinessSummary")
+            or info.get("description")
+            or _TICKER_FALLBACK_DESC.get(ticker, "")
+        )
+        description = (raw_desc[:800] if raw_desc else _TICKER_FALLBACK_DESC.get(ticker, ""))
+
+        result = {
+            "ticker":         ticker,
+            "name":           info.get("longName") or info.get("shortName") or ticker,
+            "sector":         "ETF" if is_etf else (info.get("sector") or "—"),
+            "industry":       None if is_etf else (info.get("industry") or "—"),
+            "description":    description,
+            "country":        info.get("country") or "—",
+            "market_cap":     None if is_etf else info.get("marketCap"),
+            "pe_ratio":       None if is_etf else info.get("trailingPE"),
+            "forward_pe":     None if is_etf else info.get("forwardPE"),
+            "dividend_yield": info.get("dividendYield"),
+            "website":        info.get("website") or "—",
+            "current_price":  (
+                info.get("currentPrice")
+                or info.get("regularMarketPrice")
+                or info.get("navPrice")
+            ),
+            "currency":       info.get("currency", "USD"),
+            "is_etf":         is_etf,
+            "total_assets":   info.get("totalAssets") if is_etf else None,
+        }
+        _cache_set(cache_key, result)
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        _log_ticker.error("yfinance profile failed for %s: %s", ticker, e)
+        raise HTTPException(
+            status_code=503,
+            detail=f"Could not load profile for {ticker}. Yahoo Finance may be temporarily unavailable.",
+        )
+
+
+# ---------------------------------------------------------------------------
 # Debug
 # ---------------------------------------------------------------------------
 
