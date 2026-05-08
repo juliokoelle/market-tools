@@ -233,40 +233,13 @@ def root():
 
 @app.post("/briefing/generate")
 def briefing_generate(provider: str = Query("anthropic")):
-    if provider not in ("anthropic", "openai"):
-        raise HTTPException(status_code=400, detail="provider must be 'anthropic' or 'openai'")
-
-    from scripts.generate_briefing import generate
-    from scripts.utils import today
-
-    today_str = today()
-
-    if _today_briefing_exists(today_str):
-        tomorrow = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "error": "rate_limit",
-                "message": "Heutiges Briefing bereits generiert. Nächste Generierung ab Mitternacht (lokale Zeit).",
-                "next_available": tomorrow.isoformat(),
-            },
-        )
-
-    try:
-        result = generate(today_str, provider=provider)
-        # Mark as exists immediately so any request within the next 60 s gets 429
-        _cache_set(f"exists:{today_str}", True)
-        _cache_del("briefing_list")
-        return {
-            "date": result["date"],
-            "markdown": result["markdown"],
-            "cost_usd": result["cost_usd"],
-        }
-    except EnvironmentError as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    except Exception as e:
-        logging.getLogger("briefing").error("generate failed: %s", e)
-        raise HTTPException(status_code=500, detail=f"Generation failed: {e}")
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "error": "generation_disabled",
+            "message": "Briefing wird täglich automatisch per E-Mail bezogen.",
+        },
+    )
 
 
 @app.get("/briefing/list")
@@ -470,8 +443,14 @@ def get_daily_briefing():
 
 @app.post("/generate-briefing")
 def generate_briefing_legacy():
-    """Legacy endpoint — delegates to POST /briefing/generate?provider=anthropic."""
-    return briefing_generate(provider="anthropic")
+    """Legacy endpoint — disabled, use Gmail pipeline instead."""
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "error": "generation_disabled",
+            "message": "Briefing wird täglich automatisch per E-Mail bezogen.",
+        },
+    )
 
 
 # ---------------------------------------------------------------------------
