@@ -551,26 +551,6 @@
     .btn-secondary:hover { background: rgba(139,38,53,0.08); border-color: var(--accent-hover); }
     .btn-secondary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* Generate button */
-    #generateBtn {
-      font-family: var(--sans);
-      font-size: 0.8rem;
-      font-weight: 600;
-      color: var(--accent);
-      background: var(--accent-lt);
-      border: none;
-      border-radius: 7px;
-      padding: 7px 14px;
-      cursor: pointer;
-      transition: background 0.14s;
-      white-space: nowrap;
-      min-height: 36px;
-    }
-    #generateBtn:hover:not(:disabled) { background: var(--accent-lt); }
-    #generateBtn:disabled { opacity: 0.5; cursor: not-allowed; }
-    #generateStatus { font-size: 0.72rem; color: var(--faint); }
-    #generateStatus.ok    { color: var(--green-dk); }
-    #generateStatus.error { color: var(--red-dk); }
 
     /* ─────────────────────────────────────────────
        FORMS & INPUTS
@@ -1599,16 +1579,11 @@
         <p id="briefingSubtitle">Markets · Commodities · Geopolitics · Analysis</p>
       </div>
       <div style="display:flex; flex-direction:column; align-items:flex-end; gap:6px;">
-        <div style="display:flex; gap:8px;">
-          <button id="generatePremiumBtn" class="btn-primary" onclick="generateBriefing('anthropic')">Generate Premium</button>
-          <button id="generateQuickBtn"   class="btn-secondary" onclick="generateBriefing('openai')">Generate Quick</button>
-        </div>
-        <span id="generateStatus" style="font-size:0.75rem; color:var(--muted);"></span>
-        <span id="costCounter"    style="font-size:0.72rem; color:var(--faint);"></span>
+        <span style="font-size:0.75rem; color:var(--faint);">Briefing arrives daily at ~08:15 (CEST)</span>
       </div>
     </div>
     <div class="card">
-      <div id="briefingContent" style="font-size:0.9rem; color:var(--muted);">Ready to generate. Briefings are saved to julio-brain.</div>
+      <div id="briefingContent" style="font-size:0.9rem; color:var(--muted);">Select a date from the archive to read the briefing.</div>
     </div>
     <div style="margin-top:20px;">
       <div class="card-label" style="margin-bottom:10px;">Archive</div>
@@ -2700,51 +2675,6 @@ async function loadBriefingPreview() {
   }
 }
 
-async function generateBriefing(provider = 'anthropic') {
-  const premiumBtn = document.getElementById('generatePremiumBtn');
-  const quickBtn   = document.getElementById('generateQuickBtn');
-  const statusEl   = document.getElementById('generateStatus');
-  const contentEl  = document.getElementById('briefingContent');
-
-  premiumBtn.disabled = true;
-  quickBtn.disabled   = true;
-  statusEl.textContent = 'Generating… ~60s, please wait';
-  contentEl.style.color = 'var(--muted)';
-  contentEl.textContent = 'Generating briefing…';
-
-  try {
-    const resp = await fetch(`${API_BASE}/briefing/generate?provider=${provider}`, { method: 'POST' });
-    const text = await resp.text();
-    let data = {};
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch {
-      throw new Error(text || `HTTP ${resp.status}`);
-    }
-    if (!resp.ok) {
-      throw new Error(data.detail || data.error || `HTTP ${resp.status}`);
-    }
-
-    const providerLabel = provider === 'anthropic' ? 'Premium (Claude)' : 'Quick (GPT)';
-    const costStr       = `$${(data.cost_usd ?? 0).toFixed(4)}`;
-    const dateStr       = data.date ?? new Date().toISOString().slice(0, 10);
-
-    contentEl.style.color = 'var(--green-dk)';
-    contentEl.textContent = `Briefing generated and saved to julio-brain`;
-    statusEl.textContent  = `${dateStr} · ${providerLabel} · ${costStr}`;
-
-    loadBriefingPreview();
-    loadBriefingArchive();
-    loadCostSummary();
-  } catch (e) {
-    contentEl.style.color = 'var(--red-dk)';
-    contentEl.textContent = `Generation failed: ${e.message}`;
-    statusEl.textContent = '';
-  } finally {
-    premiumBtn.disabled = false;
-    quickBtn.disabled   = false;
-  }
-}
 
 async function loadBriefingArchive() {
   const archiveEl = document.getElementById('archiveList');
@@ -2768,10 +2698,6 @@ async function loadBriefingArchive() {
         contentEl.style.color = 'var(--green-dk)';
         contentEl.textContent = 'Briefing generated and saved to julio-brain';
       }
-      const statusEl = document.getElementById('generateStatus');
-      if (statusEl && !statusEl.textContent) {
-        statusEl.textContent = `${todayStr} · saved`;
-      }
     }
 
     archiveEl.innerHTML = list.map(item => `
@@ -2791,9 +2717,7 @@ async function loadCostSummary() {
     const resp = await fetch(`${API_BASE}/briefing/cost-summary`);
     if (!resp.ok) return;
     const data = await resp.json();
-    const month = new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
-    const el = document.getElementById('costCounter');
-    if (el) el.textContent = `${month}: $${data.current_month_cost.toFixed(2)} of $${data.budget_usd.toFixed(2)}`;
+    // cost display element removed; summary fetched but not rendered
   } catch { /* non-critical */ }
 }
 
