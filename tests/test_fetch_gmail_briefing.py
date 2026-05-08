@@ -73,3 +73,75 @@ def test_clean_markdown_trims_whitespace():
     md = "\n\n  Content here.  \n\n"
     result = _clean_markdown(md)
     assert result == "Content here."
+
+
+# ── IMAP fetch tests ─────────────────────────────────────────────────────────
+
+def test_extract_html_from_simple_html_message():
+    from email.mime.text import MIMEText
+    from scripts.fetch_gmail_briefing import _extract_html
+    raw = MIMEText("<h2>Gold +1%</h2>", "html", "utf-8").as_bytes()
+    msg = email_lib.message_from_bytes(raw)
+    result = _extract_html(msg)
+    assert result is not None
+    assert "Gold" in result
+
+
+def test_extract_html_from_multipart_message():
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from scripts.fetch_gmail_briefing import _extract_html
+    msg = MIMEMultipart("alternative")
+    msg.attach(MIMEText("Plain text version", "plain", "utf-8"))
+    msg.attach(MIMEText("<p>HTML version</p>", "html", "utf-8"))
+    result = _extract_html(email_lib.message_from_bytes(msg.as_bytes()))
+    assert result is not None
+    assert "HTML version" in result
+
+
+def test_extract_html_returns_none_for_plain_only():
+    from email.mime.text import MIMEText
+    from scripts.fetch_gmail_briefing import _extract_html
+    msg = email_lib.message_from_bytes(
+        MIMEText("Plain only", "plain", "utf-8").as_bytes()
+    )
+    result = _extract_html(msg)
+    assert result is None
+
+
+def test_fetch_email_html_returns_none_when_search_empty():
+    from unittest.mock import MagicMock
+    from scripts.fetch_gmail_briefing import _fetch_email_html
+    conn = MagicMock()
+    conn.select.return_value = ("OK", [b"1"])
+    conn.search.return_value = ("OK", [b""])  # no results
+    result = _fetch_email_html(conn, "markets@m.morningcrunch.de")
+    assert result is None
+
+
+def test_fetch_email_html_returns_html_body():
+    from email.mime.text import MIMEText
+    from unittest.mock import MagicMock
+    from scripts.fetch_gmail_briefing import _fetch_email_html
+    raw  = MIMEText("<h2>Markets Today</h2>", "html", "utf-8").as_bytes()
+    conn = MagicMock()
+    conn.select.return_value = ("OK", [b"1"])
+    conn.search.return_value = ("OK", [b"42"])
+    conn.fetch.return_value  = ("OK", [(b"42 (RFC822 {256})", raw)])
+    result = _fetch_email_html(conn, "markets@m.morningcrunch.de")
+    assert result is not None
+    assert "Markets Today" in result
+
+
+def test_fetch_email_html_takes_last_uid_when_multiple():
+    """When multiple UIDs match, fetch the last (most recent) one."""
+    from email.mime.text import MIMEText
+    from unittest.mock import MagicMock
+    from scripts.fetch_gmail_briefing import _fetch_email_html
+    raw  = MIMEText("<p>Latest</p>", "html", "utf-8").as_bytes()
+    conn = MagicMock()
+    conn.select.return_value = ("OK", [b"5"])
+    conn.search.return_value = ("OK", [b"10 11 12"])
+    conn.fetch.return_value  = ("OK", [(b"12 (RFC822 {100})", raw)])
+    _fetch_email_html(conn, "markets@m.morningcrunch.de")
+    conn.fetch.assert_called_once_with(b"12", "(RFC822)")
