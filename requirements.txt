@@ -11,3 +11,5 @@ feedparser
 weasyprint
 markdown
 pyyaml
+html2text
+httpx
