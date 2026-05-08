@@ -145,3 +145,70 @@ def test_fetch_email_html_takes_last_uid_when_multiple():
     conn.fetch.return_value  = ("OK", [(b"12 (RFC822 {100})", raw)])
     _fetch_email_html(conn, "markets@m.morningcrunch.de")
     conn.fetch.assert_called_once_with(b"12", "(RFC822)")
+
+
+# ── fetch_today_briefing public API ──────────────────────────────────────────
+
+def test_fetch_today_briefing_returns_none_when_no_emails():
+    from unittest.mock import MagicMock, patch
+    from scripts.fetch_gmail_briefing import fetch_today_briefing
+    mock_conn = MagicMock()
+    with patch("scripts.fetch_gmail_briefing._connect_imap", return_value=mock_conn), \
+         patch("scripts.fetch_gmail_briefing._fetch_email_html", return_value=None):
+        result = fetch_today_briefing()
+    assert result is None
+    mock_conn.logout.assert_called_once()
+
+
+def test_fetch_today_briefing_combines_both_sections():
+    from unittest.mock import MagicMock, patch
+    from scripts.fetch_gmail_briefing import fetch_today_briefing
+    mock_conn = MagicMock()
+
+    def fake_fetch(conn, sender):
+        if "markets" in sender:
+            return "<h2>Gold +1%</h2><p>DAX up.</p>"
+        return "<h2>SAP Deal</h2><p>Acquisition closed.</p>"
+
+    with patch("scripts.fetch_gmail_briefing._connect_imap", return_value=mock_conn), \
+         patch("scripts.fetch_gmail_briefing._fetch_email_html", side_effect=fake_fetch):
+        result = fetch_today_briefing()
+
+    assert result is not None
+    assert "MarketsXrunch" in result
+    assert "DealsXrunch" in result
+    assert result.index("MarketsXrunch") < result.index("DealsXrunch")
+    assert "---" in result  # section separator
+
+
+def test_fetch_today_briefing_partial_returns_content():
+    """Only one email found — return partial content, not None."""
+    from unittest.mock import MagicMock, patch
+    from scripts.fetch_gmail_briefing import fetch_today_briefing
+    mock_conn = MagicMock()
+
+    def fake_fetch(conn, sender):
+        return "<p>Markets content</p>" if "markets" in sender else None
+
+    with patch("scripts.fetch_gmail_briefing._connect_imap", return_value=mock_conn), \
+         patch("scripts.fetch_gmail_briefing._fetch_email_html", side_effect=fake_fetch):
+        result = fetch_today_briefing()
+
+    assert result is not None
+    assert "MarketsXrunch" in result
+    assert "DealsXrunch" not in result
+
+
+def test_fetch_today_briefing_closes_connection_on_error():
+    from unittest.mock import MagicMock, patch
+    import pytest
+    from scripts.fetch_gmail_briefing import fetch_today_briefing
+    mock_conn = MagicMock()
+
+    with patch("scripts.fetch_gmail_briefing._connect_imap", return_value=mock_conn), \
+         patch("scripts.fetch_gmail_briefing._fetch_email_html",
+               side_effect=RuntimeError("boom")):
+        with pytest.raises(RuntimeError):
+            fetch_today_briefing()
+
+    mock_conn.logout.assert_called_once()

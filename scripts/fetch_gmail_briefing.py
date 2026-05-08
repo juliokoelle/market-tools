@@ -117,3 +117,34 @@ def _connect_imap() -> imaplib.IMAP4_SSL:
     conn = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT)
     conn.login(username, password)
     return conn
+
+
+def fetch_today_briefing() -> str | None:
+    """Fetch today's newsletters from both MorningCrunch senders via IMAP.
+
+    Returns combined Markdown string, or None if neither email was found.
+    """
+    conn = _connect_imap()
+    sections: list[str] = []
+
+    try:
+        for sender_cfg in BRIEFING_SENDERS:
+            sender = sender_cfg["from"]
+            label  = sender_cfg["label"]
+            html = _fetch_email_html(conn, sender)
+            if html is None:
+                log.warning("[gmail] No email from %s today — skipping section.", sender)
+                continue
+            md = _clean_markdown(_html_to_markdown(html))
+            sections.append(f"## {label}\n\n{md}")
+            log.info("[gmail] Fetched %d chars from %s.", len(md), sender)
+    finally:
+        try:
+            conn.logout()
+        except Exception:
+            pass
+
+    if not sections:
+        return None
+
+    return "\n\n---\n\n".join(sections)
