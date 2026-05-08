@@ -14,3 +14,11 @@ services:
     staticPublishPath: ./frontend
     buildCommand: ""
     autoDeploy: true
+
+  - type: cron
+    name: gmail-briefing-cron
+    env: python
+    plan: free
+    schedule: "15 6 * * *"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m scripts.run_gmail_briefing
