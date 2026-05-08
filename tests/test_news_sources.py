@@ -38,8 +38,10 @@ def test_fetch_feed_returns_empty_on_bad_url():
 
 
 def test_fetch_feed_parses_mock_feed():
+    from datetime import datetime, timezone
     from scripts.news_sources import NewsItem, fetch_feed
 
+    now = datetime.now(timezone.utc)
     mock_parsed = MagicMock()
     entry = MagicMock()
     entry.get.side_effect = lambda k, d="": {
@@ -47,7 +49,7 @@ def test_fetch_feed_parses_mock_feed():
         "summary": "Gold reached $3,400 per ounce.",
         "link": "https://reuters.com/gold",
     }.get(k, d)
-    entry.published_parsed = (2026, 4, 28, 9, 0, 0, 1, 118, 0)
+    entry.published_parsed = (now.year, now.month, now.day, now.hour, 0, 0, 0, 0, 0)
     entry.updated_parsed = None
     mock_parsed.entries = [entry]
 
