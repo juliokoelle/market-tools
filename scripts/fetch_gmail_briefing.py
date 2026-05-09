@@ -45,22 +45,61 @@ _FOOTER_RE = re.compile(
     re.IGNORECASE,
 )
 
+# Lines that are pure table-structure noise: only pipes, dashes, or whitespace
+_TABLE_LINE_RE = re.compile(r"^\s*[\|\-]+\s*$")
+
+# Zero-width/invisible Unicode spacers used by email clients
+_INVISIBLE_RE = re.compile(r"[​‌‍­﻿⁠]+")
+
+
+def _preprocess_html(html: str) -> str:
+    """Ensure table cells become separate lines; strip spacer/tracking-only cells."""
+    # End each table cell with a line-break so adjacent cells don't concatenate
+    html = re.sub(r"</t[dh]>", "</td>\n", html, flags=re.IGNORECASE)
+    html = re.sub(r"<br\s*/?>", "\n", html, flags=re.IGNORECASE)
+    return html
+
 
 def _html_to_markdown(html: str) -> str:
     """Convert HTML email body to structured Markdown."""
+    html = _preprocess_html(html)
     h = ht.HTML2Text()
-    h.ignore_links  = False
+    h.ignore_links  = True   # strip tracking URLs, keep link text
     h.ignore_images = True
+    h.ignore_tables = True   # extract table cell text without pipe/dash syntax
     h.body_width    = 0
     h.unicode_snob  = True
     return h.handle(html)
 
 
 def _clean_markdown(md: str) -> str:
-    """Strip footer boilerplate and collapse excessive blank lines."""
-    lines = [line for line in md.splitlines() if not _FOOTER_RE.search(line)]
-    text  = "\n".join(lines)
-    text  = re.sub(r"\n{3,}", "\n\n", text)
+    """Remove table artifacts, invisible chars, footers; collapse blank lines."""
+    # Strip zero-width/invisible spacer characters
+    md = _INVISIBLE_RE.sub("", md)
+
+    lines = []
+    for line in md.splitlines():
+        # Drop footer lines
+        if _FOOTER_RE.search(line):
+            continue
+        # Drop pure table-structure lines (| | |, ---, |---|)
+        if _TABLE_LINE_RE.match(line):
+            continue
+        # Strip leading/trailing pipe characters left over from single-cell rows
+        stripped = line.strip().strip("|").strip()
+        # Drop lines that became empty or are just whitespace after stripping
+        if not stripped and not line.strip():
+            lines.append("")
+            continue
+        # Use the pipe-stripped version only if the original started/ended with |
+        if line.strip().startswith("|") or line.strip().endswith("|"):
+            lines.append(stripped)
+        else:
+            lines.append(line)
+
+    text = "\n".join(lines)
+    # Collapse 3+ consecutive blank lines to 2
+    text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 
 
