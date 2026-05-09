@@ -13,4 +13,4 @@ markdown
 pyyaml
 html2text
 httpx
-python-telegram-bot>=20.0
+python-telegram-bot[job-queue]>=20.0
