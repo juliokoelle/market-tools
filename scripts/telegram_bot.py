@@ -22,7 +22,7 @@ import json
 import logging
 import os
 import re
-from datetime import time
+from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
 import openai
@@ -46,11 +46,13 @@ _OWNER_ID = int(os.getenv("TELEGRAM_CHAT_ID", "0"))
 
 _VISION_PROMPT = (
     "Analyze this image. Reply ONLY with valid JSON on a single line — no markdown, no extra text.\n"
-    'Format: {"type": "task" | "note" | "question", "text": "<content>"}\n'
+    'Format: {"type": "task" | "note" | "question" | "shopping_list", "text": "<content>"}\n'
     "Rules:\n"
     "- task: something to do, an action item, a to-do\n"
     "- question: something to look up, research, or decide\n"
+    "- shopping_list: a list of items to buy or purchase\n"
     "- note: everything else (screenshot, information, idea, reference)\n"
+    "For task and shopping_list, if multiple items exist return them comma-separated in text.\n"
     "Extract the most relevant content from the image as the text value."
 )
 
@@ -71,12 +73,21 @@ def _get_openai() -> openai.OpenAI:
 # File mutation helpers
 # ---------------------------------------------------------------------------
 
+def _now_berlin() -> str:
+    return datetime.now(_BERLIN).strftime("%H:%M")
+
+
+def _note_entry(text: str) -> str:
+    return f"- [{_now_berlin()}] {text}"
+
+
 def _make_daily_note(run_date: str) -> str:
     return (
         f"---\ndate: {run_date}\ntype: daily\n---\n\n"
         f"# {run_date}\n\n"
         "## Tasks\n\n"
         "## Notes\n\n"
+        "## Shopping List\n\n"
         "## Focus\n\n"
         "## Log\n\n"
         "## Open Questions\n\n"
@@ -122,6 +133,21 @@ def _daily_mutator(section: str, entry: str):
     return f"10_Daily/{run_date}.md", mutate
 
 
+def _daily_mutator_entries(section: str, entries: list[str]):
+    """Insert multiple entries into a section in a single GitHub write."""
+    run_date = today()
+
+    def mutate(current: str) -> str:
+        if not current:
+            current = _make_daily_note(run_date)
+        result = current
+        for entry in entries:
+            result = insert_into_section(result, section, entry)
+        return result
+
+    return f"10_Daily/{run_date}.md", mutate
+
+
 def _questions_mutator(entry: str):
     def mutate(current: str) -> str:
         if not current:
@@ -146,7 +172,7 @@ def _parse_vision_response(text: str) -> tuple[str, str]:
         data = json.loads(text)
         type_ = str(data.get("type", "note")).lower()
         content = str(data.get("text", "")).strip()
-        if type_ not in ("task", "note", "question"):
+        if type_ not in ("task", "note", "question", "shopping_list"):
             type_ = "note"
         return type_, content or text
     except (json.JSONDecodeError, KeyError, TypeError):
@@ -224,7 +250,7 @@ async def cmd_note(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not text:
         await update.message.reply_text("Usage: /note <text>")
         return
-    path, mutate = _daily_mutator("Notes", text)
+    path, mutate = _daily_mutator("Notes", _note_entry(text))
     try:
         github_read_modify_write(path, mutate, f"capture: note ({today()})")
         await update.message.reply_text("✓ Note gespeichert.")
@@ -255,7 +281,7 @@ async def plain_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     text = (update.message.text or "").strip()
     if not text:
         return
-    path, mutate = _daily_mutator("Notes", text)
+    path, mutate = _daily_mutator("Notes", _note_entry(text))
     try:
         github_read_modify_write(path, mutate, f"capture: note ({today()})")
         await update.message.reply_text("✓ Note gespeichert.")
@@ -287,7 +313,7 @@ async def handle_voice(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             await update.message.reply_text("Keine Sprache erkannt.")
             return
 
-        path, mutate = _daily_mutator("Notes", text)
+        path, mutate = _daily_mutator("Notes", _note_entry(text))
         github_read_modify_write(path, mutate, f"capture: voice note ({today()})")
         await update.message.reply_text(f'🎙 Erkannt: "{text}"\n✓ Note gespeichert.')
     except Exception as e:
@@ -327,17 +353,24 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         raw = response.choices[0].message.content or ""
         type_, content = _parse_vision_response(raw)
 
-        label_map = {"task": "Task", "note": "Note", "question": "Frage"}
+        label_map = {"task": "Task", "note": "Note", "question": "Frage", "shopping_list": "Einkaufsliste"}
         label = label_map.get(type_, "Note")
 
         if type_ == "task":
-            path, mutate = _daily_mutator("Tasks", f"- [ ] {content}")
+            items = [i.strip() for i in content.split(",") if i.strip()]
+            entries = [f"- [ ] {item}" for item in items]
+            path, mutate = _daily_mutator_entries("Tasks", entries)
             github_read_modify_write(path, mutate, f"capture: photo task ({today()})")
+        elif type_ == "shopping_list":
+            items = [i.strip() for i in content.split(",") if i.strip()]
+            entries = [f"- [ ] {item}" for item in items]
+            path, mutate = _daily_mutator_entries("Shopping List", entries)
+            github_read_modify_write(path, mutate, f"capture: photo shopping ({today()})")
         elif type_ == "question":
             path, mutate = _questions_mutator(f"- [ ] {content} ({today()})")
             github_read_modify_write(path, mutate, f"capture: photo question ({today()})")
         else:
-            path, mutate = _daily_mutator("Notes", content)
+            path, mutate = _daily_mutator("Notes", _note_entry(content))
             github_read_modify_write(path, mutate, f"capture: photo note ({today()})")
 
         await update.message.reply_text(f"📷 {label} erkannt: {content}\n✓ Gespeichert.")

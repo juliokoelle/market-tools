@@ -249,3 +249,98 @@ def test_parse_vision_markdown_wrapped_json():
     )
     assert t == "task"
     assert c == "Do something"
+
+
+def test_parse_vision_shopping_list():
+    from scripts.telegram_bot import _parse_vision_response
+
+    t, c = _parse_vision_response('{"type": "shopping_list", "text": "Milk, Eggs, Bread"}')
+    assert t == "shopping_list"
+    assert "Milk" in c
+
+
+# ---------------------------------------------------------------------------
+# _now_berlin and _note_entry
+# ---------------------------------------------------------------------------
+
+def test_note_entry_format():
+    from unittest.mock import patch
+    from scripts.telegram_bot import _note_entry
+
+    with patch("scripts.telegram_bot._now_berlin", return_value="14:30"):
+        entry = _note_entry("Quick thought")
+    assert entry == "- [14:30] Quick thought"
+
+
+def test_note_entry_contains_timestamp_brackets():
+    from unittest.mock import patch
+    from scripts.telegram_bot import _note_entry
+
+    with patch("scripts.telegram_bot._now_berlin", return_value="09:05"):
+        entry = _note_entry("Reminder")
+    assert entry.startswith("- [09:05]")
+
+
+# ---------------------------------------------------------------------------
+# _make_daily_note — Shopping List section
+# ---------------------------------------------------------------------------
+
+def test_make_daily_note_has_shopping_list():
+    from scripts.telegram_bot import _make_daily_note
+
+    note = _make_daily_note("2026-05-09")
+    assert "## Shopping List" in note
+
+
+def test_make_daily_note_shopping_list_between_notes_and_focus():
+    from scripts.telegram_bot import _make_daily_note
+
+    note = _make_daily_note("2026-05-09")
+    notes_pos = note.index("## Notes")
+    shopping_pos = note.index("## Shopping List")
+    focus_pos = note.index("## Focus")
+    assert notes_pos < shopping_pos < focus_pos
+
+
+# ---------------------------------------------------------------------------
+# _daily_mutator_entries
+# ---------------------------------------------------------------------------
+
+def test_daily_mutator_entries_inserts_multiple():
+    from unittest.mock import patch
+    from scripts.telegram_bot import _daily_mutator_entries
+
+    existing = (
+        "---\ndate: 2026-05-09\ntype: daily\n---\n\n"
+        "# 2026-05-09\n\n"
+        "## Tasks\n\n"
+        "## Notes\n\n"
+        "## Shopping List\n\n"
+        "## Focus\n\n"
+    )
+    with patch("scripts.telegram_bot.today", return_value="2026-05-09"):
+        _, mutate = _daily_mutator_entries("Tasks", ["- [ ] Buy milk", "- [ ] Call bank"])
+
+    result = mutate(existing)
+    lines = result.splitlines()
+    assert "- [ ] Buy milk" in lines
+    assert "- [ ] Call bank" in lines
+    tasks_idx = lines.index("## Tasks")
+    notes_idx = lines.index("## Notes")
+    milk_idx = lines.index("- [ ] Buy milk")
+    bank_idx = lines.index("- [ ] Call bank")
+    assert tasks_idx < milk_idx < notes_idx
+    assert tasks_idx < bank_idx < notes_idx
+
+
+def test_daily_mutator_entries_shopping_section():
+    from unittest.mock import patch
+    from scripts.telegram_bot import _daily_mutator_entries
+
+    with patch("scripts.telegram_bot.today", return_value="2026-05-09"):
+        path, mutate = _daily_mutator_entries("Shopping List", ["- [ ] Milk", "- [ ] Eggs"])
+
+    result = mutate("")
+    assert "## Shopping List" in result
+    assert "- [ ] Milk" in result
+    assert "- [ ] Eggs" in result
