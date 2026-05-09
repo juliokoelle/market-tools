@@ -16,7 +16,7 @@ import imaplib
 import logging
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import html2text as ht
 
@@ -33,6 +33,10 @@ BRIEFING_SENDERS = [
     {
         "from":  "deals@m2.morningcrunch.de",
         "label": "DealsXrunch — Deals & Business",
+    },
+    {
+        "from":  "thepapayanews@substack.com",
+        "label": "Papaya News",
     },
 ]
 
@@ -74,12 +78,13 @@ def _extract_html(msg: email_lib.message.Message) -> str | None:
 
 
 def _fetch_email_html(conn: imaplib.IMAP4_SSL, sender: str) -> str | None:
-    """Search INBOX (fallback: All Mail) for today's email from sender.
+    """Search INBOX (fallback: All Mail) for emails from sender within last 24 h.
 
+    Uses SINCE yesterday so late-arriving or weekend editions are not missed.
     Returns the HTML body of the most recent match, or None if not found.
     """
-    today_str = datetime.now(timezone.utc).strftime("%d-%b-%Y")  # e.g. "08-May-2026"
-    criteria  = f'(FROM "{sender}" SINCE {today_str})'
+    since_str = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%d-%b-%Y")
+    criteria  = f'(FROM "{sender}" SINCE {since_str})'
 
     for mailbox in ("INBOX", '"[Gmail]/All Mail"'):
         typ, _ = conn.select(mailbox)

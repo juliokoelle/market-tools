@@ -109,6 +109,27 @@ def test_extract_html_returns_none_for_plain_only():
     assert result is None
 
 
+def test_fetch_email_html_searches_since_yesterday():
+    """SINCE date must be yesterday so late-arriving emails are not missed."""
+    from datetime import datetime, timedelta, timezone
+    from unittest.mock import MagicMock, patch, call
+    from scripts.fetch_gmail_briefing import _fetch_email_html
+    conn = MagicMock()
+    conn.select.return_value = ("OK", [b"1"])
+    conn.search.return_value = ("OK", [b""])  # no results — we only check criteria
+
+    fixed_now = datetime(2026, 5, 9, 7, 0, 0, tzinfo=timezone.utc)
+    expected_since = "08-May-2026"  # yesterday
+
+    with patch("scripts.fetch_gmail_briefing.datetime") as mock_dt:
+        mock_dt.now.return_value = fixed_now
+        mock_dt.side_effect = lambda *a, **kw: datetime(*a, **kw)
+        _fetch_email_html(conn, "markets@m.morningcrunch.de")
+
+    criteria_used = conn.search.call_args[0][1]
+    assert expected_since in criteria_used
+
+
 def test_fetch_email_html_returns_none_when_search_empty():
     from unittest.mock import MagicMock
     from scripts.fetch_gmail_briefing import _fetch_email_html
@@ -160,15 +181,22 @@ def test_fetch_today_briefing_returns_none_when_no_emails():
     mock_conn.logout.assert_called_once()
 
 
-def test_fetch_today_briefing_combines_both_sections():
+def test_fetch_today_briefing_combines_all_sections():
     from unittest.mock import MagicMock, patch
     from scripts.fetch_gmail_briefing import fetch_today_briefing
     mock_conn = MagicMock()
 
+    html_by_sender = {
+        "markets": "<h2>Gold +1%</h2><p>DAX up.</p>",
+        "deals":   "<h2>SAP Deal</h2><p>Acquisition closed.</p>",
+        "papaya":  "<h2>Tech Roundup</h2><p>AI funding surge.</p>",
+    }
+
     def fake_fetch(conn, sender):
-        if "markets" in sender:
-            return "<h2>Gold +1%</h2><p>DAX up.</p>"
-        return "<h2>SAP Deal</h2><p>Acquisition closed.</p>"
+        for key, html in html_by_sender.items():
+            if key in sender:
+                return html
+        return None
 
     with patch("scripts.fetch_gmail_briefing._connect_imap", return_value=mock_conn), \
          patch("scripts.fetch_gmail_briefing._fetch_email_html", side_effect=fake_fetch):
@@ -177,8 +205,9 @@ def test_fetch_today_briefing_combines_both_sections():
     assert result is not None
     assert "MarketsXrunch" in result
     assert "DealsXrunch" in result
-    assert result.index("MarketsXrunch") < result.index("DealsXrunch")
-    assert "---" in result  # section separator
+    assert "Papaya News" in result
+    assert result.index("MarketsXrunch") < result.index("DealsXrunch") < result.index("Papaya News")
+    assert result.count("---") == 2  # two separators for three sections
 
 
 def test_fetch_today_briefing_partial_returns_content():
