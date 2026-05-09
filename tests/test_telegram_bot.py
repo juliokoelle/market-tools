@@ -1,5 +1,4 @@
-"""Unit tests for Telegram bot section-manipulation logic."""
-import pytest
+"""Unit tests for Telegram bot section-manipulation and summary logic."""
 
 
 def test_insert_into_existing_empty_section():
@@ -119,3 +118,134 @@ def test_daily_mutator_inserts_into_existing_note():
     result = mutate(existing)
     assert "- [ ] Call bank" in result
     assert "Work on report." in result
+
+
+# ---------------------------------------------------------------------------
+# _extract_open_items
+# ---------------------------------------------------------------------------
+
+def test_extract_open_items_returns_unchecked_only():
+    from scripts.telegram_bot import _extract_open_items
+
+    text = (
+        "# 2026-05-09\n\n"
+        "## Tasks\n\n"
+        "- [ ] First task\n"
+        "- [x] Done task\n"
+        "- [ ] Second task\n\n"
+        "## Notes\n\nSome note.\n"
+    )
+    result = _extract_open_items(text, "Tasks")
+    assert result == ["- [ ] First task", "- [ ] Second task"]
+
+
+def test_extract_open_items_ignores_done():
+    from scripts.telegram_bot import _extract_open_items
+
+    text = "## Tasks\n\n- [x] Already done\n\n## Notes\n"
+    assert _extract_open_items(text, "Tasks") == []
+
+
+def test_extract_open_items_missing_section():
+    from scripts.telegram_bot import _extract_open_items
+
+    assert _extract_open_items("# 2026-05-09\n\n## Notes\nSome note.\n", "Tasks") == []
+
+
+def test_extract_open_items_does_not_leak_into_next_section():
+    from scripts.telegram_bot import _extract_open_items
+
+    text = (
+        "## Tasks\n\n- [ ] Task only\n\n"
+        "## Notes\n\n"
+        "## Follow-ups\n\n- [ ] Follow-up only\n"
+    )
+    assert _extract_open_items(text, "Tasks")     == ["- [ ] Task only"]
+    assert _extract_open_items(text, "Follow-ups") == ["- [ ] Follow-up only"]
+
+
+# ---------------------------------------------------------------------------
+# _format_summary
+# ---------------------------------------------------------------------------
+
+def test_format_summary_with_items():
+    from scripts.telegram_bot import _format_summary
+
+    msg = _format_summary(
+        ["- [ ] Call bank", "- [ ] Review notes"],
+        ["- [ ] What is a basis swap? (2026-05-09)"],
+        "2026-05-09",
+    )
+    assert "Call bank" in msg
+    assert "Review notes" in msg
+    assert "basis swap" in msg
+    assert "2 Tasks" in msg
+    assert "1 Fragen" in msg
+
+
+def test_format_summary_empty_lists():
+    from scripts.telegram_bot import _format_summary
+
+    msg = _format_summary([], [], "2026-05-09")
+    assert "erledigt" in msg.lower()
+
+
+def test_format_summary_strips_checkbox_prefix():
+    from scripts.telegram_bot import _format_summary
+
+    msg = _format_summary(["- [ ] Do something"], [], "2026-05-09")
+    assert "Do something" in msg
+    assert "- [ ]" not in msg
+
+
+# ---------------------------------------------------------------------------
+# _parse_vision_response
+# ---------------------------------------------------------------------------
+
+def test_parse_vision_json_task():
+    from scripts.telegram_bot import _parse_vision_response
+
+    t, c = _parse_vision_response('{"type": "task", "text": "Buy milk"}')
+    assert t == "task"
+    assert c == "Buy milk"
+
+
+def test_parse_vision_json_note():
+    from scripts.telegram_bot import _parse_vision_response
+
+    t, c = _parse_vision_response('{"type": "note", "text": "Interesting article"}')
+    assert t == "note"
+    assert "Interesting" in c
+
+
+def test_parse_vision_json_question():
+    from scripts.telegram_bot import _parse_vision_response
+
+    t, c = _parse_vision_response('{"type": "question", "text": "What is X?"}')
+    assert t == "question"
+    assert "What is X?" in c
+
+
+def test_parse_vision_unknown_type_falls_back_to_note():
+    from scripts.telegram_bot import _parse_vision_response
+
+    t, _ = _parse_vision_response('{"type": "random", "text": "Something"}')
+    assert t == "note"
+
+
+def test_parse_vision_invalid_json_falls_back_to_note():
+    from scripts.telegram_bot import _parse_vision_response
+
+    t, c = _parse_vision_response("This is not JSON at all")
+    assert t == "note"
+    assert "not JSON" in c
+
+
+def test_parse_vision_markdown_wrapped_json():
+    from scripts.telegram_bot import _parse_vision_response
+
+    t, c = _parse_vision_response(
+        '```json\n{"type": "task", "text": "Do something"}\n```'
+    )
+    assert t == "task"
+    assert c == "Do something"

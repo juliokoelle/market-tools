@@ -102,6 +102,31 @@ def _local_commit(run_date: str, content: str) -> None:
     log.info("[brain] Local commit: %s", target)
 
 
+def github_read(path: str) -> str | None:
+    """Read a file from GitHub. Returns decoded text, None on 404 or missing token."""
+    cfg = _gh_config()
+    if not cfg:
+        log.warning("[brain] GITHUB_TOKEN not set — skipping github_read.")
+        return None
+    token, owner, repo = cfg
+    api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    try:
+        resp = requests.get(api_url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            return base64.b64decode(data["content"].replace("\n", "")).decode("utf-8")
+        if resp.status_code != 404:
+            log.warning("[brain] github_read HTTP %s for %s", resp.status_code, path)
+        return None
+    except requests.RequestException as e:
+        log.warning("[brain] github_read failed: %s", e)
+        return None
+
+
 def github_read_modify_write(
     path: str,
     mutate_fn: Callable[[str], str],
