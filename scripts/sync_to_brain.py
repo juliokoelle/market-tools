@@ -18,6 +18,7 @@ import base64
 import logging
 import os
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 import requests
@@ -99,6 +100,65 @@ def _local_commit(run_date: str, content: str) -> None:
         cwd=BRAIN_DIR, check=True, capture_output=True,
     )
     log.info("[brain] Local commit: %s", target)
+
+
+def github_read_modify_write(
+    path: str,
+    mutate_fn: Callable[[str], str],
+    commit_msg: str,
+) -> None:
+    """Read path from GitHub, apply mutate_fn(current_text) → new_text, write back.
+
+    Creates the file if it doesn't exist (mutate_fn receives "" in that case).
+    Raises RuntimeError on GitHub API failure so callers can report the error.
+    """
+    cfg = _gh_config()
+    if not cfg:
+        raise RuntimeError("GITHUB_TOKEN not set — cannot write to brain.")
+    token, owner, repo = cfg
+
+    api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{path}"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+
+    sha: str | None = None
+    current_text = ""
+    try:
+        resp = requests.get(api_url, headers=headers, timeout=10)
+        if resp.status_code == 200:
+            data = resp.json()
+            sha = data.get("sha")
+            current_text = base64.b64decode(
+                data["content"].replace("\n", "")
+            ).decode("utf-8")
+        elif resp.status_code != 404:
+            raise RuntimeError(f"GitHub GET failed: HTTP {resp.status_code}")
+    except requests.RequestException as e:
+        raise RuntimeError(f"GitHub GET request failed: {e}") from e
+
+    new_text = mutate_fn(current_text)
+
+    body: dict = {
+        "message": commit_msg,
+        "content": base64.b64encode(new_text.encode("utf-8")).decode("ascii"),
+        "branch": "main",
+    }
+    if sha:
+        body["sha"] = sha
+
+    try:
+        resp = requests.put(api_url, headers=headers, json=body, timeout=30)
+    except requests.RequestException as e:
+        raise RuntimeError(f"GitHub PUT request failed: {e}") from e
+
+    if resp.status_code not in (200, 201):
+        raise RuntimeError(
+            f"GitHub PUT failed: HTTP {resp.status_code} — {resp.text[:200]}"
+        )
+    action = "updated" if sha else "created"
+    log.info("[brain] github_read_modify_write OK — %s %s", action, path)
 
 
 def sync(run_date: str, content: str) -> None:
