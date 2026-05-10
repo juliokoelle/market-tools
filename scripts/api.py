@@ -30,6 +30,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/health")
+def health():
+    return {"status": "ok"}
+
 OUTPUT_LATEST.parent.mkdir(parents=True, exist_ok=True)
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
