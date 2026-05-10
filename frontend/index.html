@@ -411,12 +411,12 @@ async function loadMarket(){
   const tickers = 'AAPL,MSFT,NVDA,TSLA,GOOGL,AMZN,META,JPM,V,BRK-B';
   try {
     const d = await GET('/market/prices?tickers='+tickers);
-    const rows = Object.entries(d).map(([t,v])=>`<tr>
+    const prices = d.prices || {};
+    const rows = Object.entries(prices).filter(([,v])=>v!=null).map(([t,v])=>`<tr>
       <td style="font-weight:700">${t}</td>
-      <td>$${v.price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
-      <td class="${v.change_pct>=0?'pos':'neg'}">${v.change_pct>=0?'+':''}${v.change_pct.toFixed(2)}%</td>
+      <td>$${Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
     </tr>`).join('');
-    document.getElementById('mkt-content').innerHTML = `<div class="card"><h2 style="font-size:1rem;font-weight:700;margin-bottom:1rem">Market Prices</h2><table><thead><tr><th>Ticker</th><th>Price</th><th>Change</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    document.getElementById('mkt-content').innerHTML = `<div class="card"><h2 style="font-size:1rem;font-weight:700;margin-bottom:1rem">Market Prices</h2><table><thead><tr><th>Ticker</th><th>Price</th></tr></thead><tbody>${rows}</tbody></table></div>`;
     mktDone = true;
   } catch(e){ console.error('[market]', e); document.getElementById('mkt-content').innerHTML='<p style="color:var(--text-muted)">Market data unavailable.</p>'; }
 }
@@ -424,7 +424,8 @@ async function loadMarket(){
 // ── Briefing ──
 async function loadBriefing(){
   if (bfDone) return; bfDone = true;
-  const today = new Date().toISOString().slice(0,10);
+  const _n=new Date();
+  const today=_n.getFullYear()+'-'+String(_n.getMonth()+1).padStart(2,'0')+'-'+String(_n.getDate()).padStart(2,'0');
   try {
     const list = await GET('/briefing/list');
     const listEl = document.getElementById('bf-list');
@@ -448,7 +449,7 @@ async function selectBF(date){
   });
   try {
     const d = await GET('/briefing/'+date);
-    document.getElementById('bf-body').innerHTML = d.html || mdToHtml(d.content||'');
+    document.getElementById('bf-body').innerHTML = d.html_render || mdToHtml(d.markdown||'');
   } catch(e){
     try {
       console.log('[briefing] API failed, trying GitHub:', GH+'/'+date+'.md');
@@ -555,8 +556,8 @@ function renderAnalysis(a){
   const riskLabel=vol<15?'Conservative':vol<25?'Moderate':'Aggressive';
   const riskColor=vol<15?'var(--positive)':vol<25?'var(--neutral)':'var(--negative)';
   const fmt=n=>n.toLocaleString('de-DE',{maximumFractionDigits:0});
-  const metric=(label,value,color)=>`<div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px"><p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">${label}</p><p style="font-size:1.1rem;font-weight:700;color:${color||'var(--text-primary)'}">  ${value}</p></div>`;
-  const smMetric=(label,value)=>`<div style="padding:.6rem .75rem;background:var(--bg-tertiary);border-radius:8px"><p style="font-size:.7rem;color:var(--text-secondary);margin-bottom:.2rem">${label}</p><p style="font-size:1rem;font-weight:700">${value}</p></div>`;
+  const metric=(label,value,color,hint)=>`<div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px"><p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">${label}</p><p style="font-size:1.1rem;font-weight:700;color:${color||'var(--text-primary)'}">${value}</p>${hint?`<p style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem;line-height:1.4">${hint}</p>`:''}</div>`;
+  const smMetric=(label,value,hint)=>`<div style="padding:.6rem .75rem;background:var(--bg-tertiary);border-radius:8px"><p style="font-size:.7rem;color:var(--text-secondary);margin-bottom:.2rem">${label}</p><p style="font-size:1rem;font-weight:700">${value}</p>${hint?`<p style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem;line-height:1.4">${hint}</p>`:''}</div>`;
   let assets='';
   if(a.assets?.length){
     const rows=a.assets.map(x=>{const ar=(x.annual_return||0)*100,av=(x.volatility||0)*100;return`<tr><td style="font-weight:700">${x.ticker}</td><td style="color:var(--text-secondary)">${(x.weight*100).toFixed(1)}%</td><td class="${ar>=0?'pos':'neg'}">${ar>=0?'+':''}${ar.toFixed(1)}%</td><td style="color:var(--text-secondary)">${av.toFixed(1)}%</td></tr>`;}).join('');
@@ -565,15 +566,15 @@ function renderAnalysis(a){
   document.getElementById('pf-result').innerHTML=`<div class="card">
     <h2 style="font-size:1rem;font-weight:700;margin-bottom:1.25rem">Analysis</h2>
     <div class="grid-4" style="margin-bottom:1rem">
-      ${metric('Total Value','€'+fmt(a.total_value||0),'')}
-      ${metric('Annual Return',(ret>=0?'+':'')+ret.toFixed(1)+'%',ret>=0?'var(--positive)':'var(--negative)')}
-      ${metric('Volatility',vol.toFixed(1)+'%','')}
-      ${metric('Risk Profile',riskLabel,riskColor)}
+      ${metric('Total Value','€'+fmt(a.total_value||0),'','Sum of all current position values')}
+      ${metric('Annual Return',(ret>=0?'+':'')+ret.toFixed(1)+'%',ret>=0?'var(--positive)':'var(--negative)','Weighted expected return p.a. from 1-year price history')}
+      ${metric('Volatility',vol.toFixed(1)+'%','','Annualised σ of daily returns (σ × √252)')}
+      ${metric('Risk Profile',riskLabel,riskColor,'&lt;15% Conservative · 15–25% Moderate · &gt;25% Aggressive')}
     </div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:1.25rem">
-      ${smMetric('Diversification',div.toFixed(0)+'/100')}
-      ${smMetric('Positions',String(a.number_of_positions||0))}
-      ${smMetric('Largest Position',lp.toFixed(1)+'%')}
+      ${smMetric('Diversification',div.toFixed(0)+'/100','1 − HHI of weights: 100 = fully diversified')}
+      ${smMetric('Positions',String(a.number_of_positions||0),'Number of distinct assets')}
+      ${smMetric('Largest Position',lp.toFixed(1)+'%','% of total value in the single largest holding')}
     </div>
     ${a.commentary?`<p style="font-size:.875rem;color:var(--text-secondary);line-height:1.7;margin-bottom:1.25rem;padding:1rem;background:var(--accent-lt);border-radius:8px;border-left:3px solid var(--accent)">${a.commentary}</p>`:''}
     ${assets}
@@ -590,11 +591,19 @@ function declineSeed(){ localStorage.setItem(K.seed,'1'); pfPos=[{ticker:'',inve
 // ── Hot Stocks ──
 async function loadHotStocks(){
   if(hsDone) return; hsDone=true;
-  const sec=(title,stocks)=>`<div class="card"><h2 style="font-size:1rem;font-weight:700;margin-bottom:1rem">${title}</h2><table><thead><tr><th>Ticker</th><th>Name</th><th>Price</th><th>Change</th></tr></thead><tbody>${stocks.map(s=>`<tr><td style="font-weight:700">${s.ticker}</td><td style="color:var(--text-secondary)">${s.name}</td><td>$${(s.price||0).toFixed(2)}</td><td class="${(s.change_pct||0)>=0?'pos':'neg'}">${(s.change_pct||0)>=0?'+':''}${(s.change_pct||0).toFixed(2)}%</td></tr>`).join('')}</tbody></table></div>`;
   try{
     const d=await GET('/market/hot-stocks');
-    document.getElementById('hs-content').innerHTML=`<div style="display:flex;flex-direction:column;gap:1rem">${sec('📈 Top Gainers',d.gainers||[])}${sec('📉 Top Losers',d.losers||[])}</div>`;
-  }catch(e){ console.error('[hot-stocks]', e); document.getElementById('hs-content').innerHTML='<p style="color:var(--text-muted)">Data unavailable.</p>'; }
+    const stocks=d.stocks||[];
+    if(!stocks.length){document.getElementById('hs-content').innerHTML='<p style="color:var(--text-muted)">No data available.</p>';return;}
+    const gainers=[...stocks].sort((a,b)=>b.return-a.return).slice(0,10);
+    const losers=[...stocks].sort((a,b)=>a.return-b.return).slice(0,10);
+    const secHS=(title,items)=>`<div class="card"><h2 style="font-size:1rem;font-weight:700;margin-bottom:1rem">${title}</h2><table><thead><tr><th>Ticker</th><th>5d Return</th><th>Avg Volume</th></tr></thead><tbody>${items.map(s=>`<tr><td style="font-weight:700">${s.ticker}</td><td class="${s.return>=0?'pos':'neg'}">${s.return>=0?'+':''}${(s.return*100).toFixed(2)}%</td><td style="color:var(--text-muted)">${(s.volume_avg/1e6).toFixed(1)}M</td></tr>`).join('')}</tbody></table></div>`;
+    document.getElementById('hs-content').innerHTML=`<div style="display:flex;flex-direction:column;gap:1rem">${secHS('📈 Top Gainers',gainers)}${secHS('📉 Top Losers',losers)}</div>`;
+  }catch(e){
+    console.error('[hot-stocks]',e);
+    const status=e&&typeof e.status==='number'?`HTTP ${e.status}`:'network error';
+    document.getElementById('hs-content').innerHTML=`<p style="color:var(--negative)">Hot Stocks unavailable (${status}). Check browser console.</p>`;
+  }
 }
 
 // ── Stock Analyzer ──
@@ -602,21 +611,93 @@ async function analyzeStock(){
   const ticker=document.getElementById('az-inp').value.trim().toUpperCase(); if(!ticker) return;
   document.getElementById('az-result').innerHTML='<p style="color:var(--text-muted)">Analyzing…</p>';
   try{
-    const d=await GET('/stock/'+ticker+'/detail');
-    const chg=d.change_pct||0;
+    const [d,p]=await Promise.all([
+      GET('/stock/'+ticker+'/detail'),
+      GET('/ticker/'+ticker+'/profile').catch(()=>null)
+    ]);
+    const price=p?.price??d.components?.momentum?.details?.price??0;
+    const chg=p?.change_pct??0;
+    const pe=p?.pe_ratio??d.components?.valuation?.details?.trailing_pe;
+    const hi52=p?.week52_high, lo52=p?.week52_low;
+    const comp=d.components||{};
+    const mom=comp.momentum||{}, sent=comp.sentiment||{}, valc=comp.valuation, anac=comp.analyst;
+    const fmtP=v=>v!=null?`$${Number(v).toFixed(2)}`:'—';
+    const scoreRow=(lbl,sc,wt,det)=>`<tr>
+      <td style="font-size:.85rem;font-weight:600">${lbl}</td>
+      <td style="font-weight:700">${Number(sc).toFixed(0)}/100</td>
+      <td style="font-size:.8rem;color:var(--text-muted)">${(wt*100).toFixed(0)}%</td>
+      <td style="font-size:.78rem;color:var(--text-muted)">${det}</td>
+    </tr>`;
+    const momDet=`30d: ${mom.details?.return_30d??'—'}% · 90d: ${mom.details?.return_90d??'—'}% · MA50: ${mom.details?.above_ma50?'↑':'↓'} · MA200: ${mom.details?.above_ma200?'↑':'↓'}`;
+    const sentDet=`${sent.details?.label||'—'} · ${sent.details?.headlines_count||0} headlines (${sent.details?.source||'—'})`;
+    const valDet=valc?`P/E: ${valc.details?.trailing_pe??'—'} · Fwd P/E: ${valc.details?.forward_pe??'—'} · P/B: ${valc.details?.price_to_book??'—'}`:'not applicable';
+    const anaDet=anac?`${anac.details?.recommendation||'—'} · mean ${anac.details?.recommendation_mean??'—'} · ${anac.details?.analyst_count||0} analysts`:'not applicable';
+    const bullRows=[
+      scoreRow('Momentum',mom.score??50,mom.weight??0.3,momDet),
+      scoreRow('Sentiment',sent.score??50,sent.weight??0.3,sentDet),
+      valc?scoreRow('Valuation',valc.score??50,valc.weight??0.2,valDet):'',
+      anac?scoreRow('Analyst',anac.score??50,anac.weight??0.2,anaDet):'',
+    ].join('');
     document.getElementById('az-result').innerHTML=`<div class="card">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem">
-        <div><h2 style="font-size:1.2rem;font-weight:800">${d.ticker}</h2><p style="color:var(--text-secondary);font-size:.875rem">${d.name} · ${d.sector}</p></div>
-        <div style="text-align:right"><p style="font-size:1.4rem;font-weight:700">$${(d.price||0).toFixed(2)}</p><p class="${chg>=0?'pos':'neg'}">${chg>=0?'+':''}${chg.toFixed(2)}%</p></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem;flex-wrap:wrap;gap:.5rem">
+        <div><h2 style="font-size:1.2rem;font-weight:800">${d.ticker}</h2><p style="color:var(--text-secondary);font-size:.875rem">${d.company_name||d.ticker} · ${d.sector||'—'}</p></div>
+        <div style="text-align:right"><p style="font-size:1.4rem;font-weight:700">${fmtP(price)}</p><p class="${chg>=0?'pos':'neg'}">${chg>=0?'+':''}${chg.toFixed(2)}%</p></div>
       </div>
-      <div class="grid-4">
-        <div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px"><p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">Bull Score</p><p style="font-size:1rem;font-weight:700">${(d.bull_score||0).toFixed(0)}/100</p></div>
-        <div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px"><p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">Market Cap</p><p style="font-size:1rem;font-weight:700">$${((d.market_cap||0)/1e9).toFixed(1)}B</p></div>
-        <div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px"><p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">P/E Ratio</p><p style="font-size:1rem;font-weight:700">${d.pe_ratio?d.pe_ratio.toFixed(1):'—'}</p></div>
-        <div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px"><p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">52w High</p><p style="font-size:1rem;font-weight:700">$${(d.week_52_high||0).toFixed(2)}</p></div>
+      <div class="grid-4" style="margin-bottom:1.25rem">
+        <div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px">
+          <p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">Bull Score</p>
+          <p style="font-size:1rem;font-weight:700">${d.bull_score??0}/100</p>
+          <p style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem">Composite 0–100 ↓ breakdown</p>
+        </div>
+        <div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px">
+          <p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">Market Cap</p>
+          <p style="font-size:1rem;font-weight:700">${d.market_cap?'$'+((d.market_cap)/1e9).toFixed(1)+'B':'—'}</p>
+          <p style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem">Source: yfinance</p>
+        </div>
+        <div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px">
+          <p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">P/E Ratio</p>
+          <p style="font-size:1rem;font-weight:700">${pe!=null?Number(pe).toFixed(1):'—'}</p>
+          <p style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem">Trailing twelve months</p>
+        </div>
+        <div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px">
+          <p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">52-Week Range</p>
+          <p style="font-size:.95rem;font-weight:700">${fmtP(lo52)} – ${fmtP(hi52)}</p>
+          <p style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem">Low – High</p>
+        </div>
       </div>
+      <div style="margin-bottom:1.25rem">
+        <p class="label" style="margin-bottom:.5rem">Bull Score Breakdown</p>
+        <div style="overflow-x:auto"><table>
+          <thead><tr><th>Component</th><th>Score</th><th>Weight</th><th>Signal</th></tr></thead>
+          <tbody>${bullRows}</tbody>
+        </table></div>
+        <p style="font-size:.7rem;color:var(--text-muted);margin-top:.4rem">Momentum 30% (price trends) · Sentiment 30% (AI headline analysis) · Valuation 20% (P/E, P/B) · Analyst 20% (consensus recommendation)</p>
+      </div>
+      ${d.description?`<p style="font-size:.825rem;color:var(--text-secondary);line-height:1.7;margin-bottom:1.25rem;padding:.75rem;background:var(--bg-tertiary);border-radius:8px">${d.description}</p>`:''}
+      <button class="btn btn-outline" style="font-size:.8rem" onclick="loadAISummary('${d.ticker}')">🤖 AI Analysis (Claude)</button>
+      <div id="ai-${d.ticker}" style="margin-top:1rem"></div>
     </div>`;
-  }catch(e){ console.error('[analyzer]', e); document.getElementById('az-result').innerHTML=`<p style="color:var(--text-muted)">Could not load data for ${ticker}.</p>`; }
+  }catch(e){
+    console.error('[analyzer]',e);
+    const status=e&&typeof e.status==='number'?`HTTP ${e.status}`:'error';
+    document.getElementById('az-result').innerHTML=`<p style="color:var(--negative)">Could not load data for ${document.getElementById('az-inp').value.trim().toUpperCase()} (${status}). Check console.</p>`;
+  }
+}
+
+async function loadAISummary(ticker){
+  const el=document.getElementById('ai-'+ticker); if(!el) return;
+  el.innerHTML='<p style="font-size:.875rem;color:var(--text-muted)">Generating AI analysis…</p>';
+  try{
+    const d=await GET('/stock/'+ticker+'/ai-summary');
+    el.innerHTML=`<div style="padding:1rem;background:var(--accent-lt);border-radius:8px;border-left:3px solid var(--accent);margin-top:.5rem">
+      <p style="font-size:.75rem;font-weight:700;color:var(--accent);margin-bottom:.6rem">AI Analysis · Claude Sonnet · Bull Score ${d.bull_score}/100</p>
+      <div style="font-size:.875rem;color:var(--text-secondary);line-height:1.75;white-space:pre-wrap">${d.summary}</div>
+      <p style="font-size:.7rem;color:var(--text-muted);margin-top:.6rem">Generated: ${(d.generated_at||'').slice(0,16).replace('T',' ')} UTC · cached 6 h</p>
+    </div>`;
+  }catch(e){
+    const status=e&&typeof e.status==='number'?`HTTP ${e.status}`:'error';
+    el.innerHTML=`<p style="font-size:.875rem;color:var(--negative)">AI analysis unavailable (${status}).</p>`;
+  }
 }
 </script>
 </body>
