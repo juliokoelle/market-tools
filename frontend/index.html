@@ -272,16 +272,19 @@ td{padding:.45rem .5rem;border-bottom:1px solid var(--border)}
     <div class="grid-3">
       <div class="card" style="display:flex;flex-direction:column;gap:.75rem">
         <div style="display:flex;align-items:flex-start;justify-content:space-between">
-          <p style="font-size:2rem">🐴</p><span class="badge badge-green">Live</span>
+          <p style="font-size:2rem">🐴</p><span class="badge badge-blue">In Development</span>
         </div>
         <div>
           <h2 style="font-size:1.05rem;font-weight:700;margin-bottom:.35rem">HorseFinder</h2>
-          <p style="font-size:.875rem;color:var(--text-secondary);line-height:1.65">Equestrian event finder for Germany. Search tournaments by discipline, location, and date. Data scraped daily from nennung-online.de.</p>
+          <p style="font-size:.875rem;color:var(--text-secondary);line-height:1.65">Equestrian event finder for Germany. Search and filter tournaments by discipline, location, and date. Daily scraper pulls live data from nennung-online.de.</p>
         </div>
         <div style="display:flex;flex-wrap:wrap;gap:.35rem">
           <span class="badge badge-gray">FastAPI</span><span class="badge badge-gray">React</span><span class="badge badge-gray">Supabase</span>
         </div>
-        <a href="https://horsefinder-frontend.onrender.com" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="margin-top:auto;justify-content:center">Open app →</a>
+        <div class="cs-wrap" style="margin-top:auto">
+          <button disabled class="btn btn-outline" style="width:100%;justify-content:center;cursor:not-allowed;opacity:.55">Coming soon</button>
+          <div class="cs-tip">Currently in development — stay tuned</div>
+        </div>
       </div>
       <div class="card" style="display:flex;flex-direction:column;gap:.75rem">
         <div style="display:flex;align-items:flex-start;justify-content:space-between">
