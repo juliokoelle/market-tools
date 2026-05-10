@@ -2,10 +2,29 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+function classicScript() {
+  return {
+    name: 'classic-script',
+    transformIndexHtml(html: string) {
+      return html
+        .replace(/ type="module"/g, '')
+        .replace(/ crossorigin/g, '')
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), classicScript()],
   resolve: {
     alias: { '@': path.resolve(__dirname, './src') },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        format: 'iife',
+        name: 'App',
+      },
+    },
   },
   server: {
     port: 5173,
