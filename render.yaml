@@ -27,13 +27,6 @@ services:
     buildCommand: pip install -r requirements.txt
     startCommand: python -m scripts.run_gmail_briefing
 
-  - type: cron
-    name: keep-alive-ping
-    env: python
-    plan: free
-    schedule: "*/10 * * * *"
-    startCommand: python -c "import urllib.request; urllib.request.urlopen('https://market-tools-backend.onrender.com/health', timeout=30)"
-
   - type: worker
     name: telegram-bot
     env: python
