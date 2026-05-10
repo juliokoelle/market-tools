@@ -15,6 +15,10 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: dist
     autoDeploy: true
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
       - key: VITE_API_URL
         value: https://market-tools-backend.onrender.com
