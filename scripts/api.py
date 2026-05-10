@@ -597,14 +597,136 @@ def market_history(
     }
 
 
+_TTL_TICKER_BANNER  = 60.0
+_TTL_DASHBOARD      = 120.0
+_TTL_HOT_ENRICHED   = 300.0
+
+_BANNER_TICKERS    = ["GC=F", "^GSPC", "^IXIC", "BTC-USD", "VWCE.DE", "AAPL", "NVDA", "MSFT"]
+_WATCHLIST_TICKERS = ["AAPL", "MSFT", "NVDA", "TSLA", "GOOGL", "AMZN", "META", "JPM"]
+
+
+def _sparkline(ticker: str, period: str = "5d", interval: str = "1h") -> list:
+    try:
+        import yfinance as yf
+        hist = yf.Ticker(ticker).history(period=period, interval=interval)
+        if hist.empty:
+            return []
+        return [round(float(v), 2) for v in hist["Close"].dropna().values[-40:]]
+    except Exception:
+        return []
+
+
+@app.get("/ticker-banner")
+def ticker_banner():
+    cached = _cache_get("ticker_banner", _TTL_TICKER_BANNER)
+    if cached is not None:
+        return cached
+
+    import yfinance as yf
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _fetch_one(ticker: str) -> dict:
+        try:
+            fi    = yf.Ticker(ticker).fast_info
+            price = fi.get("lastPrice") or fi.get("regularMarketPrice")
+            prev  = fi.get("previousClose") or fi.get("regularMarketPreviousClose")
+            chg   = (price - prev) / prev * 100 if price and prev and prev != 0 else 0.0
+            return {
+                "ticker": ticker,
+                "price":  round(float(price), 2) if price else None,
+                "change_pct": round(float(chg), 2),
+            }
+        except Exception:
+            return {"ticker": ticker, "price": None, "change_pct": 0.0}
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        result = list(ex.map(_fetch_one, _BANNER_TICKERS))
+
+    _cache_set("ticker_banner", result)
+    return result
+
+
+@app.get("/dashboard-overview")
+def dashboard_overview():
+    cached = _cache_get("dashboard_overview", _TTL_DASHBOARD)
+    if cached is not None:
+        return cached
+
+    import yfinance as yf
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _fetch_watchlist(ticker: str) -> dict:
+        try:
+            fi    = yf.Ticker(ticker).fast_info
+            price = fi.get("lastPrice") or fi.get("regularMarketPrice")
+            prev  = fi.get("previousClose") or fi.get("regularMarketPreviousClose")
+            chg   = (price - prev) / prev * 100 if price and prev and prev != 0 else 0.0
+            return {
+                "ticker":     ticker,
+                "price":      round(float(price), 2) if price else None,
+                "change_pct": round(float(chg), 2),
+                "sparkline":  _sparkline(ticker),
+            }
+        except Exception:
+            return {"ticker": ticker, "price": None, "change_pct": 0.0, "sparkline": []}
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        watchlist = list(ex.map(_fetch_watchlist, _WATCHLIST_TICKERS))
+
+    result = {
+        "watchlist": watchlist,
+        "sp500_sparkline": _sparkline("^GSPC", period="7d", interval="1d"),
+    }
+    _cache_set("dashboard_overview", result)
+    return result
+
+
 @app.get("/market/hot-stocks")
 def market_hot_stocks():
-    stocks = get_hot_stocks(top_n=50)
+    cached = _cache_get("hot_stocks_enriched", _TTL_HOT_ENRICHED)
+    if cached is not None:
+        return cached
+
+    import yfinance as yf
+    from concurrent.futures import ThreadPoolExecutor
+
+    stocks = get_hot_stocks(top_n=20)
     if not stocks:
-        raise HTTPException(
-            status_code=503, detail="Could not fetch market data. Try again shortly."
-        )
-    return {"stocks": stocks, "total": len(stocks)}
+        raise HTTPException(status_code=503, detail="Could not fetch market data. Try again shortly.")
+
+    def _enrich(s: dict) -> dict:
+        ticker = s["ticker"]
+        try:
+            info  = yf.Ticker(ticker).info
+            price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
+            prev  = info.get("previousClose") or 0
+            chg   = (price - prev) / prev * 100 if prev else s.get("return", 0) * 100
+            return {
+                **s,
+                "name":           info.get("shortName") or info.get("longName") or ticker,
+                "price":          round(float(price), 2) if price else None,
+                "change_pct":     round(float(chg), 2),
+                "pe_ratio":       info.get("trailingPE"),
+                "week_52_high":   info.get("fiftyTwoWeekHigh"),
+                "week_52_low":    info.get("fiftyTwoWeekLow"),
+                "analyst_rating": info.get("recommendationKey"),
+                "sparkline":      _sparkline(ticker, period="5d", interval="1d"),
+            }
+        except Exception:
+            return {
+                **s,
+                "name": ticker, "price": None,
+                "change_pct": round(s.get("return", 0) * 100, 2),
+                "pe_ratio": None, "week_52_high": None,
+                "week_52_low": None, "analyst_rating": None, "sparkline": [],
+            }
+
+    with ThreadPoolExecutor(max_workers=10) as ex:
+        enriched = list(ex.map(_enrich, stocks))
+
+    result = {"stocks": enriched, "total": len(enriched)}
+    _cache_set("hot_stocks_enriched", result)
+    return result
 
 
 @app.get("/stock/analyze")
