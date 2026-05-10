@@ -343,7 +343,7 @@ function boot(){
   document.getElementById('app').style.display = 'block';
   const h = location.hash.slice(1) || 'home';
   showPage(h);
-  window.onhashchange = () => showPage(location.hash.slice(1) || 'home');
+  window.addEventListener('hashchange', () => showPage(location.hash.slice(1) || 'home'));
 }
 
 // ── Theme ──
@@ -369,7 +369,7 @@ function closeDDs(){
 
 // ── Router ──
 const MKT_PAGES = ['market','briefing','portfolio','hot-stocks','analyzer'];
-function go(page){ location.hash = '#'+page; closeDDs(); }
+function go(page){ showPage(page); location.hash = '#'+page; closeDDs(); }
 
 function showPage(page){
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
