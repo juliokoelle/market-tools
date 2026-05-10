@@ -318,6 +318,13 @@ const GH  = 'https://raw.githubusercontent.com/juliokoelle/julio-brain/main/10_D
 const PW  = 'Bookrun2026';
 const K   = { auth:'mt_auth', theme:'mt_theme', pos:'mt_portfolio_positions', seed:'mt_portfolio_seed_seen' };
 
+// ── State (must be declared before IIFE runs) ──
+const MKT_PAGES = ['market','briefing','portfolio','hot-stocks','analyzer'];
+let mktDone = false;
+let bfDone = false, bfSelected = null;
+let hsDone = false;
+let pfPos = [], pfReady = false;
+
 // ── Bootstrap ──
 (function(){
   const t = localStorage.getItem(K.theme) || 'light';
@@ -368,7 +375,6 @@ function closeDDs(){
 }
 
 // ── Router ──
-const MKT_PAGES = ['market','briefing','portfolio','hot-stocks','analyzer'];
 function go(page){ try { showPage(page); } catch(e) { console.error('showPage error:', e); } location.hash = '#'+page; closeDDs(); }
 
 function showPage(page){
@@ -400,7 +406,6 @@ async function POST(path,body){
 }
 
 // ── Market Dashboard ──
-let mktDone = false;
 async function loadMarket(){
   if (mktDone) return;
   const tickers = 'AAPL,MSFT,NVDA,TSLA,GOOGL,AMZN,META,JPM,V,BRK-B';
@@ -417,7 +422,6 @@ async function loadMarket(){
 }
 
 // ── Briefing ──
-let bfDone=false, bfSelected=null;
 async function loadBriefing(){
   if (bfDone) return; bfDone = true;
   const today = new Date().toISOString().slice(0,10);
@@ -473,7 +477,6 @@ function mdToHtml(md){
 // ── Portfolio ──
 const SEED=[{ticker:'VWCE.DE',investment:650},{ticker:'NVDA',investment:180},{ticker:'ASML',investment:180},{ticker:'MSFT',investment:150},{ticker:'GOOGL',investment:120},{ticker:'PLTR',investment:150},{ticker:'4GLD.DE',investment:570}];
 const UNI=['AAPL','MSFT','NVDA','GOOG','META','AVGO','AMD','ORCL','CRM','ADBE','INTC','QCOM','TXN','IBM','NOW','SNOW','PLTR','MU','AMAT','LRCX','AMZN','TSLA','HD','MCD','NKE','SBUX','BKNG','LOW','TGT','ABNB','EBAY','GM','F','UBER','LYFT','NFLX','DIS','CMCSA','T','VZ','TMUS','SNAP','PINS','BRK-B','JPM','BAC','WFC','GS','MS','C','AXP','BLK','SCHW','V','MA','PYPL','COF','JNJ','LLY','UNH','PFE','ABBV','MRK','TMO','ABT','DHR','AMGN','GILD','ISRG','CVS','HUM','CAT','HON','GE','BA','LMT','RTX','DE','UPS','FDX','CSX','NSC','XOM','CVX','COP','SLB','EOG','PSX','MPC','PG','KO','PEP','COST','WMT','PM','MO','CL','LIN','APD','FCX','NEM','DOW','AMT','PLD','EQIX','SPG','NEE','DUK','SO','D','VWCE.DE','4GLD.DE','ASML','SAP','BAYN.DE','BMW.DE','SIE.DE'];
-let pfPos=[], pfReady=false;
 
 function initPortfolio(){
   if (pfReady) return; pfReady = true;
@@ -585,7 +588,6 @@ function acceptSeed(){ localStorage.setItem(K.seed,'1'); pfPos=SEED.map(p=>({...
 function declineSeed(){ localStorage.setItem(K.seed,'1'); pfPos=[{ticker:'',investment:0}]; savePFLocal(); document.getElementById('seed-modal').style.display='none'; renderPF(); }
 
 // ── Hot Stocks ──
-let hsDone=false;
 async function loadHotStocks(){
   if(hsDone) return; hsDone=true;
   const sec=(title,stocks)=>`<div class="card"><h2 style="font-size:1rem;font-weight:700;margin-bottom:1rem">${title}</h2><table><thead><tr><th>Ticker</th><th>Name</th><th>Price</th><th>Change</th></tr></thead><tbody>${stocks.map(s=>`<tr><td style="font-weight:700">${s.ticker}</td><td style="color:var(--text-secondary)">${s.name}</td><td>$${(s.price||0).toFixed(2)}</td><td class="${(s.change_pct||0)>=0?'pos':'neg'}">${(s.change_pct||0)>=0?'+':''}${(s.change_pct||0).toFixed(2)}%</td></tr>`).join('')}</tbody></table></div>`;
