@@ -26,7 +26,8 @@ const PORTFOLIO_SEED: Position[] = [
   { ticker: "4GLD.DE", investment: 570 },
 ]
 
-const SEED_KEY = 'mt_portfolio_seed_seen'
+const SEED_KEY      = 'mt_portfolio_seed_seen'
+const POSITIONS_KEY = 'mt_portfolio_positions'
 
 function TickerInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [suggestions, setSuggestions] = useState<string[]>([])
@@ -118,28 +119,45 @@ function SeedModal({ onAccept, onDecline }: { onAccept: () => void; onDecline: (
 }
 
 export default function Portfolio() {
-  const [positions, setPositions] = useState<Position[]>([
-    { ticker: 'AAPL', investment: 5000 },
-    { ticker: 'MSFT', investment: 3000 },
-    { ticker: 'TSLA', investment: 2000 },
-  ])
+  const [positions, setPositions] = useState<Position[]>(() => {
+    try {
+      const saved = localStorage.getItem(POSITIONS_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      }
+    } catch {}
+    return [
+      { ticker: 'AAPL', investment: 5000 },
+      { ticker: 'MSFT', investment: 3000 },
+      { ticker: 'TSLA', investment: 2000 },
+    ]
+  })
   const [analysis, setAnalysis]   = useState<PortfolioAnalysis | null>(null)
   const [saving, setSaving]       = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [toast, setToast]         = useState('')
   const [showSeed, setShowSeed]   = useState(false)
 
+  // Persist positions to localStorage on every change
+  useEffect(() => {
+    localStorage.setItem(POSITIONS_KEY, JSON.stringify(positions))
+  }, [positions])
+
+  // Load from API (authoritative saved state overrides local)
   useEffect(() => {
     getPortfolio()
       .then(d => {
         if (d.positions?.length) {
           setPositions(d.positions)
-        } else if (!localStorage.getItem(SEED_KEY)) {
+        } else if (!localStorage.getItem(SEED_KEY) && !localStorage.getItem(POSITIONS_KEY)) {
           setShowSeed(true)
         }
       })
       .catch(() => {
-        if (!localStorage.getItem(SEED_KEY)) setShowSeed(true)
+        if (!localStorage.getItem(SEED_KEY) && !localStorage.getItem(POSITIONS_KEY)) {
+          setShowSeed(true)
+        }
       })
   }, [])
 
@@ -235,18 +253,22 @@ export default function Portfolio() {
 }
 
 function AnalysisCard({ a }: { a: PortfolioAnalysis }) {
-  const vol = a.volatility ?? 0
+  const ret    = (a.annualized_return ?? 0) * 100
+  const vol    = (a.annualized_volatility ?? 0) * 100
+  const div    = (a.diversification_score ?? 0) * 100
+  const lgPos  = (a.largest_position ?? 0) * 100
   const riskLabel = vol < 15 ? 'Conservative' : vol < 25 ? 'Moderate' : 'Aggressive'
   const riskColor = vol < 15 ? 'var(--positive)' : vol < 25 ? 'var(--neutral)' : 'var(--negative)'
 
   return (
     <div className="card">
       <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem' }}>Analysis</h2>
-      <div className="grid-4" style={{ marginBottom: '1.5rem' }}>
+
+      <div className="grid-4" style={{ marginBottom: '1rem' }}>
         {[
           { label: 'Total Value',   value: `€${(a.total_value ?? 0).toLocaleString('de-DE', { maximumFractionDigits: 0 })}`, color: undefined },
-          { label: 'Annual Return', value: `${(a.annual_return ?? 0).toFixed(1)}%`, color: (a.annual_return ?? 0) >= 0 ? 'var(--positive)' : 'var(--negative)' },
-          { label: 'Volatility',   value: `${(a.volatility ?? 0).toFixed(1)}%`, color: undefined },
+          { label: 'Annual Return', value: `${ret >= 0 ? '+' : ''}${ret.toFixed(1)}%`, color: ret >= 0 ? 'var(--positive)' : 'var(--negative)' },
+          { label: 'Volatility',   value: `${vol.toFixed(1)}%`, color: undefined },
           { label: 'Risk Profile', value: riskLabel, color: riskColor },
         ].map(m => (
           <div key={m.label} style={{ padding: '.75rem', background: 'var(--bg-tertiary)', borderRadius: 8 }}>
@@ -256,25 +278,54 @@ function AnalysisCard({ a }: { a: PortfolioAnalysis }) {
         ))}
       </div>
 
-      {a.insight && (
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '.5rem', marginBottom: '1.25rem' }}>
+        {[
+          { label: 'Diversification', value: `${div.toFixed(0)}/100` },
+          { label: 'Positions',       value: String(a.number_of_positions ?? 0) },
+          { label: 'Largest Position', value: `${lgPos.toFixed(1)}%` },
+        ].map(m => (
+          <div key={m.label} style={{ padding: '.6rem .75rem', background: 'var(--bg-tertiary)', borderRadius: 8 }}>
+            <p style={{ fontSize: '.7rem', color: 'var(--text-secondary)', marginBottom: '.2rem' }}>{m.label}</p>
+            <p style={{ fontSize: '1rem', fontWeight: 700 }}>{m.value}</p>
+          </div>
+        ))}
+      </div>
+
+      {a.commentary && (
         <p style={{ fontSize: '.875rem', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '1.25rem', padding: '1rem', background: 'var(--accent-lt)', borderRadius: 8, borderLeft: `3px solid var(--accent)` }}>
-          {a.insight}
+          {a.commentary}
         </p>
       )}
 
-      {a.positions?.length > 0 && (
+      {a.assets?.length > 0 && (
         <div>
-          <p style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '.5rem', textTransform: 'uppercase', letterSpacing: '.04em' }}>Positions</p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.35rem' }}>
-            {a.positions.map(p => (
-              <div key={p.ticker} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '.875rem', padding: '.4rem 0', borderBottom: '1px solid var(--border)' }}>
-                <span style={{ fontWeight: 700 }}>{p.ticker}</span>
-                <span style={{ color: 'var(--text-secondary)' }}>€{p.value.toLocaleString('de-DE', { maximumFractionDigits: 0 })}</span>
-                <span style={{ color: p.gain_pct >= 0 ? 'var(--positive)' : 'var(--negative)', fontWeight: 600 }}>
-                  {p.gain_pct >= 0 ? '+' : ''}{p.gain_pct.toFixed(1)}%
-                </span>
-              </div>
-            ))}
+          <p style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '.5rem', textTransform: 'uppercase', letterSpacing: '.04em' }}>Asset Breakdown</p>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
+              <thead>
+                <tr>
+                  {['Ticker', 'Weight', 'Exp. Return p.a.', 'Volatility p.a.'].map(h => (
+                    <th key={h} style={{ textAlign: 'left', padding: '.35rem .5rem', fontSize: '.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em', borderBottom: '2px solid var(--border)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {a.assets.map(asset => {
+                  const assetRet = (asset.annual_return ?? 0) * 100
+                  const assetVol = (asset.volatility ?? 0) * 100
+                  return (
+                    <tr key={asset.ticker}>
+                      <td style={{ padding: '.4rem .5rem', fontWeight: 700, borderBottom: '1px solid var(--border)' }}>{asset.ticker}</td>
+                      <td style={{ padding: '.4rem .5rem', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }}>{(asset.weight * 100).toFixed(1)}%</td>
+                      <td style={{ padding: '.4rem .5rem', color: assetRet >= 0 ? 'var(--positive)' : 'var(--negative)', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>
+                        {assetRet >= 0 ? '+' : ''}{assetRet.toFixed(1)}%
+                      </td>
+                      <td style={{ padding: '.4rem .5rem', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }}>{assetVol.toFixed(1)}%</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

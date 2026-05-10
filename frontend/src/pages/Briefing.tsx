@@ -2,28 +2,78 @@ import { useEffect, useState } from 'react'
 import { getBriefingList, getBriefing, type BriefingMeta } from '../services/api'
 
 const BASE = import.meta.env.VITE_API_URL ?? '/api'
+const GH_RAW = 'https://raw.githubusercontent.com/juliokoelle/julio-brain/main/10_Daily'
+
+function renderMarkdown(md: string): string {
+  const lines = md.split('\n')
+  const out: string[] = []
+  let para: string[] = []
+
+  const inline = (t: string) =>
+    t.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+     .replace(/\*(.+?)\*/g, '<em>$1</em>')
+
+  const flushPara = () => {
+    if (para.length) {
+      out.push(`<p>${inline(para.join(' '))}</p>`)
+      para = []
+    }
+  }
+
+  for (const raw of lines) {
+    const line = raw.trimEnd()
+    const heading = line.match(/^(#{1,6}) (.+)$/)
+    if (heading) {
+      flushPara()
+      const lvl = heading[1].length
+      out.push(`<h${lvl}>${inline(heading[2])}</h${lvl}>`)
+    } else if (/^---+$/.test(line)) {
+      flushPara()
+      out.push('<hr>')
+    } else if (line === '') {
+      flushPara()
+    } else {
+      para.push(line)
+    }
+  }
+  flushPara()
+  return out.join('\n')
+}
+
+async function fetchFromGitHub(date: string): Promise<string> {
+  const r = await fetch(`${GH_RAW}/${date}.md`)
+  if (!r.ok) throw new Error(`${r.status}`)
+  return renderMarkdown(await r.text())
+}
 
 export default function Briefing() {
-  const [list, setList]       = useState<BriefingMeta[]>([])
-  const [selected, setSelected] = useState<string | null>(null)
-  const [content, setContent] = useState<string>('')
-  const [loading, setLoading] = useState(false)
+  const today = new Date().toISOString().slice(0, 10)
+  const [list, setList]           = useState<BriefingMeta[]>([])
+  const [selected, setSelected]   = useState<string | null>(null)
+  const [content, setContent]     = useState<string>('')
+  const [loading, setLoading]     = useState(false)
+  const [fromGitHub, setFromGitHub] = useState(false)
 
   useEffect(() => {
     getBriefingList()
       .then(data => {
         setList(data)
-        if (data.length > 0) setSelected(data[0].date)
+        setSelected(data.length > 0 ? data[0].date : today)
       })
-      .catch(() => {})
-  }, [])
+      .catch(() => setSelected(today))
+  }, [today])
 
   useEffect(() => {
     if (!selected) return
     setLoading(true)
+    setFromGitHub(false)
     getBriefing(selected)
       .then(d => setContent(d.html || d.content))
-      .catch(() => setContent('Failed to load briefing.'))
+      .catch(() =>
+        fetchFromGitHub(selected)
+          .then(html => { setContent(html); setFromGitHub(true) })
+          .catch(() => setContent('<p style="color:var(--text-muted)">Briefing not available.</p>'))
+      )
       .finally(() => setLoading(false))
   }, [selected])
 
@@ -33,7 +83,6 @@ export default function Briefing() {
 
       <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: '1.5rem', alignItems: 'start' }}>
 
-        {/* Archive list */}
         <div className="card" style={{ padding: '1rem' }}>
           <p style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--text-faint)', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: '.75rem' }}>
             Archive
@@ -62,11 +111,17 @@ export default function Briefing() {
           </div>
         </div>
 
-        {/* Briefing content */}
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem' }}>
-            <p style={{ fontSize: '1rem', fontWeight: 700 }}>{selected ?? '—'}</p>
-            {selected && (
+            <div>
+              <p style={{ fontSize: '1rem', fontWeight: 700 }}>{selected ?? '—'}</p>
+              {fromGitHub && (
+                <p style={{ fontSize: '.72rem', color: 'var(--text-muted)', marginTop: '.15rem' }}>
+                  Loaded from GitHub (API offline)
+                </p>
+              )}
+            </div>
+            {selected && !fromGitHub && (
               <a
                 href={`${BASE}/briefing/${selected}/pdf`}
                 target="_blank"

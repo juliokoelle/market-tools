@@ -70,11 +70,16 @@ export interface Position { ticker: string; investment: number }
 export interface Holding { ticker: string; investment: number }
 export interface PortfolioAnalysis {
   total_value: number
-  annual_return: number
-  volatility: number
-  diversification: number
-  insight: string
-  positions: Array<{ ticker: string; value: number; gain_pct: number }>
+  annualized_return: number
+  annualized_volatility: number
+  diversification_score: number
+  largest_position_usd: number
+  largest_position: number
+  number_of_positions: number
+  assets: Array<{ ticker: string; weight: number; annual_return: number; volatility: number }>
+  positions: Record<string, { investment: number; weight: number; current_price: number; shares: number }>
+  commentary: string
+  correlation_matrix: Record<string, Record<string, number>>
 }
 export interface WatchlistCategory { category: string; stocks: StockDetail[] }
 export interface StockDetail {
