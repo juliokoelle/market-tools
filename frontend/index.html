@@ -1,16 +1,607 @@
 <!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Julio Koelle</title>
-    <meta name="description" content="Julio Koelle — personal platform, market tools, and side projects." />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Julio Koelle</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --accent:#8b2635; --accent-lt:#fbf1f3; --accent-hover:#a53344;
+  --bg-primary:#fff; --bg-secondary:#f8f8f8; --bg-tertiary:#f1f1f1; --bg-elevated:#fff;
+  --text-primary:#0a0a0a; --text-secondary:#555; --text-muted:#888;
+  --border:#e5e5e5; --shadow:0 2px 8px rgba(0,0,0,.08); --shadow-sm:0 1px 3px rgba(0,0,0,.06);
+  --radius:10px; --radius-sm:6px;
+  --positive:#16a34a; --negative:#dc2626; --neutral:#d97706;
+}
+[data-theme="dark"] {
+  --bg-primary:#0a0a0a; --bg-secondary:#141414; --bg-tertiary:#1e1e1e; --bg-elevated:#1a1a1a;
+  --text-primary:#f0f0f0; --text-secondary:#aaa; --text-muted:#666;
+  --border:#2a2a2a; --accent-lt:#1e0f12; --shadow:0 2px 12px rgba(0,0,0,.4);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',sans-serif;background:var(--bg-secondary);color:var(--text-primary);min-height:100vh}
+a{color:inherit;text-decoration:none} button{cursor:pointer;font-family:inherit} input{font-family:inherit}
+
+/* Nav */
+.nav{position:sticky;top:0;z-index:100;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+[data-theme="dark"] .nav{background:rgba(10,10,10,.92)}
+.nav-inner{max-width:1200px;margin:0 auto;padding:0 1.5rem;height:52px;display:flex;align-items:center;gap:1rem}
+.nav-logo{font-size:1rem;font-weight:800;color:var(--accent);letter-spacing:-.5px;margin-right:.5rem;cursor:pointer}
+.nav-links{display:flex;align-items:center;gap:.15rem;flex:1}
+.nav-btn{display:flex;align-items:center;gap:.3rem;padding:.35rem .7rem;border-radius:var(--radius-sm);font-size:.875rem;font-weight:500;background:none;border:none;color:var(--text-secondary);transition:background .14s,color .14s}
+.nav-btn:hover{background:var(--bg-tertiary);color:var(--text-primary)}
+.nav-btn.active{color:var(--accent)}
+.dd-wrap{position:relative}
+.dd-menu{position:absolute;top:calc(100% + .5rem);left:0;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:var(--shadow);min-width:180px;overflow:hidden;z-index:200;animation:fadeIn .15s ease}
+.dd-item{display:block;padding:.6rem 1rem;font-size:.875rem;color:var(--text-secondary);cursor:pointer;transition:background .1s,color .1s}
+.dd-item:hover{background:var(--bg-tertiary);color:var(--text-primary)}
+.dd-item.active{color:var(--accent);font-weight:600;background:var(--accent-lt)}
+.theme-toggle{display:flex;align-items:center;gap:.35rem;padding:.35rem .7rem;border-radius:var(--radius-sm);background:none;border:1px solid var(--border);color:var(--text-secondary);font-size:.8rem;white-space:nowrap}
+.theme-toggle:hover{color:var(--accent);border-color:var(--accent)}
+
+/* Layout */
+.section{max-width:1200px;margin:0 auto;padding:2rem 1.5rem}
+.card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:1.25rem;box-shadow:var(--shadow-sm)}
+.grid-2{display:grid;grid-template-columns:repeat(2,1fr);gap:1rem}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
+@media(max-width:768px){.grid-2,.grid-3,.grid-4{grid-template-columns:1fr}}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1rem;border-radius:var(--radius-sm);font-size:.875rem;font-weight:500;border:none;transition:background .14s,color .14s;text-align:center}
+.btn-primary{background:var(--accent);color:#fff} .btn-primary:hover{background:var(--accent-hover)}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text-secondary)}
+.btn-outline:hover{border-color:var(--accent);color:var(--accent)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+
+/* Badges */
+.badge{display:inline-flex;align-items:center;padding:.2rem .55rem;border-radius:20px;font-size:.72rem;font-weight:600}
+.badge-green{background:#dcfce7;color:#15803d} .badge-blue{background:#dbeafe;color:#1d4ed8} .badge-gray{background:var(--bg-tertiary);color:var(--text-muted)}
+[data-theme="dark"] .badge-green{background:#14532d;color:#86efac} [data-theme="dark"] .badge-blue{background:#1e3a5f;color:#93c5fd}
+
+/* Input */
+.inp{padding:.45rem .6rem;border:1px solid var(--border);border-radius:6px;font-size:.875rem;outline:none;width:100%;background:var(--bg-tertiary);color:var(--text-primary)}
+.inp:focus{border-color:var(--accent)}
+
+/* Misc */
+.label{font-size:.75rem;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.04em}
+.pos{color:var(--positive)} .neg{color:var(--negative)}
+table{width:100%;border-collapse:collapse;font-size:.875rem}
+th{text-align:left;padding:.35rem .5rem;font-size:.7rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:2px solid var(--border)}
+td{padding:.45rem .5rem;border-bottom:1px solid var(--border)}
+
+/* Pages */
+.page{display:none} .page.active{display:block}
+#pw-gate{min-height:100vh;display:flex;align-items:center;justify-content:center;background:var(--bg-secondary);padding:1rem}
+
+/* Autocomplete */
+.ac-wrap{position:relative}
+.ac-list{position:absolute;top:100%;left:0;right:0;z-index:50;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:var(--shadow);list-style:none;padding:.25rem 0;display:none}
+.ac-item{padding:.4rem .75rem;font-size:.875rem;cursor:pointer}
+.ac-item:hover,.ac-item.hi{background:var(--accent-lt);color:var(--accent)}
+
+/* Briefing */
+.bf-layout{display:grid;grid-template-columns:220px 1fr;gap:1.5rem;align-items:start}
+@media(max-width:700px){.bf-layout{grid-template-columns:1fr}}
+.bf-body{font-size:.9375rem;line-height:1.8}
+.bf-body h1{font-size:1.4rem;font-weight:800;margin:1.5rem 0 .75rem}
+.bf-body h2{font-size:1.15rem;font-weight:700;margin:1.25rem 0 .6rem;border-bottom:1px solid var(--border);padding-bottom:.3rem}
+.bf-body h3{font-size:1rem;font-weight:600;margin:1rem 0 .4rem}
+.bf-body p{margin-bottom:.9rem} .bf-body hr{border:none;border-top:1px solid var(--border);margin:1.5rem 0} .bf-body strong{font-weight:700}
+
+/* Coming soon */
+.cs-wrap{position:relative}
+.cs-tip{display:none;position:absolute;bottom:calc(100% + 6px);left:50%;transform:translateX(-50%);background:var(--bg-elevated);border:1px solid var(--border);border-radius:6px;padding:.35rem .7rem;font-size:.75rem;color:var(--text-secondary);white-space:nowrap;box-shadow:var(--shadow-sm);pointer-events:none;z-index:50}
+.cs-wrap:hover .cs-tip{display:block}
+
+/* Toast */
+#toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);padding:.6rem 1rem;font-size:.875rem;box-shadow:var(--shadow);z-index:999;display:none}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+</style>
+</head>
+<body>
+
+<!-- Password Gate -->
+<div id="pw-gate">
+  <div class="card" style="width:100%;max-width:360px;text-align:center">
+    <p style="font-size:2rem;margin-bottom:.75rem">🔒</p>
+    <h1 style="font-size:1.15rem;font-weight:700;margin-bottom:.35rem">Private Access</h1>
+    <p style="font-size:.875rem;color:var(--text-secondary);margin-bottom:1.5rem">Enter password to continue.</p>
+    <form id="pw-form" style="display:flex;flex-direction:column;gap:.75rem">
+      <input id="pw-inp" type="password" placeholder="Password" autofocus class="inp" style="text-align:center;font-size:1rem">
+      <p id="pw-err" style="display:none;font-size:.8rem;color:var(--negative)">Incorrect password</p>
+      <button type="submit" class="btn btn-primary" style="justify-content:center">Unlock</button>
+    </form>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app" style="display:none">
+
+<nav class="nav">
+  <div class="nav-inner">
+    <span class="nav-logo" onclick="go('home')">JK</span>
+    <div class="nav-links">
+      <div class="dd-wrap">
+        <button class="nav-btn" id="dd-market-btn" onclick="toggleDD('market')">
+          Market Tools
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="dd-menu" id="dd-market" style="display:none">
+          <span class="dd-item" onclick="go('market')">Dashboard</span>
+          <span class="dd-item" onclick="go('briefing')">Briefing</span>
+          <span class="dd-item" onclick="go('portfolio')">Portfolio</span>
+          <span class="dd-item" onclick="go('hot-stocks')">Hot Stocks</span>
+          <span class="dd-item" onclick="go('analyzer')">Stock Analyzer</span>
+        </div>
+      </div>
+      <div class="dd-wrap">
+        <button class="nav-btn" id="dd-ideas-btn" onclick="toggleDD('ideas')">
+          Ideas
+          <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="dd-menu" id="dd-ideas" style="display:none">
+          <span class="dd-item" onclick="go('ideas')">All Ideas</span>
+        </div>
+      </div>
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()">
+      <svg id="t-sun" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+      <svg id="t-moon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <span id="t-lbl">Dark</span>
+    </button>
+  </div>
+</nav>
+
+<!-- HOME -->
+<div id="page-home" class="page">
+  <div class="section" style="min-height:calc(100vh - 52px);display:flex;align-items:center">
+    <div>
+      <p style="font-size:.875rem;color:var(--accent);font-weight:600;letter-spacing:.08em;text-transform:uppercase;margin-bottom:1rem">Product · Finance · Technology</p>
+      <h1 style="font-size:3rem;font-weight:800;letter-spacing:-1.5px;line-height:1.1;margin-bottom:1.25rem">Julio Koelle</h1>
+      <p style="font-size:1.1rem;color:var(--text-secondary);line-height:1.7;max-width:520px;margin-bottom:2rem">
+        Building at the intersection of technology and finance.<br>
+        Based in Berlin · KIT · Stealth Startup
+      </p>
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+        <a href="https://linkedin.com/in/juliokoelle" target="_blank" class="btn btn-primary">LinkedIn →</a>
+        <button class="btn btn-outline" onclick="go('market')">Market Tools →</button>
+        <button class="btn btn-outline" onclick="go('ideas')">Ideas →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MARKET -->
+<div id="page-market" class="page">
+  <main class="section">
+    <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:.4rem">Dashboard</h1>
+    <p style="color:var(--text-secondary);font-size:.9rem;margin-bottom:2rem">Live market overview</p>
+    <div id="mkt-content"><p style="color:var(--text-muted)">Loading…</p></div>
+  </main>
+</div>
+
+<!-- BRIEFING -->
+<div id="page-briefing" class="page">
+  <main class="section">
+    <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:1.5rem">Daily Briefing</h1>
+    <div class="bf-layout">
+      <div class="card" style="padding:1rem">
+        <p class="label" style="margin-bottom:.75rem">Archive</p>
+        <div id="bf-list"><p style="font-size:.8rem;color:var(--text-muted)">Loading…</p></div>
+      </div>
+      <div class="card">
+        <div style="margin-bottom:1.25rem">
+          <p id="bf-title" style="font-size:1rem;font-weight:700">—</p>
+          <p id="bf-src" style="font-size:.72rem;color:var(--text-muted);margin-top:.15rem"></p>
+        </div>
+        <div id="bf-body" class="bf-body"><p style="color:var(--text-muted)">Select a date.</p></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- PORTFOLIO -->
+<div id="page-portfolio" class="page">
+  <main class="section">
+    <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:1.5rem">Portfolio</h1>
+    <div class="card" style="margin-bottom:1.5rem">
+      <h2 style="font-size:1rem;font-weight:700;margin-bottom:1rem">Holdings</h2>
+      <div id="port-rows" style="display:grid;grid-template-columns:1fr 160px 36px;gap:.5rem .75rem;margin-bottom:.75rem">
+        <p class="label">Ticker</p><p class="label">Investment (€)</p><span></span>
+      </div>
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+        <button class="btn btn-outline" style="font-size:.8rem" onclick="addRow()">+ Add row</button>
+        <button class="btn btn-outline" style="font-size:.8rem" onclick="savePF()">↑ Save to GitHub</button>
+        <button class="btn btn-primary" style="font-size:.8rem" id="analyze-btn" onclick="analyzePF()">⚡ Analyze</button>
+      </div>
+    </div>
+    <div id="pf-result"></div>
+  </main>
+</div>
+
+<!-- SEED MODAL -->
+<div id="seed-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center;padding:1rem">
+  <div class="card" style="width:100%;max-width:380px">
+    <h3 style="font-size:1rem;font-weight:700;margin-bottom:.4rem">Start with a demo portfolio?</h3>
+    <p style="font-size:.875rem;color:var(--text-secondary);line-height:1.6;margin-bottom:1.25rem">Load a sample portfolio to explore the analysis features.</p>
+    <div id="seed-list" style="margin-bottom:1.25rem;font-size:.8rem"></div>
+    <div style="display:flex;gap:.75rem">
+      <button class="btn btn-primary" style="flex:1;justify-content:center" onclick="acceptSeed()">Load demo</button>
+      <button class="btn btn-outline" style="flex:1;justify-content:center" onclick="declineSeed()">Skip</button>
+    </div>
+  </div>
+</div>
+
+<!-- HOT STOCKS -->
+<div id="page-hot-stocks" class="page">
+  <main class="section">
+    <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:.4rem">Hot Stocks</h1>
+    <p style="color:var(--text-secondary);font-size:.9rem;margin-bottom:2rem">Today's market movers</p>
+    <div id="hs-content"><p style="color:var(--text-muted)">Loading…</p></div>
+  </main>
+</div>
+
+<!-- ANALYZER -->
+<div id="page-analyzer" class="page">
+  <main class="section">
+    <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:.4rem">Stock Analyzer</h1>
+    <p style="color:var(--text-secondary);font-size:.9rem;margin-bottom:2rem">Deep analysis for any ticker</p>
+    <div class="card" style="margin-bottom:1.5rem">
+      <div style="display:flex;gap:.75rem;align-items:flex-end">
+        <div style="flex:1">
+          <p class="label" style="margin-bottom:.4rem">Ticker</p>
+          <input id="az-inp" class="inp" placeholder="e.g. AAPL" oninput="this.value=this.value.toUpperCase()" onkeydown="if(event.key==='Enter')analyzeStock()">
+        </div>
+        <button class="btn btn-primary" onclick="analyzeStock()">Analyze</button>
+      </div>
+    </div>
+    <div id="az-result"></div>
+  </main>
+</div>
+
+<!-- IDEAS -->
+<div id="page-ideas" class="page">
+  <main class="section">
+    <h1 style="font-size:1.4rem;font-weight:700;margin-bottom:.4rem">Ideas</h1>
+    <p style="color:var(--text-secondary);font-size:.9rem;margin-bottom:2rem">Side projects and apps I'm building.</p>
+    <div class="grid-3">
+      <div class="card" style="display:flex;flex-direction:column;gap:.75rem">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between">
+          <p style="font-size:2rem">🐴</p><span class="badge badge-green">Live</span>
+        </div>
+        <div>
+          <h2 style="font-size:1.05rem;font-weight:700;margin-bottom:.35rem">HorseFinder</h2>
+          <p style="font-size:.875rem;color:var(--text-secondary);line-height:1.65">Equestrian event finder for Germany. Search tournaments by discipline, location, and date. Data scraped daily from nennung-online.de.</p>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:.35rem">
+          <span class="badge badge-gray">FastAPI</span><span class="badge badge-gray">React</span><span class="badge badge-gray">Supabase</span>
+        </div>
+        <a href="https://horsefinder-frontend.onrender.com" target="_blank" rel="noopener noreferrer" class="btn btn-primary" style="margin-top:auto;justify-content:center">Open app →</a>
+      </div>
+      <div class="card" style="display:flex;flex-direction:column;gap:.75rem">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between">
+          <p style="font-size:2rem">👔</p><span class="badge badge-blue">In Progress</span>
+        </div>
+        <div>
+          <h2 style="font-size:1.05rem;font-weight:700;margin-bottom:.35rem">MyWardrobe</h2>
+          <p style="font-size:.875rem;color:var(--text-secondary);line-height:1.65">Smart wardrobe management — catalog your clothing, plan outfits, and discover what you actually wear.</p>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:.35rem">
+          <span class="badge badge-gray">React Native</span><span class="badge badge-gray">AI</span><span class="badge badge-gray">Mobile</span>
+        </div>
+        <div class="cs-wrap" style="margin-top:auto">
+          <button disabled class="btn btn-outline" style="width:100%;justify-content:center;cursor:not-allowed;opacity:.55">Coming soon</button>
+          <div class="cs-tip">In development — stay tuned</div>
+        </div>
+      </div>
+      <div class="card" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:200px;border:2px dashed var(--border);background:transparent;box-shadow:none;gap:.5rem;color:var(--text-muted)">
+        <p style="font-size:1.75rem">+</p><p style="font-size:.875rem">Next idea</p>
+      </div>
+    </div>
+  </main>
+</div>
+
+</div><!-- /app -->
+<div id="toast"></div>
+
+<script>
+const API = location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://market-tools-backend.onrender.com';
+const GH  = 'https://raw.githubusercontent.com/juliokoelle/julio-brain/main/10_Daily';
+const PW  = 'Bookrun2026';
+const K   = { auth:'mt_auth', theme:'mt_theme', pos:'mt_portfolio_positions', seed:'mt_portfolio_seed_seen' };
+
+// ── Bootstrap ──
+(function(){
+  const t = localStorage.getItem(K.theme) || 'light';
+  applyTheme(t);
+  if (localStorage.getItem(K.auth) === '1') boot();
+
+  document.getElementById('pw-form').onsubmit = function(e){
+    e.preventDefault();
+    if (document.getElementById('pw-inp').value === PW) {
+      localStorage.setItem(K.auth,'1'); boot();
+    } else {
+      document.getElementById('pw-err').style.display = 'block';
+      const i = document.getElementById('pw-inp');
+      i.style.animation = 'none';
+      requestAnimationFrame(() => i.style.animation = 'shake .4s ease');
+    }
+  };
+  document.addEventListener('click', e => { if (!e.target.closest('.dd-wrap')) closeDDs(); });
+})();
+
+function boot(){
+  document.getElementById('pw-gate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  const h = location.hash.slice(1) || 'home';
+  showPage(h);
+  window.onhashchange = () => showPage(location.hash.slice(1) || 'home');
+}
+
+// ── Theme ──
+function applyTheme(t){
+  document.documentElement.dataset.theme = t;
+  localStorage.setItem(K.theme, t);
+  document.getElementById('t-sun').style.display  = t==='dark'?'block':'none';
+  document.getElementById('t-moon').style.display = t==='dark'?'none':'block';
+  document.getElementById('t-lbl').textContent    = t==='dark'?'Light':'Dark';
+}
+function toggleTheme(){ applyTheme(document.documentElement.dataset.theme==='dark'?'light':'dark'); }
+
+// ── Dropdowns ──
+function toggleDD(name){
+  const el = document.getElementById('dd-'+name);
+  const open = el.style.display !== 'none';
+  closeDDs();
+  if (!open) el.style.display = 'block';
+}
+function closeDDs(){
+  ['market','ideas'].forEach(n => { const m=document.getElementById('dd-'+n); if(m) m.style.display='none'; });
+}
+
+// ── Router ──
+const MKT_PAGES = ['market','briefing','portfolio','hot-stocks','analyzer'];
+function go(page){ location.hash = '#'+page; closeDDs(); }
+
+function showPage(page){
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const el = document.getElementById('page-'+page);
+  if (el) el.classList.add('active');
+  document.getElementById('dd-market-btn').classList.toggle('active', MKT_PAGES.includes(page));
+  document.getElementById('dd-ideas-btn').classList.toggle('active', page==='ideas');
+  if (page==='market')     loadMarket();
+  else if (page==='briefing')   loadBriefing();
+  else if (page==='portfolio')  initPortfolio();
+  else if (page==='hot-stocks') loadHotStocks();
+}
+
+// ── Helpers ──
+let toastT;
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.style.display='block'; clearTimeout(toastT); toastT=setTimeout(()=>t.style.display='none',3000); }
+async function GET(path){ const r=await fetch(API+path); if(!r.ok) throw r; return r.json(); }
+async function POST(path,body){ const r=await fetch(API+path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); if(!r.ok) throw r; return r.json(); }
+
+// ── Market Dashboard ──
+let mktDone = false;
+async function loadMarket(){
+  if (mktDone) return;
+  const tickers = 'AAPL,MSFT,NVDA,TSLA,GOOGL,AMZN,META,JPM,V,BRK-B';
+  try {
+    const d = await GET('/market/prices?tickers='+tickers);
+    const rows = Object.entries(d).map(([t,v])=>`<tr>
+      <td style="font-weight:700">${t}</td>
+      <td>$${v.price.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td class="${v.change_pct>=0?'pos':'neg'}">${v.change_pct>=0?'+':''}${v.change_pct.toFixed(2)}%</td>
+    </tr>`).join('');
+    document.getElementById('mkt-content').innerHTML = `<div class="card"><h2 style="font-size:1rem;font-weight:700;margin-bottom:1rem">Market Prices</h2><table><thead><tr><th>Ticker</th><th>Price</th><th>Change</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    mktDone = true;
+  } catch(e){ document.getElementById('mkt-content').innerHTML='<p style="color:var(--text-muted)">Market data unavailable.</p>'; }
+}
+
+// ── Briefing ──
+let bfDone=false, bfSelected=null;
+async function loadBriefing(){
+  if (bfDone) return; bfDone = true;
+  const today = new Date().toISOString().slice(0,10);
+  try {
+    const list = await GET('/briefing/list');
+    const listEl = document.getElementById('bf-list');
+    if (!list.length){ listEl.innerHTML='<p style="font-size:.8rem;color:var(--text-muted)">No briefings yet.</p>'; selectBF(today); return; }
+    listEl.innerHTML = list.map(b=>`<button id="bfb-${b.date}" onclick="selectBF('${b.date}')"
+      style="width:100%;text-align:left;padding:.45rem .6rem;border-radius:6px;font-size:.85rem;border:none;cursor:pointer;background:transparent;color:var(--text-muted)">${b.date}</button>`).join('');
+    selectBF(list[0].date);
+  } catch(e){ document.getElementById('bf-list').innerHTML='<p style="font-size:.8rem;color:var(--text-muted)">Offline</p>'; selectBF(today); }
+}
+
+async function selectBF(date){
+  bfSelected = date;
+  document.getElementById('bf-title').textContent = date;
+  document.getElementById('bf-src').textContent = '';
+  document.getElementById('bf-body').innerHTML = '<p style="color:var(--text-muted)">Loading…</p>';
+  document.querySelectorAll('[id^="bfb-"]').forEach(b=>{
+    const me = b.id==='bfb-'+date;
+    b.style.background = me?'var(--accent-lt)':'transparent';
+    b.style.color = me?'var(--accent)':'var(--text-muted)';
+    b.style.fontWeight = me?'600':'400';
+  });
+  try {
+    const d = await GET('/briefing/'+date);
+    document.getElementById('bf-body').innerHTML = d.html || mdToHtml(d.content||'');
+  } catch(e){
+    try {
+      const r = await fetch(GH+'/'+date+'.md');
+      if (!r.ok) throw 0;
+      document.getElementById('bf-body').innerHTML = mdToHtml(await r.text());
+      document.getElementById('bf-src').textContent = 'Loaded from GitHub (API offline)';
+    } catch(e2){ document.getElementById('bf-body').innerHTML='<p style="color:var(--text-muted)">Briefing not available.</p>'; }
+  }
+}
+
+function mdToHtml(md){
+  const out=[]; let para=[];
+  const fl=t=>t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/\*(.+?)\*/g,'<em>$1</em>');
+  const fp=()=>{ if(para.length){out.push('<p>'+fl(para.join(' '))+'</p>');para=[];} };
+  for(const raw of md.split('\n')){
+    const l=raw.trimEnd(), h=l.match(/^(#{1,6}) (.+)$/);
+    if(h){fp();out.push('<h'+h[1].length+'>'+fl(h[2])+'</h'+h[1].length+'>');}
+    else if(/^---+$/.test(l)){fp();out.push('<hr>');}
+    else if(!l){fp();}
+    else{para.push(l);}
+  }
+  fp(); return out.join('\n');
+}
+
+// ── Portfolio ──
+const SEED=[{ticker:'VWCE.DE',investment:650},{ticker:'NVDA',investment:180},{ticker:'ASML',investment:180},{ticker:'MSFT',investment:150},{ticker:'GOOGL',investment:120},{ticker:'PLTR',investment:150},{ticker:'4GLD.DE',investment:570}];
+const UNI=['AAPL','MSFT','NVDA','GOOG','META','AVGO','AMD','ORCL','CRM','ADBE','INTC','QCOM','TXN','IBM','NOW','SNOW','PLTR','MU','AMAT','LRCX','AMZN','TSLA','HD','MCD','NKE','SBUX','BKNG','LOW','TGT','ABNB','EBAY','GM','F','UBER','LYFT','NFLX','DIS','CMCSA','T','VZ','TMUS','SNAP','PINS','BRK-B','JPM','BAC','WFC','GS','MS','C','AXP','BLK','SCHW','V','MA','PYPL','COF','JNJ','LLY','UNH','PFE','ABBV','MRK','TMO','ABT','DHR','AMGN','GILD','ISRG','CVS','HUM','CAT','HON','GE','BA','LMT','RTX','DE','UPS','FDX','CSX','NSC','XOM','CVX','COP','SLB','EOG','PSX','MPC','PG','KO','PEP','COST','WMT','PM','MO','CL','LIN','APD','FCX','NEM','DOW','AMT','PLD','EQIX','SPG','NEE','DUK','SO','D','VWCE.DE','4GLD.DE','ASML','SAP','BAYN.DE','BMW.DE','SIE.DE'];
+let pfPos=[], pfReady=false;
+
+function initPortfolio(){
+  if (pfReady) return; pfReady = true;
+  try { const s=JSON.parse(localStorage.getItem(K.pos)||'[]'); if(s.length){pfPos=s;renderPF();return;} } catch(e){}
+  GET('/portfolio')
+    .then(d=>{ if(d.positions?.length){pfPos=d.positions;renderPF();}else if(!localStorage.getItem(K.seed)){showSeed();}else{pfPos=[{ticker:'',investment:0}];renderPF();} })
+    .catch(()=>{ if(!localStorage.getItem(K.seed)&&!localStorage.getItem(K.pos)){showSeed();}else{pfPos=[{ticker:'',investment:0}];renderPF();} });
+}
+
+function savePFLocal(){ localStorage.setItem(K.pos, JSON.stringify(pfPos)); }
+
+function renderPF(){
+  const c = document.getElementById('port-rows');
+  c.innerHTML = '<p class="label">Ticker</p><p class="label">Investment (€)</p><span></span>';
+  pfPos.forEach((p,i)=>{
+    const wrap = document.createElement('div'); wrap.className='ac-wrap';
+    const inp = document.createElement('input');
+    inp.className='inp'; inp.value=p.ticker; inp.placeholder='e.g. AAPL';
+    inp.autocomplete='off'; inp.spellcheck=false;
+    inp.oninput=function(){ const v=this.value.toUpperCase().replace(/\s/g,''); pfPos[i].ticker=v; savePFLocal(); filterAC(i,v,wrap); };
+    inp.onkeydown=e=>acKey(e,i,wrap);
+    const ul=document.createElement('ul'); ul.className='ac-list'; ul.id='ac'+i;
+    wrap.append(inp,ul);
+
+    const num=document.createElement('input'); num.type='number'; num.className='inp'; num.value=p.investment||''; num.placeholder='5000';
+    num.oninput=function(){ pfPos[i].investment=parseFloat(this.value)||0; savePFLocal(); };
+
+    const del=document.createElement('button');
+    del.textContent='×'; del.style.cssText='background:none;border:none;color:var(--text-muted);font-size:1.1rem;cursor:pointer;display:flex;align-items:center;justify-content:center';
+    del.onclick=()=>{ pfPos.splice(i,1); savePFLocal(); renderPF(); };
+
+    c.append(wrap,num,del);
+  });
+}
+
+function filterAC(i,q,wrap){
+  const ul=wrap.querySelector('ul');
+  if(!q){ul.style.display='none';return;}
+  const m=UNI.filter(t=>t.startsWith(q)).slice(0,6);
+  if(!m.length){ul.style.display='none';return;}
+  ul.innerHTML=m.map((t,j)=>`<li class="ac-item" data-val="${t}" onmousedown="pickAC(${i},'${t}')">${t}</li>`).join('');
+  ul.style.display='block';
+}
+
+function pickAC(i,val){ pfPos[i].ticker=val; savePFLocal(); renderPF(); }
+
+function acKey(e,i,wrap){
+  const ul=wrap.querySelector('ul'); if(ul.style.display==='none') return;
+  const items=[...ul.querySelectorAll('.ac-item')];
+  let hi=ul.querySelector('.hi'), idx=hi?items.indexOf(hi):-1;
+  if(e.key==='ArrowDown'){e.preventDefault();idx=Math.min(idx+1,items.length-1);}
+  else if(e.key==='ArrowUp'){e.preventDefault();idx=Math.max(idx-1,-1);}
+  else if(e.key==='Enter'&&hi){e.preventDefault();pickAC(i,hi.dataset.val);return;}
+  else if(e.key==='Escape'){ul.style.display='none';return;}
+  items.forEach((it,j)=>it.classList.toggle('hi',j===idx));
+}
+
+function addRow(){ pfPos.push({ticker:'',investment:0}); renderPF(); }
+
+async function savePF(){
+  try{ await POST('/portfolio',{positions:pfPos.filter(p=>p.ticker)}); toast('Portfolio saved ✓'); }
+  catch(e){ toast('Save failed'); }
+}
+
+async function analyzePF(){
+  const valid=pfPos.filter(p=>p.ticker&&p.investment>0); if(!valid.length) return;
+  const btn=document.getElementById('analyze-btn'); btn.textContent='Analyzing…'; btn.disabled=true;
+  try{ renderAnalysis(await POST('/portfolio/analyze',{holdings:valid})); }
+  catch(e){ toast('Analysis failed'); }
+  finally{ btn.textContent='⚡ Analyze'; btn.disabled=false; }
+}
+
+function renderAnalysis(a){
+  const ret=(a.annualized_return||0)*100, vol=(a.annualized_volatility||0)*100;
+  const div=(a.diversification_score||0)*100, lp=(a.largest_position||0)*100;
+  const riskLabel=vol<15?'Conservative':vol<25?'Moderate':'Aggressive';
+  const riskColor=vol<15?'var(--positive)':vol<25?'var(--neutral)':'var(--negative)';
+  const fmt=n=>n.toLocaleString('de-DE',{maximumFractionDigits:0});
+  const metric=(label,value,color)=>`<div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px"><p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">${label}</p><p style="font-size:1.1rem;font-weight:700;color:${color||'var(--text-primary)'}">  ${value}</p></div>`;
+  const smMetric=(label,value)=>`<div style="padding:.6rem .75rem;background:var(--bg-tertiary);border-radius:8px"><p style="font-size:.7rem;color:var(--text-secondary);margin-bottom:.2rem">${label}</p><p style="font-size:1rem;font-weight:700">${value}</p></div>`;
+  let assets='';
+  if(a.assets?.length){
+    const rows=a.assets.map(x=>{const ar=(x.annual_return||0)*100,av=(x.volatility||0)*100;return`<tr><td style="font-weight:700">${x.ticker}</td><td style="color:var(--text-secondary)">${(x.weight*100).toFixed(1)}%</td><td class="${ar>=0?'pos':'neg'}">${ar>=0?'+':''}${ar.toFixed(1)}%</td><td style="color:var(--text-secondary)">${av.toFixed(1)}%</td></tr>`;}).join('');
+    assets=`<div><p class="label" style="margin-bottom:.5rem">Asset Breakdown</p><div style="overflow-x:auto"><table><thead><tr><th>Ticker</th><th>Weight</th><th>Exp. Return p.a.</th><th>Volatility p.a.</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  }
+  document.getElementById('pf-result').innerHTML=`<div class="card">
+    <h2 style="font-size:1rem;font-weight:700;margin-bottom:1.25rem">Analysis</h2>
+    <div class="grid-4" style="margin-bottom:1rem">
+      ${metric('Total Value','€'+fmt(a.total_value||0),'')}
+      ${metric('Annual Return',(ret>=0?'+':'')+ret.toFixed(1)+'%',ret>=0?'var(--positive)':'var(--negative)')}
+      ${metric('Volatility',vol.toFixed(1)+'%','')}
+      ${metric('Risk Profile',riskLabel,riskColor)}
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:1.25rem">
+      ${smMetric('Diversification',div.toFixed(0)+'/100')}
+      ${smMetric('Positions',String(a.number_of_positions||0))}
+      ${smMetric('Largest Position',lp.toFixed(1)+'%')}
+    </div>
+    ${a.commentary?`<p style="font-size:.875rem;color:var(--text-secondary);line-height:1.7;margin-bottom:1.25rem;padding:1rem;background:var(--accent-lt);border-radius:8px;border-left:3px solid var(--accent)">${a.commentary}</p>`:''}
+    ${assets}
+  </div>`;
+}
+
+function showSeed(){
+  document.getElementById('seed-list').innerHTML=SEED.map(p=>`<div style="display:flex;justify-content:space-between;padding:.25rem 0;border-bottom:1px solid var(--border)"><span style="font-weight:700">${p.ticker}</span><span style="color:var(--text-secondary)">€${p.investment}</span></div>`).join('');
+  document.getElementById('seed-modal').style.display='flex';
+}
+function acceptSeed(){ localStorage.setItem(K.seed,'1'); pfPos=SEED.map(p=>({...p})); savePFLocal(); document.getElementById('seed-modal').style.display='none'; renderPF(); }
+function declineSeed(){ localStorage.setItem(K.seed,'1'); pfPos=[{ticker:'',investment:0}]; savePFLocal(); document.getElementById('seed-modal').style.display='none'; renderPF(); }
+
+// ── Hot Stocks ──
+let hsDone=false;
+async function loadHotStocks(){
+  if(hsDone) return; hsDone=true;
+  const sec=(title,stocks)=>`<div class="card"><h2 style="font-size:1rem;font-weight:700;margin-bottom:1rem">${title}</h2><table><thead><tr><th>Ticker</th><th>Name</th><th>Price</th><th>Change</th></tr></thead><tbody>${stocks.map(s=>`<tr><td style="font-weight:700">${s.ticker}</td><td style="color:var(--text-secondary)">${s.name}</td><td>$${(s.price||0).toFixed(2)}</td><td class="${(s.change_pct||0)>=0?'pos':'neg'}">${(s.change_pct||0)>=0?'+':''}${(s.change_pct||0).toFixed(2)}%</td></tr>`).join('')}</tbody></table></div>`;
+  try{
+    const d=await GET('/market/hot-stocks');
+    document.getElementById('hs-content').innerHTML=`<div style="display:flex;flex-direction:column;gap:1rem">${sec('📈 Top Gainers',d.gainers||[])}${sec('📉 Top Losers',d.losers||[])}</div>`;
+  }catch(e){ document.getElementById('hs-content').innerHTML='<p style="color:var(--text-muted)">Data unavailable.</p>'; }
+}
+
+// ── Stock Analyzer ──
+async function analyzeStock(){
+  const ticker=document.getElementById('az-inp').value.trim().toUpperCase(); if(!ticker) return;
+  document.getElementById('az-result').innerHTML='<p style="color:var(--text-muted)">Analyzing…</p>';
+  try{
+    const d=await GET('/stock/'+ticker+'/detail');
+    const chg=d.change_pct||0;
+    document.getElementById('az-result').innerHTML=`<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem">
+        <div><h2 style="font-size:1.2rem;font-weight:800">${d.ticker}</h2><p style="color:var(--text-secondary);font-size:.875rem">${d.name} · ${d.sector}</p></div>
+        <div style="text-align:right"><p style="font-size:1.4rem;font-weight:700">$${(d.price||0).toFixed(2)}</p><p class="${chg>=0?'pos':'neg'}">${chg>=0?'+':''}${chg.toFixed(2)}%</p></div>
+      </div>
+      <div class="grid-4">
+        <div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px"><p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">Bull Score</p><p style="font-size:1rem;font-weight:700">${(d.bull_score||0).toFixed(0)}/100</p></div>
+        <div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px"><p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">Market Cap</p><p style="font-size:1rem;font-weight:700">$${((d.market_cap||0)/1e9).toFixed(1)}B</p></div>
+        <div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px"><p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">P/E Ratio</p><p style="font-size:1rem;font-weight:700">${d.pe_ratio?d.pe_ratio.toFixed(1):'—'}</p></div>
+        <div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px"><p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">52w High</p><p style="font-size:1rem;font-weight:700">$${(d.week_52_high||0).toFixed(2)}</p></div>
+      </div>
+    </div>`;
+  }catch(e){ document.getElementById('az-result').innerHTML=`<p style="color:var(--text-muted)">Could not load data for ${ticker}.</p>`; }
+}
+</script>
+</body>
 </html>

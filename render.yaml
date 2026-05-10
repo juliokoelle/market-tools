@@ -11,13 +11,8 @@ services:
     name: market-tools-frontend
     env: static
     plan: free
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
+    staticPublishPath: ./frontend
     autoDeploy: true
-    envVars:
-      - key: VITE_API_URL
-        value: https://market-tools-backend.onrender.com
 
   - type: cron
     name: gmail-briefing-cron
