@@ -16,7 +16,7 @@ import imaplib
 import logging
 import os
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import html2text as ht
 
@@ -116,14 +116,19 @@ def _extract_html(msg: email_lib.message.Message) -> str | None:
     return None
 
 
-def _fetch_email_html(conn: imaplib.IMAP4_SSL, sender: str) -> str | None:
-    """Search INBOX (fallback: All Mail) for emails from sender within last 24 h.
+def _fetch_email_html(conn: imaplib.IMAP4_SSL, sender: str, target_date: date | None = None) -> str | None:
+    """Search INBOX (fallback: All Mail) for emails from sender.
 
-    Uses SINCE yesterday so late-arriving or weekend editions are not missed.
+    If target_date is given, searches for emails ON that exact date (backfill).
+    Otherwise searches SINCE yesterday (normal daily run).
     Returns the HTML body of the most recent match, or None if not found.
     """
-    since_str = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%d-%b-%Y")
-    criteria  = f'(FROM "{sender}" SINCE {since_str})'
+    if target_date is not None:
+        date_str  = target_date.strftime("%d-%b-%Y")
+        criteria  = f'(FROM "{sender}" ON {date_str})'
+    else:
+        since_str = (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%d-%b-%Y")
+        criteria  = f'(FROM "{sender}" SINCE {since_str})'
 
     for mailbox in ("INBOX", '"[Gmail]/All Mail"'):
         typ, _ = conn.select(mailbox)
@@ -164,10 +169,12 @@ def _connect_imap() -> imaplib.IMAP4_SSL:
     return conn
 
 
-def fetch_today_briefing() -> str | None:
-    """Fetch today's newsletters from both MorningCrunch senders via IMAP.
+def fetch_today_briefing(target_date: date | None = None) -> str | None:
+    """Fetch newsletters from BRIEFING_SENDERS via IMAP.
 
-    Returns combined Markdown string, or None if neither email was found.
+    target_date: specific date for backfill (ON search).
+                 None = today's run (SINCE yesterday search).
+    Returns combined Markdown string, or None if no email was found.
     """
     conn = _connect_imap()
     sections: list[str] = []
@@ -176,7 +183,7 @@ def fetch_today_briefing() -> str | None:
         for sender_cfg in BRIEFING_SENDERS:
             sender = sender_cfg["from"]
             label  = sender_cfg["label"]
-            html = _fetch_email_html(conn, sender)
+            html = _fetch_email_html(conn, sender, target_date)
             if html is None:
                 log.warning("[gmail] No email from %s today — skipping section.", sender)
                 continue

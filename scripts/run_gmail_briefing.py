@@ -1,5 +1,5 @@
 """
-Gmail briefing pipeline — designed to run as a Render Cron Job at 06:15 UTC.
+Gmail briefing pipeline — runs as a LaunchAgent (08:15 CEST) or Render Cron (06:15 UTC).
 
 Steps:
   1. Verify GMAIL_USERNAME and GMAIL_APP_PASSWORD are set
@@ -7,8 +7,15 @@ Steps:
   3. Save to outputs/latest-briefing.md + outputs/YYYY-MM-DD-briefing.md
   4. Sync to julio-brain via GitHub API
 
-Run locally:
+Run locally (today):
     python -m scripts.run_gmail_briefing
+
+Backfill a specific date:
+    python -m scripts.run_gmail_briefing --date 2026-05-11
+
+Backfill a date range:
+    for d in 2026-05-11 2026-05-12 2026-05-13; do
+        python -m scripts.run_gmail_briefing --date $d; done
 
 Required environment variables:
     GMAIL_USERNAME
@@ -20,9 +27,10 @@ Required environment variables:
 
 from __future__ import annotations
 
+import argparse
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -49,17 +57,23 @@ def _check_env() -> None:
         sys.exit(1)
 
 
-def run() -> None:
+def run(run_date_str: str | None = None) -> None:
     _check_env()
 
-    run_date = today()
+    run_date = run_date_str or today()
     _log(f"=== Gmail briefing pipeline started for {run_date} ===")
 
+    # Parse target_date for backfill (ON search) vs today (SINCE yesterday search)
+    target: date | None = None
+    if run_date_str is not None:
+        year, month, day = map(int, run_date_str.split("-"))
+        target = date(year, month, day)
+
     _log("Fetching emails from Gmail…")
-    briefing_md = fetch_today_briefing()
+    briefing_md = fetch_today_briefing(target_date=target)
 
     if briefing_md is None:
-        _log("No briefing emails found today — exiting without overwrite.")
+        _log("No briefing emails found — exiting without overwrite.")
         sys.exit(0)
 
     header  = f"# Daily Briefing — {run_date}\n\n"
@@ -83,4 +97,12 @@ def run() -> None:
 
 
 if __name__ == "__main__":
-    run()
+    parser = argparse.ArgumentParser(description="Gmail briefing pipeline")
+    parser.add_argument(
+        "--date",
+        metavar="YYYY-MM-DD",
+        default=None,
+        help="Target date for backfill (default: today, uses SINCE-yesterday IMAP search)",
+    )
+    args = parser.parse_args()
+    run(args.date)
