@@ -1363,8 +1363,12 @@ def _wdi_to_db(body: _WardrobeBody, partial: bool = False) -> dict:
         "favorite":             body.favorite,
     }
     if partial:
+        # PUT: only fields explicitly provided, never touch user_id
         return {k: v for k, v in d.items() if v is not None and k != "user_id"}
-    return d
+    # INSERT: skip None values so missing optional columns don't fail; always keep user_id
+    result = {k: v for k, v in d.items() if v is not None}
+    result.setdefault("user_id", "julio")
+    return result
 
 
 @app.get("/wardrobe/items")
