@@ -55,7 +55,13 @@ def _github_put(token: str, owner: str, repo: str, run_date: str, content: str) 
     try:
         get_resp = requests.get(api_url, headers=headers, timeout=10)
         if get_resp.status_code == 200:
-            sha = get_resp.json().get("sha")
+            data = get_resp.json()
+            sha = data.get("sha")
+            existing_b64 = data.get("content", "").replace("\n", "")
+            existing_text = base64.b64decode(existing_b64).decode("utf-8")
+            if existing_text.strip() == content.strip():
+                log.info("[brain] GitHub content unchanged — skipping PUT for %s.", run_date)
+                return
     except requests.RequestException as e:
         log.warning("[brain] GitHub GET for SHA failed: %s", e)
 
@@ -90,9 +96,11 @@ def _local_commit(run_date: str, content: str) -> None:
 
     if target.exists():
         existing = target.read_text(encoding="utf-8")
-        target.write_text(existing + "\n\n---\n\n" + content, encoding="utf-8")
-    else:
-        target.write_text(content, encoding="utf-8")
+        if existing.strip() == content.strip():
+            log.info("[brain] Local file unchanged — skipping commit.")
+            return
+
+    target.write_text(content, encoding="utf-8")
 
     subprocess.run(["git", "add", str(target)], cwd=BRAIN_DIR, check=True, capture_output=True)
     subprocess.run(
