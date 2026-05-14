@@ -153,6 +153,30 @@ td{padding:.45rem .5rem;border-bottom:1px solid var(--border)}
 
 @keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
 @keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.pulse{animation:pulse 1.5s ease-in-out infinite}
+
+/* Info modal */
+.info-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;opacity:0;pointer-events:none;transition:opacity .18s ease}
+.info-modal-overlay.open{opacity:1;pointer-events:auto}
+.info-modal{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);padding:1.5rem;width:100%;max-width:440px;transform:translateY(10px);transition:transform .18s ease;box-shadow:var(--shadow)}
+.info-modal-overlay.open .info-modal{transform:translateY(0)}
+
+/* Score bars */
+.score-bar-wrap{background:var(--border);border-radius:20px;height:5px;overflow:hidden}
+.score-bar{height:5px;border-radius:20px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+
+/* Signal badges */
+.sig-badge{display:inline-flex;align-items:center;gap:.25rem;padding:.18rem .5rem;border-radius:20px;font-size:.71rem;font-weight:600;margin:.1rem}
+.sig-bull{background:rgba(34,197,94,.15);color:#22c55e}
+.sig-bear{background:rgba(239,68,68,.15);color:#ef4444}
+.sig-neutral{background:rgba(245,158,11,.12);color:#f59e0b}
+.sig-info{background:var(--bg-tertiary);color:var(--text-muted);font-weight:500}
+
+/* Clickable metric cards */
+.metric-card{background:var(--bg-tertiary);border-radius:8px;padding:.75rem;cursor:pointer;transition:background .15s,border-color .15s;border:1px solid transparent;position:relative;user-select:none}
+.metric-card:hover{background:var(--bg-primary);border-color:var(--border)}
+.metric-card .info-icon{position:absolute;top:.45rem;right:.45rem;font-size:.65rem;color:var(--text-muted);border:1px solid var(--border-subtle,var(--border));border-radius:50%;width:15px;height:15px;display:flex;align-items:center;justify-content:center;line-height:1}
 </style>
 </head>
 <body>
@@ -224,7 +248,10 @@ td{padding:.45rem .5rem;border-bottom:1px solid var(--border)}
         Based in Berlin · KIT · Stealth Startup
       </p>
       <div style="display:flex;gap:.75rem;flex-wrap:wrap">
-        <a href="https://linkedin.com/in/juliokoelle" target="_blank" class="btn btn-primary">LinkedIn →</a>
+        <a href="https://www.linkedin.com/in/julio-koelle-864026180/" target="_blank" class="btn btn-primary" style="gap:.5rem">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+          LinkedIn →
+        </a>
         <button class="btn btn-outline" onclick="go('market')">Market Tools →</button>
         <button class="btn btn-outline" onclick="go('ideas')">Ideas →</button>
       </div>
@@ -277,6 +304,11 @@ td{padding:.45rem .5rem;border-bottom:1px solid var(--border)}
       </div>
     </div>
     <div id="pf-result"></div>
+    <!-- Portfolio Asset Slide-In Panel -->
+    <div id="pf-asset-panel" style="display:none;position:fixed;top:0;right:0;width:min(380px,100vw);height:100vh;background:var(--bg-elevated);border-left:1px solid var(--border);z-index:400;padding:1.5rem;overflow-y:auto;box-shadow:-4px 0 20px rgba(0,0,0,.3)">
+      <button onclick="document.getElementById('pf-asset-panel').style.display='none'" style="position:absolute;top:1rem;right:1rem;background:none;border:none;font-size:1.2rem;color:var(--text-muted);cursor:pointer">✕</button>
+      <div id="pf-asset-body"></div>
+    </div>
   </main>
 </div>
 
@@ -368,8 +400,43 @@ td{padding:.45rem .5rem;border-bottom:1px solid var(--border)}
 </div><!-- /app -->
 <div id="toast"></div>
 
+<!-- Info Modal -->
+<div id="info-modal" class="info-modal-overlay" onclick="if(event.target===this)closeInfoModal()">
+  <div class="info-modal">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1rem">
+      <h3 id="info-modal-title" style="font-size:1rem;font-weight:700"></h3>
+      <button onclick="closeInfoModal()" style="background:none;border:none;font-size:1.2rem;color:var(--text-muted);cursor:pointer;padding:0;line-height:1">✕</button>
+    </div>
+    <div id="info-modal-body" style="font-size:.875rem;color:var(--text-secondary);line-height:1.7"></div>
+  </div>
+</div>
+
 <script>
 const API = location.hostname === 'localhost' ? 'http://localhost:8000' : 'https://market-tools-backend-my0v.onrender.com';
+
+// ── Metric Info Map ──
+const METRIC_INFO = {
+  pf_total: {title:'Total Value', body:'Sum of all current position values, computed from live prices fetched via yfinance.'},
+  pf_return: {title:'Annual Return', body:'Weighted expected return per annum, based on each asset\'s 1-year price history. Positive values indicate the portfolio historically grew at this annualised rate.'},
+  pf_vol:   {title:'Volatility', body:'Annualised standard deviation of daily returns (σ × √252). Measures how much the portfolio swings — higher volatility means higher risk and wider price swings.'},
+  pf_risk:  {title:'Risk Profile', body:'Derived from volatility: Conservative &lt;15% · Moderate 15–25% · Aggressive &gt;25%. A guide to how stable or turbulent the portfolio historically is.'},
+  pf_div:   {title:'Diversification', body:'1 minus the Herfindahl–Hirschman Index (HHI) of weights, scaled to 100. A score of 100 means equal weights across many uncorrelated assets; lower scores indicate concentration.'},
+  pf_pos:   {title:'Positions', body:'Number of distinct ticker symbols in the portfolio. More positions generally improve diversification, but only if the assets are not highly correlated.'},
+  pf_lp:    {title:'Largest Position', body:'Percentage of total portfolio value held in the single largest position. A high concentration in one asset increases idiosyncratic risk.'},
+  az_bull:  {title:'Bull Score', body:'Composite 0–100 score combining Momentum (30%), Sentiment (30%), Valuation (20%), and Analyst consensus (20%). Higher = more bullish signals across all dimensions.'},
+  az_mcap:  {title:'Market Cap', body:'Total market capitalisation: share price × shares outstanding. Indicates the company\'s size. Source: yfinance.'},
+  az_pe:    {title:'P/E Ratio (TTM)', body:'Price-to-Earnings ratio over the trailing twelve months. Compares the stock price to annual earnings per share. A lower P/E can indicate value; a higher P/E may reflect growth expectations or overvaluation.'},
+  az_52w:   {title:'52-Week Range', body:'The lowest and highest closing prices over the past 52 weeks. Useful for gauging where the current price sits relative to its recent trading range — proximity to the high or low can signal momentum.'},
+};
+
+// ── Info Modal Helpers ──
+function showInfo(key){ const m=METRIC_INFO[key]; if(m) showInfoModal(m.title,m.body); }
+function showInfoModal(title,body){
+  document.getElementById('info-modal-title').textContent=title;
+  document.getElementById('info-modal-body').innerHTML=body;
+  document.getElementById('info-modal').classList.add('open');
+}
+function closeInfoModal(){ document.getElementById('info-modal').classList.remove('open'); }
 const GH  = 'https://raw.githubusercontent.com/juliokoelle/julio-brain/main/10_Daily';
 const PW  = 'Bookrun2026';
 const K   = { auth:'mt_auth', theme:'mt_theme', pos:'mt_portfolio_positions', seed:'mt_portfolio_seed_seen' };
@@ -760,29 +827,82 @@ function renderAnalysis(a){
   const riskLabel=vol<15?'Conservative':vol<25?'Moderate':'Aggressive';
   const riskColor=vol<15?'var(--positive)':vol<25?'var(--neutral)':'var(--negative)';
   const fmt=n=>n.toLocaleString('de-DE',{maximumFractionDigits:0});
-  const metric=(label,value,color,hint)=>`<div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px"><p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">${label}</p><p style="font-size:1.1rem;font-weight:700;color:${color||'var(--text-primary)'}">${value}</p>${hint?`<p style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem;line-height:1.4">${hint}</p>`:''}</div>`;
-  const smMetric=(label,value,hint)=>`<div style="padding:.6rem .75rem;background:var(--bg-tertiary);border-radius:8px"><p style="font-size:.7rem;color:var(--text-secondary);margin-bottom:.2rem">${label}</p><p style="font-size:1rem;font-weight:700">${value}</p>${hint?`<p style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem;line-height:1.4">${hint}</p>`:''}</div>`;
+  const mc=(key,label,value,color)=>`<div class="metric-card" onclick="showInfo('${key}')">
+    <span class="info-icon">ⓘ</span>
+    <p style="font-size:.72rem;color:var(--text-secondary);margin-bottom:.3rem">${label}</p>
+    <p style="font-size:1.05rem;font-weight:700;color:${color||'var(--text-primary)'}">${value}</p>
+  </div>`;
   let assets='';
   if(a.assets?.length){
-    const rows=a.assets.map(x=>{const ar=(x.annual_return||0)*100,av=(x.volatility||0)*100;return`<tr><td style="font-weight:700">${x.ticker}</td><td style="color:var(--text-secondary)">${(x.weight*100).toFixed(1)}%</td><td class="${ar>=0?'pos':'neg'}">${ar>=0?'+':''}${ar.toFixed(1)}%</td><td style="color:var(--text-secondary)">${av.toFixed(1)}%</td></tr>`;}).join('');
-    assets=`<div><p class="label" style="margin-bottom:.5rem">Asset Breakdown</p><div style="overflow-x:auto"><table><thead><tr><th>Ticker</th><th>Weight</th><th>Exp. Return p.a.</th><th>Volatility p.a.</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+    const rows=a.assets.map(x=>{const ar=(x.annual_return||0)*100,av=(x.volatility||0)*100;return`<tr style="cursor:pointer" onclick="openPFAssetPanel('${x.ticker}')">
+      <td style="font-weight:700">${x.ticker}</td>
+      <td style="color:var(--text-secondary)">${(x.weight*100).toFixed(1)}%</td>
+      <td class="${ar>=0?'pos':'neg'}">${ar>=0?'+':''}${ar.toFixed(1)}%</td>
+      <td style="color:var(--text-secondary)">${av.toFixed(1)}%</td>
+    </tr>`;}).join('');
+    assets=`<div><p class="label" style="margin-bottom:.5rem">Asset Breakdown</p>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>Ticker</th><th>Weight</th><th>Exp. Return p.a.</th><th>Volatility p.a.</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <p style="font-size:.7rem;color:var(--text-muted);margin-top:.35rem">Click a row to view asset details</p>
+    </div>`;
   }
   document.getElementById('pf-result').innerHTML=`<div class="card">
-    <h2 style="font-size:1rem;font-weight:700;margin-bottom:1.25rem">Analysis</h2>
-    <div class="grid-4" style="margin-bottom:1rem">
-      ${metric('Total Value','€'+fmt(a.total_value||0),'','Sum of all current position values')}
-      ${metric('Annual Return',(ret>=0?'+':'')+ret.toFixed(1)+'%',ret>=0?'var(--positive)':'var(--negative)','Weighted expected return p.a. from 1-year price history')}
-      ${metric('Volatility',vol.toFixed(1)+'%','','Annualised σ of daily returns (σ × √252)')}
-      ${metric('Risk Profile',riskLabel,riskColor,'&lt;15% Conservative · 15–25% Moderate · &gt;25% Aggressive')}
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.5rem;flex-wrap:wrap;gap:.75rem">
+      <div>
+        <p class="label" style="margin-bottom:.2rem">Portfolio Summary</p>
+        <p style="font-size:2rem;font-weight:800">€${fmt(a.total_value||0)}</p>
+      </div>
+      <div style="text-align:right;cursor:pointer" onclick="showInfo('pf_return')">
+        <p class="label" style="margin-bottom:.2rem">Annual Return</p>
+        <p style="font-size:1.5rem;font-weight:700;color:${ret>=0?'var(--positive)':'var(--negative)'}">${ret>=0?'+':''}${ret.toFixed(1)}%</p>
+      </div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.5rem;margin-bottom:1.25rem">
-      ${smMetric('Diversification',div.toFixed(0)+'/100','1 − HHI of weights: 100 = fully diversified')}
-      ${smMetric('Positions',String(a.number_of_positions||0),'Number of distinct assets')}
-      ${smMetric('Largest Position',lp.toFixed(1)+'%','% of total value in the single largest holding')}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.75rem;margin-bottom:1.25rem">
+      ${mc('pf_vol','Volatility',vol.toFixed(1)+'%','')}
+      ${mc('pf_risk','Risk Profile',riskLabel,riskColor)}
+      ${mc('pf_div','Diversification',div.toFixed(0)+'/100','')}
+      ${mc('pf_pos','Positions',String(a.number_of_positions||0),'')}
+      ${mc('pf_lp','Largest Position',lp.toFixed(1)+'%','')}
     </div>
     ${a.commentary?`<p style="font-size:.875rem;color:var(--text-secondary);line-height:1.7;margin-bottom:1.25rem;padding:1rem;background:var(--accent-lt);border-radius:8px;border-left:3px solid var(--accent)">${a.commentary}</p>`:''}
     ${assets}
   </div>`;
+}
+
+async function openPFAssetPanel(ticker){
+  const panel=document.getElementById('pf-asset-panel');
+  const body=document.getElementById('pf-asset-body');
+  panel.style.display='block';
+  body.innerHTML=`<div style="margin-top:2rem"><p style="font-size:.875rem;color:var(--text-muted)" class="pulse">Loading ${ticker}…</p></div>`;
+  try{
+    const [d,p]=await Promise.all([
+      GET('/stock/'+ticker+'/detail').catch(()=>null),
+      GET('/ticker/'+ticker+'/profile').catch(()=>null)
+    ]);
+    const price=p?.price??d?.components?.momentum?.details?.price??0;
+    const chg=p?.change_pct??0;
+    const pos=chg>=0;
+    body.innerHTML=`<div style="margin-top:2rem">
+      <h3 style="font-size:1.2rem;font-weight:800">${ticker}</h3>
+      <p style="font-size:.8rem;color:var(--text-muted);margin-bottom:.75rem">${p?.name||ticker}${p?.sector?' · '+p.sector:''}</p>
+      <div style="display:flex;align-items:baseline;gap:.5rem;margin-bottom:1.25rem">
+        <span style="font-size:1.6rem;font-weight:700">$${Number(price).toFixed(2)}</span>
+        <span style="font-weight:700;color:${pos?'var(--positive)':'var(--negative)'}">${pos?'+':''}${chg.toFixed(2)}%</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;margin-bottom:1.25rem">
+        ${mCard('Bull Score', d?.bull_score!=null?d.bull_score+'/100':'—')}
+        ${mCard('P/E Ratio', p?.pe_ratio?Number(p.pe_ratio).toFixed(1):'—')}
+        ${mCard('52w High', p?.week52_high?'$'+Number(p.week52_high).toFixed(2):'—')}
+        ${mCard('52w Low',  p?.week52_low?'$'+Number(p.week52_low).toFixed(2):'—')}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:.5rem">
+        <a href="https://finance.yahoo.com/quote/${ticker}" target="_blank" class="btn btn-outline" style="font-size:.8rem;justify-content:center">Yahoo Finance ↗</a>
+        <button class="btn btn-outline" style="font-size:.8rem;justify-content:center" onclick="document.getElementById('pf-asset-panel').style.display='none';document.getElementById('az-inp').value='${ticker}';go('analyzer');analyzeStock()">Open in Analyzer →</button>
+      </div>
+    </div>`;
+  }catch(e){ body.innerHTML=`<p style="color:var(--negative);margin-top:2rem">Failed to load ${ticker}</p>`; }
 }
 
 function showSeed(){
@@ -869,9 +989,27 @@ function openHSPanel(s){
 }
 
 // ── Stock Analyzer ──
+function compRow(label, score, weight, details, signals){
+  const sc=Math.max(0,Math.min(100,Number(score)||50));
+  const barColor=sc>=65?'var(--positive)':sc>=40?'var(--neutral)':'var(--negative)';
+  const sigsHtml=(signals||[]).map(s=>`<span class="sig-badge ${s.cls}">${s.label}</span>`).join('');
+  return `<div style="margin-bottom:1.1rem">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.3rem">
+      <p style="font-size:.85rem;font-weight:600">${label} <span style="font-size:.74rem;color:var(--text-muted);font-weight:400">(${(weight*100).toFixed(0)}%)</span></p>
+      <p style="font-size:.85rem;font-weight:700">${sc.toFixed(0)}/100</p>
+    </div>
+    <div class="score-bar-wrap" style="margin-bottom:.4rem">
+      <div class="score-bar" style="width:${sc}%;background:${barColor}"></div>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:.2rem">
+      ${sigsHtml}<span class="sig-badge sig-info">${details}</span>
+    </div>
+  </div>`;
+}
+
 async function analyzeStock(){
   const ticker=document.getElementById('az-inp').value.trim().toUpperCase(); if(!ticker) return;
-  document.getElementById('az-result').innerHTML='<p style="color:var(--text-muted)">Analyzing…</p>';
+  document.getElementById('az-result').innerHTML='<p style="color:var(--text-muted)" class="pulse">Analyzing…</p>';
   try{
     const [d,p]=await Promise.all([
       GET('/stock/'+ticker+'/detail'),
@@ -884,56 +1022,50 @@ async function analyzeStock(){
     const comp=d.components||{};
     const mom=comp.momentum||{}, sent=comp.sentiment||{}, valc=comp.valuation, anac=comp.analyst;
     const fmtP=v=>v!=null?`$${Number(v).toFixed(2)}`:'—';
-    const scoreRow=(lbl,sc,wt,det)=>`<tr>
-      <td style="font-size:.85rem;font-weight:600">${lbl}</td>
-      <td style="font-weight:700">${Number(sc).toFixed(0)}/100</td>
-      <td style="font-size:.8rem;color:var(--text-muted)">${(wt*100).toFixed(0)}%</td>
-      <td style="font-size:.78rem;color:var(--text-muted)">${det}</td>
-    </tr>`;
-    const momDet=`30d: ${mom.details?.return_30d??'—'}% · 90d: ${mom.details?.return_90d??'—'}% · MA50: ${mom.details?.above_ma50?'↑':'↓'} · MA200: ${mom.details?.above_ma200?'↑':'↓'}`;
-    const sentDet=`${sent.details?.label||'—'} · ${sent.details?.headlines_count||0} headlines (${sent.details?.source||'—'})`;
-    const valDet=valc?`P/E: ${valc.details?.trailing_pe??'—'} · Fwd P/E: ${valc.details?.forward_pe??'—'} · P/B: ${valc.details?.price_to_book??'—'}`:'not applicable';
-    const anaDet=anac?`${anac.details?.recommendation||'—'} · mean ${anac.details?.recommendation_mean??'—'} · ${anac.details?.analyst_count||0} analysts`:'not applicable';
-    const bullRows=[
-      scoreRow('Momentum',mom.score??50,mom.weight??0.3,momDet),
-      scoreRow('Sentiment',sent.score??50,sent.weight??0.3,sentDet),
-      valc?scoreRow('Valuation',valc.score??50,valc.weight??0.2,valDet):'',
-      anac?scoreRow('Analyst',anac.score??50,anac.weight??0.2,anaDet):'',
-    ].join('');
+    const scoreSig=sc=>{const s=Number(sc)||50;return s>=65?[{cls:'sig-bull',label:'Bullish'}]:s<=40?[{cls:'sig-bear',label:'Bearish'}]:[{cls:'sig-neutral',label:'Neutral'}];};
+    const momSigs=[
+      ...scoreSig(mom.score??50),
+      mom.details?.above_ma50!=null?{cls:mom.details.above_ma50?'sig-bull':'sig-bear',label:'MA50 '+(mom.details.above_ma50?'↑':'↓')}:null,
+      mom.details?.above_ma200!=null?{cls:mom.details.above_ma200?'sig-bull':'sig-bear',label:'MA200 '+(mom.details.above_ma200?'↑':'↓')}:null,
+    ].filter(Boolean);
+    const sentLabel=sent.details?.label||'';
+    const sentSigs=[
+      sentLabel?{cls:sentLabel.toLowerCase().includes('bull')?'sig-bull':sentLabel.toLowerCase().includes('bear')?'sig-bear':'sig-neutral',label:sentLabel}:null,
+      ...scoreSig(sent.score??50),
+    ].filter(Boolean);
+    const momDet=`30d: ${mom.details?.return_30d??'—'}% · 90d: ${mom.details?.return_90d??'—'}%`;
+    const sentDet=`${sent.details?.headlines_count||0} headlines · ${sent.details?.source||'—'}`;
+    const valDet=valc?`P/E: ${valc.details?.trailing_pe??'—'} · Fwd P/E: ${valc.details?.forward_pe??'—'} · P/B: ${valc.details?.price_to_book??'—'}`:' n/a';
+    const anaDet=anac?`${anac.details?.recommendation||'—'} · mean ${anac.details?.recommendation_mean??'—'} · ${anac.details?.analyst_count||0} analysts`:' n/a';
+    const mc=(key,label,value,color)=>`<div class="metric-card" onclick="showInfo('${key}')">
+      <span class="info-icon">ⓘ</span>
+      <p style="font-size:.72rem;color:var(--text-secondary);margin-bottom:.3rem">${label}</p>
+      <p style="font-size:1.05rem;font-weight:700;color:${color||'var(--text-primary)'}">${value}</p>
+    </div>`;
     document.getElementById('az-result').innerHTML=`<div class="card">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:1.25rem;flex-wrap:wrap;gap:.5rem">
-        <div><h2 style="font-size:1.2rem;font-weight:800">${d.ticker}</h2><p style="color:var(--text-secondary);font-size:.875rem">${d.company_name||d.ticker} · ${d.sector||'—'}</p></div>
-        <div style="text-align:right"><p style="font-size:1.4rem;font-weight:700">${fmtP(price)}</p><p class="${chg>=0?'pos':'neg'}">${chg>=0?'+':''}${chg.toFixed(2)}%</p></div>
+        <div>
+          <h2 style="font-size:1.2rem;font-weight:800">${d.ticker}</h2>
+          <p style="color:var(--text-secondary);font-size:.875rem">${d.company_name||d.ticker} · ${d.sector||'—'}</p>
+        </div>
+        <div style="text-align:right">
+          <p style="font-size:1.4rem;font-weight:700">${fmtP(price)}</p>
+          <p class="${chg>=0?'pos':'neg'}">${chg>=0?'+':''}${chg.toFixed(2)}%</p>
+        </div>
       </div>
       <div class="grid-4" style="margin-bottom:1.25rem">
-        <div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px">
-          <p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">Bull Score</p>
-          <p style="font-size:1rem;font-weight:700">${d.bull_score??0}/100</p>
-          <p style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem">Composite 0–100 ↓ breakdown</p>
-        </div>
-        <div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px">
-          <p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">Market Cap</p>
-          <p style="font-size:1rem;font-weight:700">${d.market_cap?'$'+((d.market_cap)/1e9).toFixed(1)+'B':'—'}</p>
-          <p style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem">Source: yfinance</p>
-        </div>
-        <div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px">
-          <p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">P/E Ratio</p>
-          <p style="font-size:1rem;font-weight:700">${pe!=null?Number(pe).toFixed(1):'—'}</p>
-          <p style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem">Trailing twelve months</p>
-        </div>
-        <div style="padding:.75rem;background:var(--bg-tertiary);border-radius:8px">
-          <p style="font-size:.75rem;color:var(--text-secondary);margin-bottom:.25rem">52-Week Range</p>
-          <p style="font-size:.95rem;font-weight:700">${fmtP(lo52)} – ${fmtP(hi52)}</p>
-          <p style="font-size:.7rem;color:var(--text-muted);margin-top:.2rem">Low – High</p>
-        </div>
+        ${mc('az_bull','Bull Score',(d.bull_score??0)+'/100','')}
+        ${mc('az_mcap','Market Cap',d.market_cap?'$'+((d.market_cap)/1e9).toFixed(1)+'B':'—','')}
+        ${mc('az_pe','P/E Ratio (TTM)',pe!=null?Number(pe).toFixed(1):'—','')}
+        ${mc('az_52w','52-Week Range',fmtP(lo52)+' – '+fmtP(hi52),'')}
       </div>
       <div style="margin-bottom:1.25rem">
-        <p class="label" style="margin-bottom:.5rem">Bull Score Breakdown</p>
-        <div style="overflow-x:auto"><table>
-          <thead><tr><th>Component</th><th>Score</th><th>Weight</th><th>Signal</th></tr></thead>
-          <tbody>${bullRows}</tbody>
-        </table></div>
-        <p style="font-size:.7rem;color:var(--text-muted);margin-top:.4rem">Momentum 30% (price trends) · Sentiment 30% (AI headline analysis) · Valuation 20% (P/E, P/B) · Analyst 20% (consensus recommendation)</p>
+        <p class="label" style="margin-bottom:.75rem">Bull Score Breakdown</p>
+        ${compRow('Momentum', mom.score??50, mom.weight??0.3, momDet, momSigs)}
+        ${compRow('Sentiment', sent.score??50, sent.weight??0.3, sentDet, sentSigs)}
+        ${valc?compRow('Valuation', valc.score??50, valc.weight??0.2, valDet, scoreSig(valc.score??50)):''}
+        ${anac?compRow('Analyst', anac.score??50, anac.weight??0.2, anaDet, scoreSig(anac.score??50)):''}
+        <p style="font-size:.7rem;color:var(--text-muted)">Momentum 30% · Sentiment 30% · Valuation 20% · Analyst 20%</p>
       </div>
       ${d.description?`<p style="font-size:.825rem;color:var(--text-secondary);line-height:1.7;margin-bottom:1.25rem;padding:.75rem;background:var(--bg-tertiary);border-radius:8px">${d.description}</p>`:''}
       <button class="btn btn-outline" style="font-size:.8rem" onclick="loadAISummary('${d.ticker}')">🤖 AI Analysis (Claude)</button>
@@ -942,13 +1074,13 @@ async function analyzeStock(){
   }catch(e){
     console.error('[analyzer]',e);
     const status=e&&typeof e.status==='number'?`HTTP ${e.status}`:'error';
-    document.getElementById('az-result').innerHTML=`<p style="color:var(--negative)">Could not load data for ${document.getElementById('az-inp').value.trim().toUpperCase()} (${status}). Check console.</p>`;
+    document.getElementById('az-result').innerHTML=`<p style="color:var(--negative)">Could not load data for ${document.getElementById('az-inp').value.trim().toUpperCase()} (${status}).</p>`;
   }
 }
 
 async function loadAISummary(ticker){
   const el=document.getElementById('ai-'+ticker); if(!el) return;
-  el.innerHTML='<p style="font-size:.875rem;color:var(--text-muted)">Generating AI analysis…</p>';
+  el.innerHTML='<p style="font-size:.875rem;color:var(--text-muted)" class="pulse">Generating AI analysis…</p>';
   try{
     const d=await GET('/stock/'+ticker+'/ai-summary');
     el.innerHTML=`<div style="padding:1rem;background:var(--accent-lt);border-radius:8px;border-left:3px solid var(--accent);margin-top:.5rem">
