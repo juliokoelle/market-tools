@@ -1115,18 +1115,46 @@ def _geocode_city(city: str) -> tuple[float, float]:
         return (0.0, 0.0)
 
 
+def _geo_persist(city: str, lat: float, lng: float) -> None:
+    """Write geocoded coordinates back to Supabase for all events in this city."""
+    sb = _get_hf_client()
+    if sb is None or lat == 0.0:
+        return
+    try:
+        sb.from_("events").update({"lat": lat, "lng": lng}).eq("city", city).execute()
+    except Exception as exc:
+        logging.warning("Geo persist failed for %r: %s", city, exc)
+
+
 def _warm_geo_cache_bg():
-    """Background: geocode all unique cities from DB at 1 req/sec."""
+    """Background: geocode cities that have no coordinates in DB, persist results."""
     sb = _get_hf_client()
     if sb is None:
         return
     try:
-        resp = sb.from_("events").select("city").execute()
-        cities = list({r["city"] for r in resp.data if r.get("city") and r["city"] not in _geo_cache})
-        logging.info("HorseFinder: warming geo cache for %d cities", len(cities))
-        for city in cities:
-            _geocode_city(city)
-        logging.info("HorseFinder: geo cache warm (%d entries)", len(_geo_cache))
+        # Load already-geocoded coordinates from DB into memory cache first
+        resp = sb.from_("events").select("city,lat,lng").execute()
+        pre_loaded = 0
+        for r in resp.data:
+            city = r.get("city", "")
+            lat = r.get("lat") or 0.0
+            lng = r.get("lng") or 0.0
+            if city and lat != 0.0 and city not in _geo_cache:
+                _geo_cache[city] = (lat, lng)
+                pre_loaded += 1
+
+        # Find cities that still need geocoding
+        ungeoced = list({r["city"] for r in resp.data
+                         if r.get("city") and (r.get("lat") or 0.0) == 0.0
+                         and r["city"] not in _geo_cache})
+        logging.info("HorseFinder: %d cities pre-loaded from DB, %d need geocoding", pre_loaded, len(ungeoced))
+
+        for city in ungeoced:
+            lat, lng = _geocode_city(city)
+            if lat != 0.0:
+                _geo_persist(city, lat, lng)
+
+        logging.info("HorseFinder: geo cache ready (%d entries)", len(_geo_cache))
     except Exception as exc:
         logging.warning("Geo warmup failed: %s", exc)
 
@@ -1136,8 +1164,17 @@ def _hf_map(row: dict, dist_km: float | None = None) -> dict:
     if country == "Germany":
         country = "DE"
     start = _hf_date_iso(row.get("start_date", ""))
+    end = _hf_date_iso(row.get("end_date") or row.get("start_date", ""))
     city = row.get("city", "")
-    lat, lng = _geo_cache.get(city, (0.0, 0.0))
+
+    # Prefer DB coordinates → memory cache → fallback 0,0
+    db_lat = row.get("lat") or 0.0
+    db_lng = row.get("lng") or 0.0
+    if db_lat != 0.0:
+        lat, lng = db_lat, db_lng
+    else:
+        lat, lng = _geo_cache.get(city, (0.0, 0.0))
+
     raw_disc = row.get("discipline") or "Unknown"
     discipline = _DISC_MAP.get(raw_disc, "unknown")
     raw_levels = row.get("levels") or []
@@ -1146,10 +1183,10 @@ def _hf_map(row: dict, dist_km: float | None = None) -> dict:
         "id":         row["id"],
         "name":       row.get("title", ""),
         "city":       city,
-        "state":      "",
+        "state":      row.get("state", ""),
         "country":    country,
         "date_start": start,
-        "date_end":   start,  # DB has no end_date column
+        "date_end":   end,
         "discipline": discipline,
         "levels":     levels,
         "lat":        lat,
