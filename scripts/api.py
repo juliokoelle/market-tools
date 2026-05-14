@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -21,6 +22,12 @@ from scripts.stock_analyzer import analyze_stock
 from scripts.generate_briefing import OUTPUT_LATEST
 
 app = FastAPI()
+
+
+@app.on_event("startup")
+async def _hf_startup():
+    threading.Thread(target=_warm_geo_cache_bg, daemon=True).start()
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -1036,6 +1043,23 @@ def ticker_profile(ticker: str):
 
 _hf_client = None
 
+# German discipline name → API slug
+_DISC_MAP = {
+    "Springen":       "show_jumping",
+    "Dressur":        "dressage",
+    "Vielseitigkeit": "eventing",
+    "Fahren":         "driving",
+    "Voltigieren":    "vaulting",
+    "Breitensport":   "leisure",
+}
+# Reverse map: API slug → German (for query filtering)
+_DISC_MAP_REV = {v: k for k, v in _DISC_MAP.items()}
+
+# In-memory geocoding cache: city → (lat, lng)
+_geo_cache: dict[str, tuple[float, float]] = {}
+_geo_lock = threading.Lock()
+_geo_last_req_time = 0.0
+
 
 def _get_hf_client():
     global _hf_client
@@ -1060,24 +1084,76 @@ def _hf_date_iso(d: str | None) -> str:
     return d
 
 
+def _geocode_city(city: str) -> tuple[float, float]:
+    """Geocode a German city via Nominatim. Rate-limited to 1 req/sec."""
+    global _geo_last_req_time
+    if city in _geo_cache:
+        return _geo_cache[city]
+    with _geo_lock:
+        if city in _geo_cache:  # double-checked after lock
+            return _geo_cache[city]
+        elapsed = time.time() - _geo_last_req_time
+        if elapsed < 1.1:
+            time.sleep(1.1 - elapsed)
+        try:
+            resp = http_client.get(
+                "https://nominatim.openstreetmap.org/search",
+                params={"q": city, "country": "Germany", "format": "json", "limit": 1},
+                headers={"User-Agent": "horsefinder-app/1.0 (personal project)"},
+                timeout=5,
+            )
+            _geo_last_req_time = time.time()
+            data = resp.json()
+            if data:
+                coords = (float(data[0]["lat"]), float(data[0]["lon"]))
+                _geo_cache[city] = coords
+                return coords
+        except Exception as exc:
+            logging.warning("Geocode failed for %r: %s", city, exc)
+            _geo_last_req_time = time.time()
+        _geo_cache[city] = (0.0, 0.0)
+        return (0.0, 0.0)
+
+
+def _warm_geo_cache_bg():
+    """Background: geocode all unique cities from DB at 1 req/sec."""
+    sb = _get_hf_client()
+    if sb is None:
+        return
+    try:
+        resp = sb.from_("events").select("city").execute()
+        cities = list({r["city"] for r in resp.data if r.get("city") and r["city"] not in _geo_cache})
+        logging.info("HorseFinder: warming geo cache for %d cities", len(cities))
+        for city in cities:
+            _geocode_city(city)
+        logging.info("HorseFinder: geo cache warm (%d entries)", len(_geo_cache))
+    except Exception as exc:
+        logging.warning("Geo warmup failed: %s", exc)
+
+
 def _hf_map(row: dict, dist_km: float | None = None) -> dict:
     country = row.get("country", "DE")
     if country == "Germany":
         country = "DE"
     start = _hf_date_iso(row.get("start_date", ""))
-    end   = _hf_date_iso(row.get("end_date") or row.get("start_date", ""))
+    city = row.get("city", "")
+    lat, lng = _geo_cache.get(city, (0.0, 0.0))
+    raw_disc = row.get("discipline") or "Unknown"
+    discipline = _DISC_MAP.get(raw_disc, "unknown")
+    raw_levels = row.get("levels") or []
+    levels = [lv for lv in raw_levels if lv and lv != "Unknown"]
     return {
         "id":         row["id"],
         "name":       row.get("title", ""),
-        "city":       row.get("city", ""),
-        "state":      row.get("state", ""),
+        "city":       city,
+        "state":      "",
         "country":    country,
         "date_start": start,
-        "date_end":   end,
-        "discipline": row.get("discipline") or "",
-        "levels":     row.get("levels") or [],
-        "lat":        row.get("latitude") or 0.0,
-        "lng":        row.get("longitude") or 0.0,
+        "date_end":   start,  # DB has no end_date column
+        "discipline": discipline,
+        "levels":     levels,
+        "lat":        lat,
+        "lng":        lng,
         "source_url": row.get("source_url"),
         "distance":   round(dist_km) if dist_km is not None else None,
     }
@@ -1102,40 +1178,18 @@ def hf_list_events(
     if sb is None:
         raise HTTPException(503, "HorseFinder not configured (SUPABASE_URL/SUPABASE_KEY missing)")
 
-    # Geo-radius path via Supabase RPC
-    if lat is not None and lng is not None and radius_km:
-        resp = sb.rpc("nearby_events", {
-            "user_lat": lat, "user_lng": lng, "radius_km": radius_km,
-        }).execute()
-        if resp.data is None:
-            raise HTTPException(502, "Supabase RPC error")
-        rows = resp.data
-        if discipline:
-            rows = [r for r in rows if r.get("discipline") == discipline]
-        if date_from:
-            rows = [r for r in rows if (r.get("end_date") or r["start_date"]) >= date_from]
-        if date_to:
-            rows = [r for r in rows if r["start_date"] <= date_to]
-        if city:
-            q = city.lower()
-            rows = [r for r in rows if q in r.get("city", "").lower() or q in r.get("state", "").lower()]
-        if levels:
-            rows = [r for r in rows if any(lv in (r.get("levels") or []) for lv in levels)]
-        if all(v is not None for v in (bounds_n, bounds_s, bounds_e, bounds_w)):
-            rows = [r for r in rows
-                    if bounds_s <= (r.get("latitude") or 0) <= bounds_n
-                    and bounds_w <= (r.get("longitude") or 0) <= bounds_e]
-        return [_hf_map(r, r.get("dist_km")) for r in rows]
+    # Map API slug back to German for DB filter
+    db_discipline = _DISC_MAP_REV.get(discipline) if discipline else None
 
-    # Standard table query — apply string-safe filters in Supabase, dates in Python
+    # Standard table query — date/bounds filtering in Python (DB stores DD.MM.YYYY)
     query = sb.from_("events").select("*")
-    if discipline:
-        query = query.eq("discipline", discipline)
+    if db_discipline:
+        query = query.eq("discipline", db_discipline)
+    elif discipline == "unknown":
+        query = query.eq("discipline", "Unknown")
     if city:
         q = f"%{city}%"
-        query = query.or_(f"city.ilike.{q},state.ilike.{q}")
-    if levels:
-        query = query.overlaps("levels", levels)
+        query = query.ilike("city", q)
 
     resp = query.execute()
     if resp.data is None:
@@ -1143,14 +1197,37 @@ def hf_list_events(
 
     events = [_hf_map(r) for r in resp.data]
 
-    # Date and bounds filtering in Python (DB stores dates as DD.MM.YYYY)
+    # Date filtering
     if date_from:
-        events = [e for e in events if e["date_end"] >= date_from]
+        events = [e for e in events if e["date_start"] >= date_from]
     if date_to:
         events = [e for e in events if e["date_start"] <= date_to]
+
+    # Bounds filtering (uses cached geocoords)
     if all(v is not None for v in (bounds_n, bounds_s, bounds_e, bounds_w)):
         events = [e for e in events
-                  if bounds_s <= e["lat"] <= bounds_n and bounds_w <= e["lng"] <= bounds_e]
+                  if e["lat"] != 0.0 and
+                     bounds_s <= e["lat"] <= bounds_n and
+                     bounds_w <= e["lng"] <= bounds_e]
+
+    # Geo-radius filtering
+    if lat is not None and lng is not None and radius_km:
+        from math import radians, cos, sin, asin, sqrt
+        def _haversine(lat1, lon1, lat2, lon2):
+            R = 6371
+            dlat = radians(lat2 - lat1)
+            dlon = radians(lon2 - lon1)
+            a = sin(dlat/2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon/2)**2
+            return 2 * R * asin(sqrt(a))
+        filtered = []
+        for e in events:
+            if e["lat"] == 0.0 and e["lng"] == 0.0:
+                continue
+            dist = _haversine(lat, lng, e["lat"], e["lng"])
+            if dist <= radius_km:
+                e["distance"] = round(dist)
+                filtered.append(e)
+        events = filtered
 
     events.sort(key=lambda e: e["date_start"])
     return events
@@ -1164,7 +1241,12 @@ def hf_get_event(event_id: str):
     resp = sb.from_("events").select("*").eq("id", event_id).maybe_single().execute()
     if not resp.data:
         raise HTTPException(404, "Event not found")
-    return _hf_map(resp.data)
+    event = _hf_map(resp.data)
+    # Geocode on demand for detail page if not yet cached
+    if event["lat"] == 0.0 and event["city"]:
+        lat, lng = _geocode_city(event["city"])
+        event["lat"], event["lng"] = lat, lng
+    return event
 
 
 # ---------------------------------------------------------------------------
