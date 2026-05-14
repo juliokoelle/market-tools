@@ -1287,6 +1287,145 @@ def hf_get_event(event_id: str):
 
 
 # ---------------------------------------------------------------------------
+# MyWardrobe — personal clothing catalog
+# ---------------------------------------------------------------------------
+
+class _WardrobeBody(BaseModel):
+    name: str
+    brand: str | None = None
+    imageUrl: str | None = None
+    imageThumbnailUrl: str | None = None
+    categoryGender: str = "Unisex"
+    categoryMain: str = "Tops"
+    categorySub: str | None = None
+    colors: list[str] = []
+    size: str = ""
+    material: str | None = None
+    condition: str | None = None
+    season: str | None = None
+    tags: list[str] = []
+    notes: str | None = None
+    aiSuggested: bool = False
+    aiConfidence: float | None = None
+    sourceUrl: str | None = None
+
+
+def _wdi_map(row: dict) -> dict:
+    return {
+        "id":                row["id"],
+        "name":              row["name"],
+        "brand":             row.get("brand"),
+        "imageUrl":          row.get("image_url"),
+        "imageThumbnailUrl": row.get("image_thumbnail_url"),
+        "categoryGender":    row.get("category_gender", "Unisex"),
+        "categoryMain":      row.get("category_main", "Tops"),
+        "categorySub":       row.get("category_sub"),
+        "colors":            row.get("colors") or [],
+        "size":              row.get("size") or "",
+        "material":          row.get("material"),
+        "condition":         row.get("condition"),
+        "season":            row.get("season"),
+        "tags":              row.get("tags") or [],
+        "notes":             row.get("notes"),
+        "aiSuggested":       row.get("ai_suggested", False),
+        "aiConfidence":      row.get("ai_confidence"),
+        "sourceUrl":         row.get("source_url"),
+        "createdAt":         row.get("created_at", ""),
+        "updatedAt":         row.get("updated_at", ""),
+    }
+
+
+def _wdi_to_db(body: _WardrobeBody) -> dict:
+    return {
+        "user_id":              "julio",
+        "name":                 body.name,
+        "brand":                body.brand,
+        "image_url":            body.imageUrl,
+        "image_thumbnail_url":  body.imageThumbnailUrl,
+        "category_gender":      body.categoryGender,
+        "category_main":        body.categoryMain,
+        "category_sub":         body.categorySub,
+        "colors":               body.colors,
+        "size":                 body.size,
+        "material":             body.material,
+        "condition":            body.condition,
+        "season":               body.season,
+        "tags":                 body.tags,
+        "notes":                body.notes,
+        "ai_suggested":         body.aiSuggested,
+        "ai_confidence":        body.aiConfidence,
+        "source_url":           body.sourceUrl,
+    }
+
+
+@app.get("/wardrobe/items")
+def wdi_list(
+    category: str | None = None,
+    color: str | None = None,
+    brand: str | None = None,
+    gender: str | None = None,
+    season: str | None = None,
+):
+    sb = _get_hf_client()
+    if sb is None:
+        raise HTTPException(503, "Wardrobe not configured (SUPABASE_URL/SUPABASE_KEY missing)")
+    q = sb.from_("wardrobe_items").select("*").eq("user_id", "julio")
+    if category:
+        q = q.eq("category_main", category)
+    if gender:
+        q = q.eq("category_gender", gender)
+    if season:
+        q = q.eq("season", season)
+    if brand:
+        q = q.ilike("brand", f"%{brand}%")
+    if color:
+        q = q.contains("colors", [color])
+    resp = q.order("created_at", desc=True).execute()
+    if resp.data is None:
+        raise HTTPException(502, "Supabase query error")
+    return [_wdi_map(r) for r in resp.data]
+
+
+@app.post("/wardrobe/items", status_code=201)
+def wdi_create(body: _WardrobeBody):
+    sb = _get_hf_client()
+    if sb is None:
+        raise HTTPException(503, "Wardrobe not configured")
+    resp = sb.from_("wardrobe_items").insert(_wdi_to_db(body)).execute()
+    if not resp.data:
+        raise HTTPException(502, "Insert failed")
+    return _wdi_map(resp.data[0])
+
+
+@app.put("/wardrobe/items/{item_id}")
+def wdi_update(item_id: str, body: _WardrobeBody):
+    sb = _get_hf_client()
+    if sb is None:
+        raise HTTPException(503, "Wardrobe not configured")
+    updates = {k: v for k, v in _wdi_to_db(body).items() if k != "user_id"}
+    updates["updated_at"] = "now()"
+    resp = (
+        sb.from_("wardrobe_items")
+        .update(updates)
+        .eq("id", item_id)
+        .eq("user_id", "julio")
+        .execute()
+    )
+    if not resp.data:
+        raise HTTPException(404, "Item not found")
+    return _wdi_map(resp.data[0])
+
+
+@app.delete("/wardrobe/items/{item_id}", status_code=204)
+def wdi_delete(item_id: str):
+    sb = _get_hf_client()
+    if sb is None:
+        raise HTTPException(503, "Wardrobe not configured")
+    sb.from_("wardrobe_items").delete().eq("id", item_id).eq("user_id", "julio").execute()
+    return None
+
+
+# ---------------------------------------------------------------------------
 # Debug
 # ---------------------------------------------------------------------------
 
