@@ -1031,6 +1031,143 @@ def ticker_profile(ticker: str):
 
 
 # ---------------------------------------------------------------------------
+# HorseFinder — equestrian tournament finder
+# ---------------------------------------------------------------------------
+
+_hf_client = None
+
+
+def _get_hf_client():
+    global _hf_client
+    if _hf_client is None:
+        url = os.environ.get("SUPABASE_URL", "")
+        key = os.environ.get("SUPABASE_KEY", "")
+        if not url or not key:
+            return None
+        from supabase import create_client
+        _hf_client = create_client(url, key)
+    return _hf_client
+
+
+def _hf_date_iso(d: str | None) -> str:
+    """Convert DD.MM.YYYY → YYYY-MM-DD; pass ISO dates through unchanged."""
+    if not d:
+        return ""
+    if "." in d:
+        p = d.split(".")
+        if len(p) == 3:
+            return f"{p[2]}-{p[1]}-{p[0]}"
+    return d
+
+
+def _hf_map(row: dict, dist_km: float | None = None) -> dict:
+    country = row.get("country", "DE")
+    if country == "Germany":
+        country = "DE"
+    start = _hf_date_iso(row.get("start_date", ""))
+    end   = _hf_date_iso(row.get("end_date") or row.get("start_date", ""))
+    return {
+        "id":         row["id"],
+        "name":       row.get("title", ""),
+        "city":       row.get("city", ""),
+        "state":      row.get("state", ""),
+        "country":    country,
+        "date_start": start,
+        "date_end":   end,
+        "discipline": row.get("discipline") or "",
+        "levels":     row.get("levels") or [],
+        "lat":        row.get("latitude") or 0.0,
+        "lng":        row.get("longitude") or 0.0,
+        "source_url": row.get("source_url"),
+        "distance":   round(dist_km) if dist_km is not None else None,
+    }
+
+
+@app.get("/horsefinder/events")
+def hf_list_events(
+    discipline: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    city: str | None = None,
+    levels: list[str] | None = Query(default=None),
+    lat: float | None = None,
+    lng: float | None = None,
+    radius_km: int | None = None,
+    bounds_n: float | None = None,
+    bounds_s: float | None = None,
+    bounds_e: float | None = None,
+    bounds_w: float | None = None,
+):
+    sb = _get_hf_client()
+    if sb is None:
+        raise HTTPException(503, "HorseFinder not configured (SUPABASE_URL/SUPABASE_KEY missing)")
+
+    # Geo-radius path via Supabase RPC
+    if lat is not None and lng is not None and radius_km:
+        resp = sb.rpc("nearby_events", {
+            "user_lat": lat, "user_lng": lng, "radius_km": radius_km,
+        }).execute()
+        if resp.data is None:
+            raise HTTPException(502, "Supabase RPC error")
+        rows = resp.data
+        if discipline:
+            rows = [r for r in rows if r.get("discipline") == discipline]
+        if date_from:
+            rows = [r for r in rows if (r.get("end_date") or r["start_date"]) >= date_from]
+        if date_to:
+            rows = [r for r in rows if r["start_date"] <= date_to]
+        if city:
+            q = city.lower()
+            rows = [r for r in rows if q in r.get("city", "").lower() or q in r.get("state", "").lower()]
+        if levels:
+            rows = [r for r in rows if any(lv in (r.get("levels") or []) for lv in levels)]
+        if all(v is not None for v in (bounds_n, bounds_s, bounds_e, bounds_w)):
+            rows = [r for r in rows
+                    if bounds_s <= (r.get("latitude") or 0) <= bounds_n
+                    and bounds_w <= (r.get("longitude") or 0) <= bounds_e]
+        return [_hf_map(r, r.get("dist_km")) for r in rows]
+
+    # Standard table query — apply string-safe filters in Supabase, dates in Python
+    query = sb.from_("events").select("*")
+    if discipline:
+        query = query.eq("discipline", discipline)
+    if city:
+        q = f"%{city}%"
+        query = query.or_(f"city.ilike.{q},state.ilike.{q}")
+    if levels:
+        query = query.overlaps("levels", levels)
+
+    resp = query.execute()
+    if resp.data is None:
+        raise HTTPException(502, "Supabase query error")
+
+    events = [_hf_map(r) for r in resp.data]
+
+    # Date and bounds filtering in Python (DB stores dates as DD.MM.YYYY)
+    if date_from:
+        events = [e for e in events if e["date_end"] >= date_from]
+    if date_to:
+        events = [e for e in events if e["date_start"] <= date_to]
+    if all(v is not None for v in (bounds_n, bounds_s, bounds_e, bounds_w)):
+        events = [e for e in events
+                  if bounds_s <= e["lat"] <= bounds_n and bounds_w <= e["lng"] <= bounds_e]
+
+    events.sort(key=lambda e: e["date_start"])
+    return events
+
+
+@app.get("/horsefinder/events/{event_id}")
+def hf_get_event(event_id: str):
+    sb = _get_hf_client()
+    if sb is None:
+        raise HTTPException(503, "HorseFinder not configured")
+    resp = sb.from_("events").select("*").eq("id", event_id).maybe_single().execute()
+    if not resp.data:
+        raise HTTPException(404, "Event not found")
+    return _hf_map(resp.data)
+
+
+# ---------------------------------------------------------------------------
 # Debug
 # ---------------------------------------------------------------------------
 
