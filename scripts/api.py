@@ -1291,23 +1291,25 @@ def hf_get_event(event_id: str):
 # ---------------------------------------------------------------------------
 
 class _WardrobeBody(BaseModel):
-    name: str
+    name: str | None = None
     brand: str | None = None
     imageUrl: str | None = None
     imageThumbnailUrl: str | None = None
-    categoryGender: str = "Unisex"
-    categoryMain: str = "Tops"
+    categoryGender: str | None = None
+    categoryMain: str | None = None
     categorySub: str | None = None
-    colors: list[str] = []
-    size: str = ""
+    colors: list[str] | None = None
+    size: str | None = None
     material: str | None = None
     condition: str | None = None
     season: str | None = None
-    tags: list[str] = []
+    tags: list[str] | None = None
     notes: str | None = None
-    aiSuggested: bool = False
+    aiSuggested: bool | None = None
     aiConfidence: float | None = None
     sourceUrl: str | None = None
+    price: float | None = None
+    favorite: bool | None = None
 
 
 def _wdi_map(row: dict) -> dict:
@@ -1330,13 +1332,15 @@ def _wdi_map(row: dict) -> dict:
         "aiSuggested":       row.get("ai_suggested", False),
         "aiConfidence":      row.get("ai_confidence"),
         "sourceUrl":         row.get("source_url"),
+        "price":             row.get("price"),
+        "favorite":          row.get("favorite", False),
         "createdAt":         row.get("created_at", ""),
         "updatedAt":         row.get("updated_at", ""),
     }
 
 
-def _wdi_to_db(body: _WardrobeBody) -> dict:
-    return {
+def _wdi_to_db(body: _WardrobeBody, partial: bool = False) -> dict:
+    d = {
         "user_id":              "julio",
         "name":                 body.name,
         "brand":                body.brand,
@@ -1355,7 +1359,12 @@ def _wdi_to_db(body: _WardrobeBody) -> dict:
         "ai_suggested":         body.aiSuggested,
         "ai_confidence":        body.aiConfidence,
         "source_url":           body.sourceUrl,
+        "price":                body.price,
+        "favorite":             body.favorite,
     }
+    if partial:
+        return {k: v for k, v in d.items() if v is not None and k != "user_id"}
+    return d
 
 
 @app.get("/wardrobe/items")
@@ -1402,7 +1411,7 @@ def wdi_update(item_id: str, body: _WardrobeBody):
     sb = _get_hf_client()
     if sb is None:
         raise HTTPException(503, "Wardrobe not configured")
-    updates = {k: v for k, v in _wdi_to_db(body).items() if k != "user_id"}
+    updates = _wdi_to_db(body, partial=True)
     updates["updated_at"] = "now()"
     resp = (
         sb.from_("wardrobe_items")
