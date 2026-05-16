@@ -697,7 +697,7 @@ def market_hot_stocks():
     import yfinance as yf
     from concurrent.futures import ThreadPoolExecutor
 
-    stocks = get_hot_stocks(top_n=20)
+    stocks = get_hot_stocks(top_n=50)
     if not stocks:
         raise HTTPException(status_code=503, detail="Could not fetch market data. Try again shortly.")
 
@@ -717,7 +717,7 @@ def market_hot_stocks():
                 "week_52_high":   info.get("fiftyTwoWeekHigh"),
                 "week_52_low":    info.get("fiftyTwoWeekLow"),
                 "analyst_rating": info.get("recommendationKey"),
-                "sparkline":      _sparkline(ticker, period="5d", interval="1d"),
+                "sparkline":      _sparkline(ticker, period="1mo", interval="1d"),
             }
         except Exception:
             return {
@@ -731,9 +731,31 @@ def market_hot_stocks():
     with ThreadPoolExecutor(max_workers=10) as ex:
         enriched = list(ex.map(_enrich, stocks))
 
+    enriched.sort(key=lambda x: x.get("change_pct", 0), reverse=True)
     result = {"stocks": enriched, "total": len(enriched)}
     _cache_set("hot_stocks_enriched", result)
     return result
+
+
+@app.get("/market/search-ticker")
+def search_ticker(q: str = Query("", description="Search query (name or ticker)")):
+    if not q or len(q) < 2:
+        return []
+    import yfinance as yf
+    try:
+        results = yf.Search(q, max_results=8).quotes
+        return [
+            {
+                "ticker": r.get("symbol", ""),
+                "name": r.get("shortname") or r.get("longname") or r.get("symbol", ""),
+                "exchange": r.get("exchange") or r.get("exchDisp", ""),
+                "type": r.get("quoteType", ""),
+            }
+            for r in (results or [])
+            if r.get("symbol")
+        ][:5]
+    except Exception:
+        return []
 
 
 @app.get("/stock/analyze")
