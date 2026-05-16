@@ -40,7 +40,7 @@ from telegram.ext import (
 from scripts.sync_to_brain import github_read, github_read_modify_write
 from scripts.utils import today
 from scripts.vault_utils import insert_into_section, make_daily_note as _make_daily_note, note_entry as _note_entry
-from scripts.classifier import classify_text, CapturedItem
+from scripts.classifier import classify_text, CapturedItem, VALID_TYPES
 from scripts.capture_router import route_item
 
 logging.basicConfig(level=logging.INFO)
@@ -157,6 +157,8 @@ async def handle_confirmation(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
         if len(parts) != 3:
             return
         _, new_type, key = parts
+        if new_type not in VALID_TYPES:
+            return
         if key not in pending:
             await query.edit_message_reply_markup(reply_markup=None)
             return
