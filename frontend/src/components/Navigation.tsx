@@ -1,170 +1,128 @@
-import { useState, useRef, useEffect } from 'react'
-import { NavLink, Link, useLocation } from 'react-router-dom'
+import { NavLink } from 'react-router-dom'
 import { useTheme } from '../hooks/useTheme'
 
-const marketLinks = [
-  { to: '/market',            label: 'Dashboard',      end: true },
-  { to: '/market/briefing',   label: 'Briefing',       end: false },
-  { to: '/market/portfolio',  label: 'Portfolio',      end: false },
-  { to: '/market/hot-stocks', label: 'Hot Stocks',     end: false },
-  { to: '/market/analyzer',   label: 'Stock Analyzer', end: false },
-]
-
-const ideaLinks = [
-  { to: '/ideas', label: 'All Ideas', end: false },
-]
-
-function Dropdown({ label, links, isActive }: {
-  label: string
-  links: { to: string; label: string; end: boolean }[]
-  isActive: boolean
-}) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function handler(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
-
+function IconDashboard() {
   return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <button
-        className={`nav-btn${isActive ? ' nav-btn--active' : ''}`}
-        onClick={() => setOpen(o => !o)}
-        aria-expanded={open}
-      >
-        {label}
-        <svg width="11" height="11" viewBox="0 0 12 12" fill="none"
-          style={{ marginLeft: 2, transition: 'transform .15s', transform: open ? 'rotate(180deg)' : 'none' }}>
-          <path d="M2 4l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </button>
-      {open && (
-        <div className="nav-dropdown" onClick={() => setOpen(false)}>
-          {links.map(l => (
-            <NavLink
-              key={l.to}
-              to={l.to}
-              end={l.end}
-              className={({ isActive }) => `nav-dropdown-item${isActive ? ' active' : ''}`}
-            >
-              {l.label}
-            </NavLink>
-          ))}
-        </div>
-      )}
-    </div>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/>
+      <rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/>
+    </svg>
   )
 }
-
-function SunIcon() {
+function IconBriefing() {
   return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+      <polyline points="14 2 14 8 20 8"/>
+      <line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>
+      <polyline points="10 9 9 9 8 9"/>
+    </svg>
+  )
+}
+function IconPortfolio() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+  )
+}
+function IconHot() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8.5 14.5A2.5 2.5 0 0011 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 11-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 002.5 2.5z"/>
+    </svg>
+  )
+}
+function IconAnalyzer() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/>
+      <line x1="6" y1="20" x2="6" y2="14"/><line x1="2" y1="20" x2="22" y2="20"/>
+    </svg>
+  )
+}
+function IconIdeas() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+    </svg>
+  )
+}
+function IconSun() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="5"/>
+      <line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
       <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
       <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
-      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+    </svg>
+  )
+}
+function IconMoon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/>
     </svg>
   )
 }
 
-function MoonIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-    </svg>
-  )
-}
+const NAV_MARKET = [
+  { to: '/market',            label: 'Dashboard',      icon: <IconDashboard />, end: true },
+  { to: '/market/briefing',   label: 'Briefing',       icon: <IconBriefing />,  end: false },
+  { to: '/market/portfolio',  label: 'Portfolio',      icon: <IconPortfolio />, end: false },
+  { to: '/market/hot-stocks', label: 'Hot Stocks',     icon: <IconHot />,       end: false },
+  { to: '/market/analyzer',   label: 'Stock Analyzer', icon: <IconAnalyzer />,  end: false },
+]
 
 export default function Navigation() {
-  const location = useLocation()
   const { theme, toggle } = useTheme()
-  const isMarket = location.pathname.startsWith('/market')
-  const isIdeas  = location.pathname.startsWith('/ideas')
 
   return (
-    <>
-      <nav className="nav">
-        <div className="nav-inner">
-          <Link to="/" className="nav-logo">JK</Link>
+    <aside className="sidebar">
+      {/* Logo */}
+      <div className="sidebar-logo">
+        <div className="sidebar-logo-mark">JK</div>
+        <span className="sidebar-logo-name">Intelligence OS</span>
+      </div>
 
-          <div className="nav-links">
-            <Dropdown label="Market Tools" links={marketLinks} isActive={isMarket} />
-            <Dropdown label="Ideas"        links={ideaLinks}   isActive={isIdeas} />
-          </div>
-
-          <button
-            onClick={toggle}
-            className="theme-toggle"
-            title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      {/* Market section */}
+      <div className="sidebar-section">
+        <p className="sidebar-section-label">Market</p>
+        {NAV_MARKET.map(l => (
+          <NavLink
+            key={l.to}
+            to={l.to}
+            end={l.end}
+            className={({ isActive }) => `sidebar-item${isActive ? ' active' : ''}`}
           >
-            {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-            <span style={{ fontSize: '.75rem' }}>{theme === 'dark' ? 'Light' : 'Dark'}</span>
-          </button>
-        </div>
-      </nav>
+            <span className="sidebar-item-icon">{l.icon}</span>
+            {l.label}
+          </NavLink>
+        ))}
+      </div>
 
-      <style>{`
-        .nav {
-          position: sticky; top: 0; z-index: 100;
-          background: rgba(var(--nav-bg, 255,255,255), .92);
-          backdrop-filter: blur(12px);
-          border-bottom: 1px solid var(--border);
-        }
-        [data-theme="dark"] .nav { background: rgba(10,10,10,.92); }
+      <div className="sidebar-divider" />
 
-        .nav-inner {
-          max-width: 1200px; margin: 0 auto; padding: 0 1.5rem;
-          height: 52px; display: flex; align-items: center; gap: 1rem;
-        }
-        .nav-logo {
-          font-size: 1rem; font-weight: 800; color: var(--accent);
-          letter-spacing: -.5px; margin-right: .5rem;
-        }
-        .nav-links { display: flex; align-items: center; gap: .15rem; flex: 1; }
+      {/* Ideas section */}
+      <div className="sidebar-section">
+        <p className="sidebar-section-label">Capture</p>
+        <NavLink
+          to="/ideas"
+          className={({ isActive }) => `sidebar-item${isActive ? ' active' : ''}`}
+        >
+          <span className="sidebar-item-icon"><IconIdeas /></span>
+          Ideas
+        </NavLink>
+      </div>
 
-        .nav-btn {
-          display: flex; align-items: center; gap: .3rem;
-          padding: .35rem .7rem; border-radius: var(--radius-sm);
-          font-size: .875rem; font-weight: 500;
-          background: none; border: none;
-          color: var(--text-secondary);
-          transition: background .14s, color .14s;
-        }
-        .nav-btn:hover    { background: var(--bg-tertiary); color: var(--text-primary); }
-        .nav-btn--active  { color: var(--accent); }
-
-        .nav-dropdown {
-          position: absolute; top: calc(100% + .5rem); left: 0;
-          background: var(--bg-elevated);
-          border: 1px solid var(--border);
-          border-radius: var(--radius-sm);
-          box-shadow: var(--shadow);
-          min-width: 180px; overflow: hidden;
-          animation: fadeIn .15s ease;
-        }
-        .nav-dropdown-item {
-          display: block; padding: .6rem 1rem;
-          font-size: .875rem; color: var(--text-secondary);
-          transition: background .1s, color .1s;
-        }
-        .nav-dropdown-item:hover { background: var(--bg-tertiary); color: var(--text-primary); }
-        .nav-dropdown-item.active { color: var(--accent); font-weight: 600; background: var(--accent-lt); }
-
-        .theme-toggle {
-          display: flex; align-items: center; gap: .35rem;
-          padding: .35rem .7rem; border-radius: var(--radius-sm);
-          background: none; border: 1px solid var(--border);
-          color: var(--text-secondary); font-size: .8rem;
-          transition: border-color .14s, color .14s;
-          white-space: nowrap;
-        }
-        .theme-toggle:hover { color: var(--accent); border-color: var(--accent); }
-      `}</style>
-    </>
+      {/* Footer */}
+      <div className="sidebar-footer">
+        <button className="theme-toggle" onClick={toggle} title="Toggle theme">
+          {theme === 'dark' ? <IconSun /> : <IconMoon />}
+          <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>
+        </button>
+      </div>
+    </aside>
   )
 }

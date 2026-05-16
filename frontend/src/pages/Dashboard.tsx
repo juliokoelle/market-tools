@@ -3,38 +3,61 @@ import { Link } from 'react-router-dom'
 import { getMarketPrices, getBriefingPreview } from '../services/api'
 
 const MARKET_TICKERS = '^GSPC,GC=F,EURUSD=X,CL=F,^VIX'
-const TICKER_LABELS: Record<string, string> = {
-  '^GSPC': 'S&P 500', 'GC=F': 'Gold', 'EURUSD=X': 'EUR/USD',
-  'CL=F': 'Brent Oil', '^VIX': 'VIX',
+const TICKER_META: Record<string, { label: string; unit: string; prefix: string }> = {
+  '^GSPC':   { label: 'S&P 500',  unit: 'pts',    prefix: '' },
+  'GC=F':    { label: 'Gold',     unit: 'USD/oz', prefix: '$' },
+  'EURUSD=X':{ label: 'EUR/USD',  unit: '',       prefix: '' },
+  'CL=F':    { label: 'Brent',    unit: 'USD/bbl',prefix: '$' },
+  '^VIX':    { label: 'VIX',      unit: '',       prefix: '' },
 }
 
-function PctBadge({ v }: { v: number }) {
+function formatPrice(ticker: string, price: number) {
+  const m = TICKER_META[ticker]
+  if (!m) return price.toFixed(2)
+  if (ticker === 'EURUSD=X') return price.toFixed(4)
+  if (ticker === '^GSPC') return m.prefix + price.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+  return m.prefix + price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function ChangePill({ v }: { v: number }) {
   const pos = v >= 0
   return (
-    <span className={`badge ${pos ? 'badge-green' : 'badge-red'}`}>
-      {pos ? '+' : ''}{v.toFixed(2)}%
+    <span className={`badge ${pos ? 'badge-teal' : 'badge-red'}`} style={pos ? {} : { background: '#fee2e2', color: '#991b1b' }}>
+      {pos ? '▲' : '▼'} {Math.abs(v).toFixed(2)}%
     </span>
   )
 }
 
-function MarketCard({ ticker, price, change_pct }: { ticker: string; price: number; change_pct: number }) {
-  const label = TICKER_LABELS[ticker] ?? ticker
-  const isIdx = ticker.startsWith('^') && ticker !== '^VIX'
-  const isFx  = ticker.includes('USD')
-  const fmt = isIdx
-    ? price.toLocaleString('en-US', { minimumFractionDigits: 2 })
-    : isFx
-      ? price.toFixed(4)
-      : `$${price.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
-
+function MarketStatCard({ ticker, data }: { ticker: string; data?: { price: number; change_pct: number } }) {
+  const meta = TICKER_META[ticker]
   return (
-    <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '.4rem' }}>
-      <p style={{ fontSize: '.8rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{label}</p>
-      <p style={{ fontSize: '1.4rem', fontWeight: 700, letterSpacing: '-.5px' }}>{fmt}</p>
-      <PctBadge v={change_pct} />
+    <div className="card card-sm">
+      <p className="stat-label">{meta?.label ?? ticker}</p>
+      {data ? (
+        <>
+          <p className="stat-num" style={{ fontSize: '1.6rem', marginTop: '.4rem' }}>
+            {formatPrice(ticker, data.price)}
+          </p>
+          <div style={{ marginTop: '.6rem' }}>
+            <ChangePill v={data.change_pct} />
+          </div>
+          {meta?.unit && (
+            <p style={{ fontSize: '.65rem', color: 'var(--text-3)', marginTop: '.35rem' }}>{meta.unit}</p>
+          )}
+        </>
+      ) : (
+        <div style={{ height: 52, marginTop: '.4rem', background: 'var(--border-soft)', borderRadius: 8, animation: 'pulse 1.4s infinite' }} />
+      )}
     </div>
   )
 }
+
+const QUICK_LINKS = [
+  { to: '/market/portfolio',  label: 'Portfolio',      desc: 'Analyze your holdings',      icon: '📈' },
+  { to: '/market/hot-stocks', label: 'Hot Stocks',     desc: 'Top movers & gainers',        icon: '🔥' },
+  { to: '/market/analyzer',   label: 'Stock Analyzer', desc: 'Watchlist & bull scores',     icon: '📊' },
+  { to: '/market/briefing',   label: 'Full Briefing',  desc: 'Today\'s economic analysis',  icon: '📰' },
+]
 
 export default function Dashboard() {
   const [prices, setPrices] = useState<Record<string, { price: number; change_pct: number }>>({})
@@ -49,60 +72,79 @@ export default function Dashboard() {
   }, [])
 
   const tickers = MARKET_TICKERS.split(',')
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
   return (
-    <main className="page-enter section">
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-        <h1 style={{ fontSize: '1.4rem', fontWeight: 700 }}>Dashboard</h1>
-        <p style={{ fontSize: '.8rem', color: 'var(--text-faint)' }}>
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-        </p>
-      </div>
-
-      {/* Market Snapshot */}
-      <div className="grid-4" style={{ marginBottom: '1.75rem' }}>
-        {tickers.map(t => prices[t]
-          ? <MarketCard key={t} ticker={t} price={prices[t].price} change_pct={prices[t].change_pct} />
-          : <div key={t} className="card" style={{ minHeight: 96, background: loading ? '#f9fafb' : 'var(--surface)' }} />
-        )}
-      </div>
-
-      {/* Briefing Preview */}
-      <div className="card" style={{ marginBottom: '1.75rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-          <div>
-            <h2 style={{ fontSize: '1rem', fontWeight: 700 }}>Today's Briefing</h2>
-            {preview && <p style={{ fontSize: '.75rem', color: 'var(--text-faint)', marginTop: '.15rem' }}>{preview.date}</p>}
-          </div>
-          <Link to="/market/briefing" className="btn btn-outline" style={{ fontSize: '.8rem' }}>
-            Read full →
-          </Link>
+    <main className="page page-enter">
+      {/* Header */}
+      <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+        <div>
+          <h1 className="page-title">Dashboard</h1>
+          <p className="page-subtitle">{today}</p>
         </div>
-        {preview
-          ? <p style={{ fontSize: '.9rem', color: 'var(--text-muted)', lineHeight: 1.7, whiteSpace: 'pre-line' }}>
+      </div>
+
+      {/* Market snapshot */}
+      <div className="grid-5" style={{ marginBottom: '1.5rem' }}>
+        {tickers.map(t => (
+          <MarketStatCard key={t} ticker={t} data={prices[t]} />
+        ))}
+      </div>
+
+      {/* Briefing + Quick links */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1rem', marginBottom: '1.5rem' }}>
+        {/* Briefing preview */}
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+            <div>
+              <p className="stat-label">Today's Briefing</p>
+              {preview && <p style={{ fontSize: '.75rem', color: 'var(--text-3)', marginTop: '.2rem' }}>{preview.date}</p>}
+            </div>
+            <Link to="/market/briefing" className="btn btn-outline">Read full →</Link>
+          </div>
+          <div className="stat-divider" />
+          {preview ? (
+            <p style={{ fontSize: '.875rem', color: 'var(--text-2)', lineHeight: 1.75, whiteSpace: 'pre-line', marginTop: '1rem' }}>
               {preview.preview}
             </p>
-          : <p style={{ fontSize: '.875rem', color: 'var(--text-faint)' }}>
+          ) : (
+            <p style={{ fontSize: '.85rem', color: 'var(--text-3)', marginTop: '1rem' }}>
               {loading ? 'Loading briefing…' : 'No briefing available today.'}
             </p>
-        }
-      </div>
+          )}
+        </div>
 
-      {/* Quick Links */}
-      <div className="grid-3">
-        {[
-          { to: '/market/portfolio', label: 'Portfolio', icon: '💼', desc: 'Analyze your holdings' },
-          { to: '/market/hot-stocks', label: 'Hot Stocks', icon: '🔥', desc: 'Top movers today' },
-          { to: '/market/analyzer', label: 'Stock Analyzer', icon: '📊', desc: 'Watchlist + bull scores' },
-        ].map(l => (
-          <Link key={l.to} to={l.to} style={{ display: 'contents' }}>
-            <div className="card" style={{ cursor: 'pointer', transition: 'box-shadow .15s' }}>
-              <p style={{ fontSize: '1.5rem', marginBottom: '.4rem' }}>{l.icon}</p>
-              <p style={{ fontWeight: 600, marginBottom: '.2rem' }}>{l.label}</p>
-              <p style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>{l.desc}</p>
-            </div>
-          </Link>
-        ))}
+        {/* Quick links */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
+          {QUICK_LINKS.map(l => (
+            <Link key={l.to} to={l.to} style={{ display: 'block' }}>
+              <div
+                className="card card-sm"
+                style={{
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '.9rem',
+                  transition: 'box-shadow .15s, border-color .15s',
+                }}
+                onMouseEnter={e => {
+                  (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--teal-muted)'
+                  ;(e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow)'
+                }}
+                onMouseLeave={e => {
+                  (e.currentTarget as HTMLDivElement).style.borderColor = ''
+                  ;(e.currentTarget as HTMLDivElement).style.boxShadow = ''
+                }}
+              >
+                <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>{l.icon}</span>
+                <div>
+                  <p style={{ fontSize: '.875rem', fontWeight: 600, color: 'var(--text)' }}>{l.label}</p>
+                  <p style={{ fontSize: '.75rem', color: 'var(--text-3)', marginTop: '.1rem' }}>{l.desc}</p>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
       </div>
     </main>
   )
