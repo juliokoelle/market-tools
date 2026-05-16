@@ -450,6 +450,31 @@ async def send_evening_summary(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             pass
 
 
+async def flush_pending(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Flush unconfirmed items older than 24 h as notes. Runs daily at 23:55."""
+    pending: dict = ctx.application.bot_data.get("pending", {})
+    cutoff = _time_mod.time() - 86400
+    to_flush = [k for k, v in list(pending.items()) if v.get("ts", 0) < cutoff]
+    for key in to_flush:
+        entry = pending.pop(key, None)
+        if entry:
+            item: CapturedItem = entry["item"]
+            item.type = "note"
+            try:
+                await route_item(item)
+            except Exception as e:
+                log.error("flush_pending: failed to save item %r: %s", item.text, e)
+    if to_flush:
+        log.info("flush_pending: flushed %d expired items as notes", len(to_flush))
+        try:
+            await ctx.bot.send_message(
+                chat_id=_OWNER_ID,
+                text=f"🗑 {len(to_flush)} unbestätigte Item(s) automatisch als Note gespeichert.",
+            )
+        except Exception:
+            pass
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -470,6 +495,10 @@ def main() -> None:
     app.job_queue.run_daily(
         send_evening_summary,
         time=time(20, 30, tzinfo=_BERLIN),
+    )
+    app.job_queue.run_daily(
+        flush_pending,
+        time=time(23, 55, tzinfo=_BERLIN),
     )
 
     log.info("Telegram bot starting — polling.")
