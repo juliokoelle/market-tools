@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import unicodedata
-from datetime import datetime
-from zoneinfo import ZoneInfo
 
 import httpx
 
@@ -16,7 +15,6 @@ from scripts.vault_utils import insert_into_section, make_daily_note, note_entry
 from scripts.utils import today
 
 log = logging.getLogger(__name__)
-_BERLIN = ZoneInfo("Europe/Berlin")
 
 _MYWARDROBE_API = "https://mywardrobe-dun.vercel.app/api/wishlist"
 _MARKET_TOOLS = os.getenv(
@@ -79,7 +77,7 @@ async def route_item(item: CapturedItem) -> None:
 async def _dispatch(item: CapturedItem) -> None:
     if item.type == "task":
         path, mutate = _daily_mutate("Tasks", f"- [ ] {item.text}")
-        github_read_modify_write(path, mutate, f"capture: task ({today()})")
+        await asyncio.to_thread(github_read_modify_write, path, mutate, f"capture: task ({today()})")
 
     elif item.type == "question":
         entry = f"- [ ] {item.text} ({today()})"
@@ -89,7 +87,8 @@ async def _dispatch(item: CapturedItem) -> None:
                 current = "# Open Questions\n\n"
             return current.rstrip("\n") + "\n" + entry + "\n"
 
-        github_read_modify_write(
+        await asyncio.to_thread(
+            github_read_modify_write,
             "40_Knowledge/open-questions.md", q_mutate, f"capture: question ({today()})"
         )
 
@@ -98,25 +97,29 @@ async def _dispatch(item: CapturedItem) -> None:
         date_hint = item.metadata.get("date")
         entry = f"- [ ] {text}" + (f" ({date_hint})" if date_hint else "")
         path, mutate = _daily_mutate("Follow-ups", entry)
-        github_read_modify_write(path, mutate, f"capture: reminder ({today()})")
+        await asyncio.to_thread(github_read_modify_write, path, mutate, f"capture: reminder ({today()})")
 
     elif item.type == "idea":
         path, mutate = _daily_mutate("Notes", f"- 💡 {item.text}")
-        github_read_modify_write(path, mutate, f"capture: idea ({today()})")
+        await asyncio.to_thread(github_read_modify_write, path, mutate, f"capture: idea ({today()})")
 
     elif item.type == "gift_idea":
-        person = item.metadata.get("person") or "Unknown"
+        person = item.metadata.get("person") or ""
+        if not person:
+            log.warning("gift_idea item has no person metadata, using 'Unknown': %r", item.text)
+            person = "Unknown"
         gift = item.metadata.get("item") or item.text
         path, mutate = _gift_mutate(person, gift)
-        github_read_modify_write(path, mutate, f"capture: gift idea ({today()})")
+        await asyncio.to_thread(github_read_modify_write, path, mutate, f"capture: gift idea ({today()})")
 
     elif item.type == "wishlist":
         name = item.metadata.get("name") or item.text
         brand = item.metadata.get("brand") or None
-        price = item.metadata.get("price") or None
+        price_raw = item.metadata.get("price")
+        price = price_raw if price_raw is not None else None
         obs_entry = f"- [ ] {name}" + (f" ({brand})" if brand else "")
         path, mutate = _daily_mutate("Shopping List", obs_entry)
-        github_read_modify_write(path, mutate, f"capture: wishlist ({today()})")
+        await asyncio.to_thread(github_read_modify_write, path, mutate, f"capture: wishlist ({today()})")
         payload: dict = {"name": name, "priority": 2, "currency": "EUR"}
         if brand:
             payload["brand"] = brand
@@ -131,7 +134,7 @@ async def _dispatch(item: CapturedItem) -> None:
         notes = item.metadata.get("notes") or ""
         obs_entry = f"- 📈 ${ticker}" + (f" — {notes}" if notes else "")
         path, mutate = _daily_mutate("Notes", obs_entry)
-        github_read_modify_write(path, mutate, f"capture: stock pick ({today()})")
+        await asyncio.to_thread(github_read_modify_write, path, mutate, f"capture: stock pick ({today()})")
         async with httpx.AsyncClient(timeout=10) as client:
             resp = await client.post(
                 f"{_MARKET_TOOLS}/stock-watchlist",
@@ -140,6 +143,5 @@ async def _dispatch(item: CapturedItem) -> None:
             resp.raise_for_status()
 
     else:  # note + fallback
-        time_str = datetime.now(_BERLIN).strftime("%H:%M")
-        path, mutate = _daily_mutate("Notes", f"- [{time_str}] {item.text}")
-        github_read_modify_write(path, mutate, f"capture: note ({today()})")
+        path, mutate = _daily_mutate("Notes", note_entry(item.text))
+        await asyncio.to_thread(github_read_modify_write, path, mutate, f"capture: note ({today()})")
