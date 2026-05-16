@@ -1084,52 +1084,41 @@ def _hf_date_iso(d: str | None) -> str:
     return d
 
 
-def _nominatim_query(q: str) -> tuple[float, float]:
-    """Single Nominatim request, rate-limited. Returns (0,0) on miss."""
-    global _geo_last_req_time
-    elapsed = time.time() - _geo_last_req_time
-    if elapsed < 1.1:
-        time.sleep(1.1 - elapsed)
+def _photon_query(q: str) -> tuple[float, float]:
+    """Single Photon (Komoot/OSM) request. No rate limit. Returns (0,0) on miss."""
     try:
         resp = http_client.get(
-            "https://nominatim.openstreetmap.org/search",
-            params={"q": q, "country": "Germany", "format": "json", "limit": 1},
+            "https://photon.komoot.io/api/",
+            params={"q": q, "countrycode": "de", "limit": 1},
             headers={"User-Agent": "horsefinder-app/1.0 (personal project)"},
             timeout=5,
         )
-        _geo_last_req_time = time.time()
-        data = resp.json()
-        if data:
-            return (float(data[0]["lat"]), float(data[0]["lon"]))
+        features = resp.json().get("features", [])
+        if features:
+            coords = features[0]["geometry"]["coordinates"]  # GeoJSON: [lng, lat]
+            return (float(coords[1]), float(coords[0]))
     except Exception as exc:
-        logging.warning("Nominatim failed for %r: %s", q, exc)
-    _geo_last_req_time = time.time()
+        logging.warning("Photon failed for %r: %s", q, exc)
     return (0.0, 0.0)
 
 
-def _city_candidates(city: str) -> list[str]:
-    """Generate fallback search terms for problematic city strings."""
-    candidates = [city]
-    if "/" in city:
-        parts = [p.strip() for p in city.split("/")]
-        candidates += parts
-    # Strip common venue suffixes that confuse Nominatim
+def _normalize_city(city: str) -> str:
+    """Replace '/' with space and strip venue suffixes for better geocoding."""
     import re
-    cleaned = re.sub(r"\b(GmbH|e\.V\.|eV|AG|KG|UG)\b.*", "", city, flags=re.IGNORECASE).strip(" -|,")
-    if cleaned and cleaned != city:
-        candidates.append(cleaned)
-    return list(dict.fromkeys(candidates))  # deduplicate, preserve order
+    q = city.replace("/", " ").strip()
+    q = re.sub(r"\s+(GmbH|e\.V\.|eV|AG|KG|UG)\b.*", "", q, flags=re.IGNORECASE).strip()
+    return q
 
 
 def _geocode_city(city: str) -> tuple[float, float]:
-    """Geocode a German city via Nominatim. Tries fallback variants for tricky names."""
+    """Geocode a German city via Photon. Tries normalized variant as fallback."""
     if city in _geo_cache:
         return _geo_cache[city]
     with _geo_lock:
         if city in _geo_cache:
             return _geo_cache[city]
-        for candidate in _city_candidates(city):
-            coords = _nominatim_query(candidate)
+        for q in dict.fromkeys([city, _normalize_city(city)]):
+            coords = _photon_query(q)
             if coords != (0.0, 0.0):
                 _geo_cache[city] = coords
                 return coords
