@@ -575,12 +575,12 @@ function showLoader(el,label){
   el.innerHTML='';
   const wrap=document.createElement('div'); wrap.className='ploader';
   const cv=document.createElement('canvas');
-  const W=Math.min(480,el.clientWidth||480),H=160;
+  const W=Math.min(680,el.clientWidth||680),H=260;
   cv.width=W; cv.height=H;
   const lbl=document.createElement('p'); lbl.textContent=label||'Loading market data…'; lbl.className='pulse';
   lbl.style.cssText='font-size:.875rem;color:var(--text-muted)';
   wrap.append(cv,lbl); el.appendChild(wrap);
-  const ctx=cv.getContext('2d'),N=60,LINK=110,COLOR='#8b1a1a';
+  const ctx=cv.getContext('2d'),N=90,LINK=130,COLOR='#8b1a1a';
   let mx=-9999,my=-9999;
   const pts=Array.from({length:N},()=>({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.7,vy:(Math.random()-.5)*.7,r:Math.random()*1.5+.5}));
   cv.onmousemove=e=>{const rc=cv.getBoundingClientRect();mx=e.clientX-rc.left;my=e.clientY-rc.top;};
