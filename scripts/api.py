@@ -1084,33 +1084,55 @@ def _hf_date_iso(d: str | None) -> str:
     return d
 
 
-def _geocode_city(city: str) -> tuple[float, float]:
-    """Geocode a German city via Nominatim. Rate-limited to 1 req/sec."""
+def _nominatim_query(q: str) -> tuple[float, float]:
+    """Single Nominatim request, rate-limited. Returns (0,0) on miss."""
     global _geo_last_req_time
+    elapsed = time.time() - _geo_last_req_time
+    if elapsed < 1.1:
+        time.sleep(1.1 - elapsed)
+    try:
+        resp = http_client.get(
+            "https://nominatim.openstreetmap.org/search",
+            params={"q": q, "country": "Germany", "format": "json", "limit": 1},
+            headers={"User-Agent": "horsefinder-app/1.0 (personal project)"},
+            timeout=5,
+        )
+        _geo_last_req_time = time.time()
+        data = resp.json()
+        if data:
+            return (float(data[0]["lat"]), float(data[0]["lon"]))
+    except Exception as exc:
+        logging.warning("Nominatim failed for %r: %s", q, exc)
+    _geo_last_req_time = time.time()
+    return (0.0, 0.0)
+
+
+def _city_candidates(city: str) -> list[str]:
+    """Generate fallback search terms for problematic city strings."""
+    candidates = [city]
+    if "/" in city:
+        parts = [p.strip() for p in city.split("/")]
+        candidates += parts
+    # Strip common venue suffixes that confuse Nominatim
+    import re
+    cleaned = re.sub(r"\b(GmbH|e\.V\.|eV|AG|KG|UG)\b.*", "", city, flags=re.IGNORECASE).strip(" -|,")
+    if cleaned and cleaned != city:
+        candidates.append(cleaned)
+    return list(dict.fromkeys(candidates))  # deduplicate, preserve order
+
+
+def _geocode_city(city: str) -> tuple[float, float]:
+    """Geocode a German city via Nominatim. Tries fallback variants for tricky names."""
     if city in _geo_cache:
         return _geo_cache[city]
     with _geo_lock:
-        if city in _geo_cache:  # double-checked after lock
+        if city in _geo_cache:
             return _geo_cache[city]
-        elapsed = time.time() - _geo_last_req_time
-        if elapsed < 1.1:
-            time.sleep(1.1 - elapsed)
-        try:
-            resp = http_client.get(
-                "https://nominatim.openstreetmap.org/search",
-                params={"q": city, "country": "Germany", "format": "json", "limit": 1},
-                headers={"User-Agent": "horsefinder-app/1.0 (personal project)"},
-                timeout=5,
-            )
-            _geo_last_req_time = time.time()
-            data = resp.json()
-            if data:
-                coords = (float(data[0]["lat"]), float(data[0]["lon"]))
+        for candidate in _city_candidates(city):
+            coords = _nominatim_query(candidate)
+            if coords != (0.0, 0.0):
                 _geo_cache[city] = coords
                 return coords
-        except Exception as exc:
-            logging.warning("Geocode failed for %r: %s", city, exc)
-            _geo_last_req_time = time.time()
         _geo_cache[city] = (0.0, 0.0)
         return (0.0, 0.0)
 
