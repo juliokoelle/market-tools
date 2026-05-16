@@ -154,6 +154,12 @@ class GHPortfolioWrite(BaseModel):
     positions: list[PortfolioPosition]
 
 
+class StockWatchlistEntry(BaseModel):
+    ticker: str
+    notes: str = ""
+    added: str = ""
+
+
 # ---------------------------------------------------------------------------
 # GitHub portfolio helpers
 # ---------------------------------------------------------------------------
@@ -771,6 +777,57 @@ def portfolio_analyze(request: PortfolioRequest):
     return analyze_portfolio(
         [{"ticker": h.ticker, "investment": h.investment} for h in request.holdings]
     )
+
+
+# ---------------------------------------------------------------------------
+# Personal stock watchlist (persisted locally in data/stock_watchlist.json)
+# ---------------------------------------------------------------------------
+
+_STOCK_WATCHLIST_PATH = Path("data/stock_watchlist.json")
+
+
+def _read_stock_watchlist() -> list[dict]:
+    if not _STOCK_WATCHLIST_PATH.exists():
+        return []
+    try:
+        return json.loads(_STOCK_WATCHLIST_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def _write_stock_watchlist(data: list[dict]) -> None:
+    _STOCK_WATCHLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
+    _STOCK_WATCHLIST_PATH.write_text(
+        json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+
+@app.get("/stock-watchlist")
+def stock_watchlist_get():
+    return _read_stock_watchlist()
+
+
+@app.post("/stock-watchlist", status_code=201)
+def stock_watchlist_add(entry: StockWatchlistEntry):
+    data = _read_stock_watchlist()
+    ticker = entry.ticker.upper()
+    if not any(e["ticker"] == ticker for e in data):
+        from scripts.utils import today as _today
+        data.append({
+            "ticker": ticker,
+            "notes": entry.notes,
+            "added": entry.added or _today(),
+        })
+        _write_stock_watchlist(data)
+    return data
+
+
+@app.delete("/stock-watchlist/{ticker}")
+def stock_watchlist_remove(ticker: str):
+    data = _read_stock_watchlist()
+    data = [e for e in data if e["ticker"] != ticker.upper()]
+    _write_stock_watchlist(data)
+    return data
 
 
 # ---------------------------------------------------------------------------
