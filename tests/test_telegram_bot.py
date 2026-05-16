@@ -267,7 +267,8 @@ def test_note_entry_format():
     from unittest.mock import patch
     from scripts.telegram_bot import _note_entry
 
-    with patch("scripts.telegram_bot._now_berlin", return_value="14:30"):
+    with patch("scripts.vault_utils.datetime") as mock_dt:
+        mock_dt.now.return_value.strftime.return_value = "14:30"
         entry = _note_entry("Quick thought")
     assert entry == "- [14:30] Quick thought"
 
@@ -276,7 +277,8 @@ def test_note_entry_contains_timestamp_brackets():
     from unittest.mock import patch
     from scripts.telegram_bot import _note_entry
 
-    with patch("scripts.telegram_bot._now_berlin", return_value="09:05"):
+    with patch("scripts.vault_utils.datetime") as mock_dt:
+        mock_dt.now.return_value.strftime.return_value = "09:05"
         entry = _note_entry("Reminder")
     assert entry.startswith("- [09:05]")
 

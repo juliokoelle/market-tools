@@ -37,6 +37,7 @@ from telegram.ext import (
 
 from scripts.sync_to_brain import github_read, github_read_modify_write
 from scripts.utils import today
+from scripts.vault_utils import insert_into_section, make_daily_note as _make_daily_note, note_entry as _note_entry
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -70,56 +71,8 @@ def _get_openai() -> openai.OpenAI:
 
 
 # ---------------------------------------------------------------------------
-# File mutation helpers
-# ---------------------------------------------------------------------------
-
-def _now_berlin() -> str:
-    return datetime.now(_BERLIN).strftime("%H:%M")
-
-
-def _note_entry(text: str) -> str:
-    return f"- [{_now_berlin()}] {text}"
-
-
-def _make_daily_note(run_date: str) -> str:
-    return (
-        f"---\ndate: {run_date}\ntype: daily\n---\n\n"
-        f"# {run_date}\n\n"
-        "## Tasks\n\n"
-        "## Notes\n\n"
-        "## Shopping List\n\n"
-        "## Focus\n\n"
-        "## Log\n\n"
-        "## Open Questions\n\n"
-        "## People\n\n"
-        "## Follow-ups\n\n"
-        "---\n\n"
-        "*Briefing auto-synced from market-tools at ~08:15 CEST.*\n"
-    )
-
-
-def insert_into_section(text: str, section: str, entry: str) -> str:
-    """Append entry as last line of ## section content (before the next ## heading)."""
-    lines = text.splitlines()
-    header = f"## {section}"
-
-    try:
-        idx = next(i for i, l in enumerate(lines) if l.rstrip() == header)
-    except StopIteration:
-        return text.rstrip("\n") + f"\n\n## {section}\n\n{entry}\n"
-
-    end = len(lines)
-    for i in range(idx + 1, len(lines)):
-        if lines[i].startswith("## "):
-            end = i
-            break
-
-    insert_pos = end
-    while insert_pos > idx + 1 and not lines[insert_pos - 1].strip():
-        insert_pos -= 1
-
-    lines.insert(insert_pos, entry)
-    return "\n".join(lines) + "\n"
+# File mutation helpers (imported from vault_utils)
+# -----------------------------------------------------------------------
 
 
 def _daily_mutator(section: str, entry: str):

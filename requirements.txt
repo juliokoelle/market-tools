@@ -15,3 +15,4 @@ html2text
 httpx
 python-telegram-bot[job-queue]>=20.0
 supabase>=2.0.0
+pytest-asyncio
