@@ -1,0 +1,145 @@
+"""Routes confirmed CapturedItems to the appropriate integrations."""
+
+from __future__ import annotations
+
+import logging
+import os
+import unicodedata
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+import httpx
+
+from scripts.classifier import CapturedItem
+from scripts.sync_to_brain import github_read_modify_write
+from scripts.vault_utils import insert_into_section, make_daily_note, note_entry
+from scripts.utils import today
+
+log = logging.getLogger(__name__)
+_BERLIN = ZoneInfo("Europe/Berlin")
+
+_MYWARDROBE_API = "https://mywardrobe-dun.vercel.app/api/wishlist"
+_MARKET_TOOLS = os.getenv(
+    "MARKET_TOOLS_BACKEND_URL", "https://market-tools-backend-my0v.onrender.com"
+)
+
+
+# ---------------------------------------------------------------------------
+# Obsidian mutation helpers
+# ---------------------------------------------------------------------------
+
+def _daily_mutate(section: str, entry: str):
+    run_date = today()
+
+    def mutate(current: str) -> str:
+        if not current:
+            current = make_daily_note(run_date)
+        return insert_into_section(current, section, entry)
+
+    return f"10_Daily/{run_date}.md", mutate
+
+
+def _person_filename(name: str) -> str:
+    normalized = unicodedata.normalize("NFC", name).lower()
+    return normalized.replace(" ", "-") + ".md"
+
+
+def _make_person_note(name: str) -> str:
+    return (
+        f"---\nname: {name}\ntype: person\n---\n\n"
+        f"# {name}\n\n"
+        "## Geschenkideen\n\n"
+    )
+
+
+def _gift_mutate(person: str, item: str):
+    filename = _person_filename(person)
+    entry = f"- {item} ({today()})"
+
+    def mutate(current: str) -> str:
+        if not current:
+            current = _make_person_note(person)
+        return insert_into_section(current, "Geschenkideen", entry)
+
+    return f"50_People/{filename}", mutate
+
+
+# ---------------------------------------------------------------------------
+# Public entry point
+# ---------------------------------------------------------------------------
+
+async def route_item(item: CapturedItem) -> None:
+    """Dispatch item to integrations. Never raises."""
+    try:
+        await _dispatch(item)
+    except Exception as e:
+        log.error("route_item failed for type=%s text=%r: %s", item.type, item.text, e)
+
+
+async def _dispatch(item: CapturedItem) -> None:
+    if item.type == "task":
+        path, mutate = _daily_mutate("Tasks", f"- [ ] {item.text}")
+        github_read_modify_write(path, mutate, f"capture: task ({today()})")
+
+    elif item.type == "question":
+        entry = f"- [ ] {item.text} ({today()})"
+
+        def q_mutate(current: str) -> str:
+            if not current:
+                current = "# Open Questions\n\n"
+            return current.rstrip("\n") + "\n" + entry + "\n"
+
+        github_read_modify_write(
+            "40_Knowledge/open-questions.md", q_mutate, f"capture: question ({today()})"
+        )
+
+    elif item.type == "reminder":
+        text = item.metadata.get("text") or item.text
+        date_hint = item.metadata.get("date")
+        entry = f"- [ ] {text}" + (f" ({date_hint})" if date_hint else "")
+        path, mutate = _daily_mutate("Follow-ups", entry)
+        github_read_modify_write(path, mutate, f"capture: reminder ({today()})")
+
+    elif item.type == "idea":
+        path, mutate = _daily_mutate("Notes", f"- 💡 {item.text}")
+        github_read_modify_write(path, mutate, f"capture: idea ({today()})")
+
+    elif item.type == "gift_idea":
+        person = item.metadata.get("person") or "Unknown"
+        gift = item.metadata.get("item") or item.text
+        path, mutate = _gift_mutate(person, gift)
+        github_read_modify_write(path, mutate, f"capture: gift idea ({today()})")
+
+    elif item.type == "wishlist":
+        name = item.metadata.get("name") or item.text
+        brand = item.metadata.get("brand") or None
+        price = item.metadata.get("price") or None
+        obs_entry = f"- [ ] {name}" + (f" ({brand})" if brand else "")
+        path, mutate = _daily_mutate("Shopping List", obs_entry)
+        github_read_modify_write(path, mutate, f"capture: wishlist ({today()})")
+        payload: dict = {"name": name, "priority": 2, "currency": "EUR"}
+        if brand:
+            payload["brand"] = brand
+        if price is not None:
+            payload["price"] = float(price)
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(_MYWARDROBE_API, json=payload)
+            resp.raise_for_status()
+
+    elif item.type == "stock_pick":
+        ticker = (item.metadata.get("ticker") or item.text).upper()
+        notes = item.metadata.get("notes") or ""
+        obs_entry = f"- 📈 ${ticker}" + (f" — {notes}" if notes else "")
+        path, mutate = _daily_mutate("Notes", obs_entry)
+        github_read_modify_write(path, mutate, f"capture: stock pick ({today()})")
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                f"{_MARKET_TOOLS}/stock-watchlist",
+                json={"ticker": ticker, "notes": notes, "added": today()},
+            )
+            resp.raise_for_status()
+
+    else:  # note + fallback
+        time_str = datetime.now(_BERLIN).strftime("%H:%M")
+        path, mutate = _daily_mutate("Notes", f"- [{time_str}] {item.text}")
+        github_read_modify_write(path, mutate, f"capture: note ({today()})")
