@@ -25,8 +25,15 @@ Each element: {"type": "...", "text": "...", "metadata": {...}}
 Types and rules:
 - "wishlist": user wants to buy, own, or get something. \
 metadata: {"name": "item name", "brand": "brand or null", "price": null_or_number}
-- "stock_pick": company or ticker mentioned in investing context. \
-metadata: {"ticker": "SYMBOL", "notes": "context or null"}
+- "stock_pick": any company or stock ticker the user mentions for investment tracking — \
+this includes watching, following, considering, owning, researching, or listing stocks/shares. \
+Works in all languages (English, German, Spanish, etc.). \
+German context words: Aktien, Watchlist, Portfolio, kaufen, beobachten, investieren. \
+If the user lists multiple companies, return ONE "stock_pick" item per company. \
+Resolve company names to their official NASDAQ/NYSE ticker where possible \
+(e.g. "monday.com" → "MNDY", "take2 interactive" or "take-two" → "TTWO", \
+"alphabet" → "GOOGL", "meta" → "META", "tesla" → "TSLA"). \
+metadata: {"ticker": "SYMBOL", "company": "full company name", "notes": "user context or null"}
 - "gift_idea": item intended for a named person. \
 metadata: {"person": "Name", "item": "description"}
 - "reminder": time-anchored or "don't forget". \
@@ -36,7 +43,7 @@ metadata: {"text": "reminder text", "date": "date string or null"}
 - "idea": concept, project idea, observation without direct action. metadata: {}
 - "note": everything else. metadata: {}
 
-One message may produce multiple items (e.g. shopping list + stock mention = 2 items). \
+One message may produce multiple items (e.g. a list of 5 stocks = 5 stock_pick items). \
 Never return an empty array. When unclear, use "note"."""
 
 

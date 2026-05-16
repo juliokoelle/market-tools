@@ -66,15 +66,46 @@ def _gift_mutate(person: str, item: str):
 # Public entry point
 # ---------------------------------------------------------------------------
 
-async def route_item(item: CapturedItem) -> None:
-    """Dispatch item to integrations. Never raises."""
+async def route_item(item: CapturedItem) -> str | None:
+    """Dispatch item to integrations. Returns optional follow-up message. Never raises."""
     try:
-        await _dispatch(item)
+        return await _dispatch(item)
     except Exception as e:
         log.error("route_item failed for type=%s text=%r: %s", item.type, item.text, e)
+    return None
 
 
-async def _dispatch(item: CapturedItem) -> None:
+def _format_stock_snapshot(data: dict) -> str:
+    ticker  = data["ticker"]
+    company = data.get("company", ticker)
+    price   = data["current_price"]
+    r30     = data.get("return_30d")
+    trend   = data.get("trend", "—")
+    t_str   = data.get("trend_strength", "")
+    risk    = data.get("risk_level", "—")
+    vol     = data.get("volatility", 0)
+    sent    = data.get("sentiment", "neutral")
+    summary = data.get("summary", "")
+
+    r30_str = f"  {'+' if r30 >= 0 else ''}{r30*100:.1f}% / 30T" if r30 is not None else ""
+    trend_icon = "📈" if trend == "bullish" else "📉"
+    sent_icon  = {"positive": "🟢", "negative": "🔴", "neutral": "🟡"}.get(sent, "🟡")
+    risk_icon  = {"low": "🟢", "medium": "🟡", "high": "🔴"}.get(risk, "🟡")
+
+    lines = [
+        f"📊 *{ticker}*" + (f" ({company})" if company != ticker else ""),
+        "",
+        f"💰 Preis: ${price:.2f}{r30_str}",
+        f"{trend_icon} Trend: {trend.capitalize()} ({t_str})",
+        f"{risk_icon} Risiko: {risk.capitalize()} (Vol {vol*100:.0f}%/Jahr)",
+        f"{sent_icon} Sentiment: {sent.capitalize()}",
+    ]
+    if summary:
+        lines += ["", f"_{summary}_"]
+    return "\n".join(lines)
+
+
+async def _dispatch(item: CapturedItem) -> str | None:
     if item.type == "task":
         path, mutate = _daily_mutate("Tasks", f"- [ ] {item.text}")
         await asyncio.to_thread(github_read_modify_write, path, mutate, f"capture: task ({today()})")
@@ -130,18 +161,35 @@ async def _dispatch(item: CapturedItem) -> None:
             resp.raise_for_status()
 
     elif item.type == "stock_pick":
-        ticker = (item.metadata.get("ticker") or item.text).upper()
+        ticker = (item.metadata.get("ticker") or item.text).upper().strip()
+        company = item.metadata.get("company") or ticker
         notes = item.metadata.get("notes") or ""
-        obs_entry = f"- 📈 ${ticker}" + (f" — {notes}" if notes else "")
+        obs_entry = f"- 📈 ${ticker}" + (f" ({company})" if company != ticker else "") + (f" — {notes}" if notes else "")
         path, mutate = _daily_mutate("Notes", obs_entry)
         await asyncio.to_thread(github_read_modify_write, path, mutate, f"capture: stock pick ({today()})")
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.post(
-                f"{_MARKET_TOOLS}/stock-watchlist",
-                json={"ticker": ticker, "notes": notes, "added": today()},
-            )
-            resp.raise_for_status()
+
+        # Post to watchlist backend (non-fatal if down)
+        try:
+            async with httpx.AsyncClient(timeout=8) as client:
+                resp = await client.post(
+                    f"{_MARKET_TOOLS}/stock-watchlist",
+                    json={"ticker": ticker, "company": company, "notes": notes, "added": today()},
+                )
+                resp.raise_for_status()
+        except Exception as e:
+            log.warning("stock watchlist backend unavailable (%s) — saved to Obsidian only", e)
+
+        # Run quick analysis and return as follow-up message
+        try:
+            from scripts.stock_analyzer import analyze_stock
+            data = await asyncio.to_thread(analyze_stock, ticker)
+            data["company"] = company
+            return _format_stock_snapshot(data)
+        except Exception as e:
+            log.warning("stock analysis for %s failed: %s", ticker, e)
+            return f"📈 *{ticker}* zur Watchlist hinzugefügt."
 
     else:  # note + fallback
         path, mutate = _daily_mutate("Notes", note_entry(item.text))
         await asyncio.to_thread(github_read_modify_write, path, mutate, f"capture: note ({today()})")
+    return None

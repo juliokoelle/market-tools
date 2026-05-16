@@ -131,7 +131,9 @@ async def handle_confirmation(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
         item: CapturedItem = entry["item"]
         label = _TYPE_LABEL.get(item.type, "Note")
         await query.edit_message_text(f"✅ Gespeichert als {label}: {item.text}")
-        await route_item(item)
+        follow_up = await route_item(item)
+        if follow_up:
+            await query.message.reply_text(follow_up)
 
     elif data.startswith("discard:"):
         key = data[8:]
@@ -266,19 +268,28 @@ def _extract_open_items(text: str, section: str) -> list[str]:
     return [l.strip() for l in lines[start:end] if l.strip().startswith("- [ ]")]
 
 
+def _esc(text: str) -> str:
+    """Escape a plain-text string for Telegram MarkdownV2."""
+    for ch in r'\_*[]()~`>#+-=|{}.!':
+        text = text.replace(ch, f'\\{ch}')
+    return text
+
+
 def _format_summary(tasks: list[str], questions: list[str], run_date: str) -> str:
+    safe_date = _esc(run_date)
     if not tasks and not questions:
-        return f"✅ *Abend-Zusammenfassung — {run_date}*\n\nAlles erledigt\\. Guten Abend\\!"
+        return f"✅ *Abend\\-Zusammenfassung — {safe_date}*\n\nAlles erledigt\\. Guten Abend\\!"
 
     def bullet(line: str) -> str:
-        return "• " + (line[6:] if line.startswith("- [ ] ") else line)
+        content = line[6:] if line.startswith("- [ ] ") else line
+        return "• " + _esc(content)
 
-    parts = [f"📋 *Abend\\-Zusammenfassung — {run_date}*"]
+    parts = [f"📋 *Abend\\-Zusammenfassung — {safe_date}*"]
     parts.append("\n*Offene Tasks:*" if tasks else "\n*Offene Tasks:* —")
     parts.extend(bullet(t) for t in tasks)
     parts.append("\n*Offene Fragen:*" if questions else "\n*Offene Fragen:* —")
     parts.extend(bullet(q) for q in questions)
-    parts.append(f"\n_\\({len(tasks)} Tasks · {len(questions)} Fragen\\)_")
+    parts.append(f"\n_{len(tasks)} Tasks · {len(questions)} Fragen_")
     return "\n".join(parts)
 
 
