@@ -1084,12 +1084,51 @@ def _hf_date_iso(d: str | None) -> str:
     return d
 
 
-def _photon_query(q: str) -> tuple[float, float]:
-    """Single Photon (Komoot/OSM) request. No rate limit. Returns (0,0) on miss."""
+_EVENT_WORDS = re.compile(
+    r"\b(spring|dressur|pfingst|hallen|reit|winter|sommer|herbst|jugend|nachwuchs|cup|turnier|meisterschaft|championat|optimum)\b",
+    re.IGNORECASE,
+)
+_VENUE_WORDS = re.compile(
+    r"\b(reitanlage|reitstall|reitstadion|gestüt|gestut|hengststation|stall|anlage|jagdhaus|ecurie|rfv|rv|gmbh|ag|kg|ug|e\.v\.|ev)\b",
+    re.IGNORECASE,
+)
+_YEAR = re.compile(r"\b20\d{2}\b")
+
+
+def _city_candidates(city: str) -> list[str]:
+    seen: dict[str, None] = {}
+    def add(s: str) -> None:
+        s = re.sub(r"\s+", " ", s).strip(" ,/-")
+        if s and len(s) > 2:
+            seen[s] = None
+    add(city)
+    s1 = re.sub(r"\s+(GmbH|AG|KG|UG|e\.V\.|eV)\b.*", "", city, flags=re.IGNORECASE).strip()
+    add(s1)
+    s2 = s1.replace("/", " ").replace(" - ", " ").replace(",", " ")
+    add(s2)
+    s3 = _VENUE_WORDS.sub("", s2).strip()
+    add(s3)
+    s4 = _YEAR.sub("", _EVENT_WORDS.sub("", s3)).strip()
+    add(s4)
+    for token in re.split(r"[\s/\-,]+", s4):
+        if len(token.strip()) > 3 and not _VENUE_WORDS.match(token) and not _YEAR.match(token):
+            add(token.strip())
+            break
+    tokens = [t.strip() for t in re.split(r"[\s/\-,]+", s4) if len(t.strip()) > 3]
+    if tokens:
+        add(tokens[-1])
+    return list(seen.keys())
+
+
+def _photon_query(q: str, countrycode: str | None = "de") -> tuple[float, float]:
+    """Single Photon request. Returns (0,0) on miss."""
+    params: dict = {"q": q, "limit": 1}
+    if countrycode:
+        params["countrycode"] = countrycode
     try:
         resp = http_client.get(
             "https://photon.komoot.io/api/",
-            params={"q": q, "countrycode": "de", "limit": 1},
+            params=params,
             headers={"User-Agent": "horsefinder-app/1.0 (personal project)"},
             timeout=5,
         )
@@ -1102,23 +1141,21 @@ def _photon_query(q: str) -> tuple[float, float]:
     return (0.0, 0.0)
 
 
-def _normalize_city(city: str) -> str:
-    """Replace '/' with space and strip venue suffixes for better geocoding."""
-    import re
-    q = city.replace("/", " ").strip()
-    q = re.sub(r"\s+(GmbH|e\.V\.|eV|AG|KG|UG)\b.*", "", q, flags=re.IGNORECASE).strip()
-    return q
-
-
 def _geocode_city(city: str) -> tuple[float, float]:
-    """Geocode a German city via Photon. Tries normalized variant as fallback."""
+    """Geocode via Photon with aggressive name cleaning and international fallback."""
     if city in _geo_cache:
         return _geo_cache[city]
     with _geo_lock:
         if city in _geo_cache:
             return _geo_cache[city]
-        for q in dict.fromkeys([city, _normalize_city(city)]):
-            coords = _photon_query(q)
+        for q in _city_candidates(city):
+            coords = _photon_query(q, countrycode="de")
+            if coords != (0.0, 0.0):
+                _geo_cache[city] = coords
+                return coords
+        # Fallback: international (Luxembourg, NL, etc.)
+        for q in _city_candidates(city):
+            coords = _photon_query(q, countrycode=None)
             if coords != (0.0, 0.0):
                 _geo_cache[city] = coords
                 return coords
