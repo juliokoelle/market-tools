@@ -11,6 +11,7 @@ services:
     name: market-tools-frontend
     env: static
     plan: free
-    staticPublishPath: ./frontend
+    buildCommand: cd frontend && npm install && npm run build
+    staticPublishPath: ./frontend/dist
     autoDeploy: true
 
