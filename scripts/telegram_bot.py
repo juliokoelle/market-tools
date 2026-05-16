@@ -22,13 +22,15 @@ import json
 import logging
 import os
 import re
+import time as _time_mod
 from datetime import datetime, time
 from zoneinfo import ZoneInfo
 
 import openai
-from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import (
     Application,
+    CallbackQueryHandler,
     CommandHandler,
     ContextTypes,
     MessageHandler,
@@ -38,6 +40,8 @@ from telegram.ext import (
 from scripts.sync_to_brain import github_read, github_read_modify_write
 from scripts.utils import today
 from scripts.vault_utils import insert_into_section, make_daily_note as _make_daily_note, note_entry as _note_entry
+from scripts.classifier import classify_text, CapturedItem
+from scripts.capture_router import route_item
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -58,6 +62,114 @@ _VISION_PROMPT = (
 )
 
 _BERLIN = ZoneInfo("Europe/Berlin")
+
+_TYPE_EMOJI: dict[str, str] = {
+    "wishlist": "🛍️", "stock_pick": "📈", "gift_idea": "🎁",
+    "reminder": "⏰", "task": "📋", "question": "❓",
+    "idea": "💡", "note": "📝",
+}
+_TYPE_LABEL: dict[str, str] = {
+    "wishlist": "Wishlist", "stock_pick": "Stock Pick", "gift_idea": "Geschenkidee",
+    "reminder": "Reminder", "task": "Task", "question": "Frage",
+    "idea": "Idee", "note": "Note",
+}
+
+
+def _confirmation_keyboard(key: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([[
+        InlineKeyboardButton("✅ Speichern", callback_data=f"save:{key}"),
+        InlineKeyboardButton("✏️ Typ ändern", callback_data=f"retype:{key}"),
+        InlineKeyboardButton("❌ Verwerfen", callback_data=f"discard:{key}"),
+    ]])
+
+
+def _type_picker_keyboard(key: str) -> InlineKeyboardMarkup:
+    types = [
+        ("📋 Task", "task"), ("❓ Frage", "question"),
+        ("🛍️ Wishlist", "wishlist"), ("📈 Stock", "stock_pick"),
+        ("🎁 Geschenk", "gift_idea"), ("⏰ Reminder", "reminder"),
+        ("💡 Idee", "idea"), ("📝 Note", "note"),
+    ]
+    rows = [
+        [InlineKeyboardButton(label, callback_data=f"settype:{t}:{key}") for label, t in types[i:i+4]]
+        for i in range(0, len(types), 4)
+    ]
+    return InlineKeyboardMarkup(rows)
+
+
+async def _send_confirmations(
+    update: Update, ctx: ContextTypes.DEFAULT_TYPE, items: list[CapturedItem]
+) -> None:
+    """Send one confirmation message per item and store each in pending state."""
+    pending: dict = ctx.application.bot_data.setdefault("pending", {})
+    for item in items:
+        key = str(_time_mod.monotonic_ns())
+        pending[key] = {"item": item, "ts": _time_mod.time()}
+        emoji = _TYPE_EMOJI.get(item.type, "📝")
+        label = _TYPE_LABEL.get(item.type, "Note")
+        text = f"{emoji} *{label} erkannt*\n{item.text}"
+        await update.message.reply_text(
+            text,
+            parse_mode="Markdown",
+            reply_markup=_confirmation_keyboard(key),
+        )
+
+
+async def handle_confirmation(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle ✅/✏️/❌ and type-picker button taps."""
+    query = update.callback_query
+    await query.answer()
+    data: str = query.data or ""
+    pending: dict = ctx.application.bot_data.get("pending", {})
+
+    if data.startswith("save:"):
+        key = data[5:]
+        entry = pending.pop(key, None)
+        if entry is None:
+            await query.edit_message_reply_markup(reply_markup=None)
+            return
+        item: CapturedItem = entry["item"]
+        label = _TYPE_LABEL.get(item.type, "Note")
+        await query.edit_message_text(f"✅ Gespeichert als {label}: {item.text}")
+        await route_item(item)
+
+    elif data.startswith("discard:"):
+        key = data[8:]
+        pending.pop(key, None)
+        await query.edit_message_text("❌ Verworfen")
+
+    elif data.startswith("retype:"):
+        key = data[7:]
+        if key not in pending:
+            await query.edit_message_reply_markup(reply_markup=None)
+            return
+        item = pending[key]["item"]
+        emoji = _TYPE_EMOJI.get(item.type, "📝")
+        label = _TYPE_LABEL.get(item.type, "Note")
+        await query.edit_message_text(
+            f"{emoji} *{label} erkannt*\n{item.text}\n\nWelcher Typ?",
+            parse_mode="Markdown",
+            reply_markup=_type_picker_keyboard(key),
+        )
+
+    elif data.startswith("settype:"):
+        parts = data.split(":", 2)
+        if len(parts) != 3:
+            return
+        _, new_type, key = parts
+        if key not in pending:
+            await query.edit_message_reply_markup(reply_markup=None)
+            return
+        pending[key]["item"].type = new_type
+        item = pending[key]["item"]
+        emoji = _TYPE_EMOJI.get(new_type, "📝")
+        label = _TYPE_LABEL.get(new_type, "Note")
+        await query.edit_message_text(
+            f"{emoji} *{label} erkannt*\n{item.text}",
+            parse_mode="Markdown",
+            reply_markup=_confirmation_keyboard(key),
+        )
+
 
 # Lazy-initialized OpenAI client — only accessed when a voice/photo message arrives.
 _oai: openai.OpenAI | None = None
@@ -234,13 +346,9 @@ async def plain_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     text = (update.message.text or "").strip()
     if not text:
         return
-    path, mutate = _daily_mutator("Notes", _note_entry(text))
-    try:
-        github_read_modify_write(path, mutate, f"capture: note ({today()})")
-        await update.message.reply_text("✓ Note gespeichert.")
-    except Exception as e:
-        log.error("plain_text failed: %s", e)
-        await update.message.reply_text(f"Fehler: {e}")
+    await update.message.reply_text("🔍 Erkenne…")
+    items = classify_text(text)
+    await _send_confirmations(update, ctx, items)
 
 
 # ---------------------------------------------------------------------------
@@ -250,13 +358,12 @@ async def plain_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def handle_voice(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not _authorized(update):
         return
-    await update.message.reply_text("🎙 Transkribiere...")
+    await update.message.reply_text("🎙 Transkribiere…")
     try:
         tg_file = await update.message.voice.get_file()
         buf = io.BytesIO()
         await tg_file.download_to_memory(buf)
         buf.seek(0)
-
         transcript = _get_openai().audio.transcriptions.create(
             model="whisper-1",
             file=("audio.ogg", buf, "audio/ogg"),
@@ -265,10 +372,9 @@ async def handle_voice(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         if not text:
             await update.message.reply_text("Keine Sprache erkannt.")
             return
-
-        path, mutate = _daily_mutator("Notes", _note_entry(text))
-        github_read_modify_write(path, mutate, f"capture: voice note ({today()})")
-        await update.message.reply_text(f'🎙 Erkannt: "{text}"\n✓ Note gespeichert.')
+        await update.message.reply_text(f'🎙 Erkannt: "{text}"\n🔍 Klassifiziere…')
+        items = classify_text(text)
+        await _send_confirmations(update, ctx, items)
     except Exception as e:
         log.error("handle_voice failed: %s", e)
         await update.message.reply_text(f"Fehler: {e}")
@@ -281,7 +387,7 @@ async def handle_voice(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not _authorized(update):
         return
-    await update.message.reply_text("📷 Analysiere...")
+    await update.message.reply_text("📷 Analysiere…")
     try:
         tg_file = await update.message.photo[-1].get_file()
         buf = io.BytesIO()
@@ -306,27 +412,18 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         raw = response.choices[0].message.content or ""
         type_, content = _parse_vision_response(raw)
 
-        label_map = {"task": "Task", "note": "Note", "question": "Frage", "shopping_list": "Einkaufsliste"}
-        label = label_map.get(type_, "Note")
-
-        if type_ == "task":
-            items = [i.strip() for i in content.split(",") if i.strip()]
-            entries = [f"- [ ] {item}" for item in items]
-            path, mutate = _daily_mutator_entries("Tasks", entries)
-            github_read_modify_write(path, mutate, f"capture: photo task ({today()})")
-        elif type_ == "shopping_list":
-            items = [i.strip() for i in content.split(",") if i.strip()]
-            entries = [f"- [ ] {item}" for item in items]
-            path, mutate = _daily_mutator_entries("Shopping List", entries)
-            github_read_modify_write(path, mutate, f"capture: photo shopping ({today()})")
-        elif type_ == "question":
-            path, mutate = _questions_mutator(f"- [ ] {content} ({today()})")
-            github_read_modify_write(path, mutate, f"capture: photo question ({today()})")
+        if type_ == "shopping_list":
+            raw_items = [i.strip() for i in content.split(",") if i.strip()]
+            items = [
+                CapturedItem(type="wishlist", text=i, metadata={"name": i})
+                for i in raw_items
+            ]
         else:
-            path, mutate = _daily_mutator("Notes", _note_entry(content))
-            github_read_modify_write(path, mutate, f"capture: photo note ({today()})")
+            type_map = {"task": "task", "note": "note", "question": "question"}
+            mapped = type_map.get(type_, "note")
+            items = [CapturedItem(type=mapped, text=content, metadata={})]
 
-        await update.message.reply_text(f"📷 {label} erkannt: {content}\n✓ Gespeichert.")
+        await _send_confirmations(update, ctx, items)
     except Exception as e:
         log.error("handle_photo failed: %s", e)
         await update.message.reply_text(f"Fehler: {e}")
@@ -368,6 +465,7 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.VOICE,                     handle_voice))
     app.add_handler(MessageHandler(filters.PHOTO,                     handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,   plain_text))
+    app.add_handler(CallbackQueryHandler(handle_confirmation))
 
     app.job_queue.run_daily(
         send_evening_summary,
