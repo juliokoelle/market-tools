@@ -11,10 +11,14 @@ import HotStocks from './pages/HotStocks'
 import Analyzer from './pages/Analyzer'
 import Ideas from './pages/Ideas'
 
+const BACKEND = 'https://market-tools-backend-my0v.onrender.com'
+
 export default function App() {
   useEffect(() => {
     const saved = localStorage.getItem('mt_theme') || 'light'
     document.documentElement.dataset.theme = saved
+    // Wake up the Render backend immediately on app load (free tier sleeps after 15 min)
+    fetch(`${BACKEND}/market/prices?tickers=%5EGSPC`).catch(() => {})
   }, [])
 
   return (

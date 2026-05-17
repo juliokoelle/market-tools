@@ -17,20 +17,18 @@ const UNIVERSE = [
 ]
 
 const PORTFOLIO_SEED: Position[] = [
-  { ticker: "VWCE.DE", investment: 650 },
+  { ticker: "VWCE.DE", investment: 350 },
   { ticker: "NVDA",    investment: 180 },
   { ticker: "ASML",    investment: 180 },
-  { ticker: "MSFT",    investment: 150 },
+  { ticker: "AVGO",    investment: 170 },
   { ticker: "GOOGL",   investment: 120 },
-  { ticker: "PLTR",    investment: 150 },
-  { ticker: "4GLD.DE", investment: 570 },
 ]
 
-const WATCHLIST_SEED = ['AAPL', 'AMZN', 'META', 'TSLA', 'SAP', 'BAYN.DE', 'SIE.DE', 'BMW.DE', 'AMD', 'ORCL', 'CRM']
+const WATCHLIST_SEED = ['TSM', 'META', 'AAPL', 'AMZN', 'TSLA', 'PLTR', 'AMD', 'SAP']
 
 const SEED_KEY       = 'mt_portfolio_seed_seen'
-const POSITIONS_KEY  = 'mt_portfolio_positions'
-const WATCHLIST_KEY  = 'mt_watchlist_v1'
+const POSITIONS_KEY  = 'mt_portfolio_v2'
+const WATCHLIST_KEY  = 'mt_watchlist_v2'
 
 function TickerInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [suggestions, setSuggestions] = useState<string[]>([])
