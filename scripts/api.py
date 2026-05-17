@@ -57,8 +57,10 @@ _TTL_BULL_SCORE = 300.0   # watchlist items (5 min)
 _TTL_CHART      = 900.0   # OHLC chart data (15 min)
 _TTL_AI_SUMMARY = 21600.0 # Sonnet summary (6 h)
 _TTL_PORTFOLIO  = 30.0    # portfolio positions (30 s)
+_TTL_NAME       = 1800.0  # company names (30 min)
 
-_PORTFOLIO_GH_PATH = "20_Career/investments/portfolio-current.json"
+_PORTFOLIO_GH_PATH  = "20_Career/investments/portfolio-current.json"
+_WATCHLIST_GH_PATH  = "20_Career/investments/stock-watchlist.json"
 
 
 def _cache_get(key: str, ttl: float) -> object | None:
@@ -156,6 +158,7 @@ class GHPortfolioWrite(BaseModel):
 
 class StockWatchlistEntry(BaseModel):
     ticker: str
+    company: str = ""
     notes: str = ""
     added: str = ""
 
@@ -230,6 +233,74 @@ def _gh_portfolio_write(data: dict, sha: str | None) -> bool:
         return False
     except Exception as e:
         _log_portfolio.error("GitHub portfolio write failed: %s", e)
+        return False
+
+
+_log_watchlist = logging.getLogger("watchlist")
+
+
+def _gh_watchlist_read() -> tuple[list, str | None]:
+    """Read stock_watchlist JSON from GitHub. Returns (data, sha) or ([], None)."""
+    token = os.getenv("GITHUB_TOKEN", "").strip()
+    if not token:
+        return [], None
+    url = (
+        f"https://api.github.com/repos/{_gh_owner()}/{_gh_repo()}"
+        f"/contents/{_WATCHLIST_GH_PATH}"
+    )
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    try:
+        resp = http_client.get(url, headers=headers, timeout=10)
+        if resp.status_code == 404:
+            return [], None
+        if resp.status_code != 200:
+            _log_watchlist.warning("GitHub watchlist GET returned %s", resp.status_code)
+            return [], None
+        body = resp.json()
+        sha = body.get("sha")
+        raw = base64.b64decode(body["content"]).decode("utf-8")
+        return json.loads(raw), sha
+    except Exception as e:
+        _log_watchlist.warning("GitHub watchlist read failed: %s", e)
+        return [], None
+
+
+def _gh_watchlist_write(data: list, sha: str | None) -> bool:
+    """Write stock_watchlist JSON to GitHub. Returns True on success."""
+    token = os.getenv("GITHUB_TOKEN", "").strip()
+    if not token:
+        return False
+    url = (
+        f"https://api.github.com/repos/{_gh_owner()}/{_gh_repo()}"
+        f"/contents/{_WATCHLIST_GH_PATH}"
+    )
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/vnd.github.v3+json",
+    }
+    content_b64 = base64.b64encode(
+        json.dumps(data, indent=2, ensure_ascii=False).encode("utf-8")
+    ).decode("ascii")
+    body: dict = {
+        "message": "watchlist: update stock picks",
+        "content": content_b64,
+        "branch": "main",
+    }
+    if sha:
+        body["sha"] = sha
+    try:
+        resp = http_client.put(url, headers=headers, json=body, timeout=20)
+        if resp.status_code in (200, 201):
+            return True
+        _log_watchlist.warning(
+            "GitHub watchlist PUT returned %s: %s", resp.status_code, resp.text[:200]
+        )
+        return False
+    except Exception as e:
+        _log_watchlist.error("GitHub watchlist write failed: %s", e)
         return False
 
 
@@ -785,6 +856,18 @@ def search_ticker(q: str = Query("", description="Search query (name or ticker)"
         return []
 
 
+@app.get("/market/names")
+def market_names(tickers: str = Query("", description="Comma-separated ticker symbols")):
+    """Return {ticker: company_name} for a batch of tickers. Uses 30-min cache."""
+    from concurrent.futures import ThreadPoolExecutor
+    symbols = [t.strip().upper() for t in tickers.split(",") if t.strip()][:30]
+    if not symbols:
+        return {}
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        results = list(ex.map(_fetch_name, symbols))
+    return dict(zip(symbols, results))
+
+
 @app.get("/stock/analyze")
 def stock_analyze(ticker: str = Query(..., description="Ticker symbol, e.g. AAPL")):
     try:
@@ -808,6 +891,10 @@ _STOCK_WATCHLIST_PATH = Path("data/stock_watchlist.json")
 
 
 def _read_stock_watchlist() -> list[dict]:
+    # Try GitHub first (survives Render redeploys); fall back to local file
+    data, _ = _gh_watchlist_read()
+    if data:
+        return data
     if not _STOCK_WATCHLIST_PATH.exists():
         return []
     try:
@@ -817,6 +904,10 @@ def _read_stock_watchlist() -> list[dict]:
 
 
 def _write_stock_watchlist(data: list[dict]) -> None:
+    # Write to GitHub for persistence across Render redeploys
+    _, sha = _gh_watchlist_read()
+    _gh_watchlist_write(data, sha)
+    # Also write locally as cache
     _STOCK_WATCHLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
     _STOCK_WATCHLIST_PATH.write_text(
         json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8"
@@ -835,9 +926,10 @@ def stock_watchlist_add(entry: StockWatchlistEntry):
     if not any(e["ticker"] == ticker for e in data):
         from scripts.utils import today as _today
         data.append({
-            "ticker": ticker,
-            "notes": entry.notes,
-            "added": entry.added or _today(),
+            "ticker":  ticker,
+            "company": entry.company or _fetch_name(ticker),
+            "notes":   entry.notes,
+            "added":   entry.added or _today(),
         })
         _write_stock_watchlist(data)
     return data
@@ -877,6 +969,22 @@ def _score_one_ticker(ticker: str) -> dict:
     return result
 
 
+def _fetch_name(ticker: str) -> str:
+    """Company name with 30-min cache. Falls back to ticker on any error."""
+    cache_key = f"name:{ticker}"
+    cached = _cache_get(cache_key, _TTL_NAME)
+    if cached is not None:
+        return cached
+    import yfinance as yf
+    try:
+        info = yf.Ticker(ticker).info
+        name = info.get("longName") or info.get("shortName") or ticker
+    except Exception:
+        name = ticker
+    _cache_set(cache_key, name)
+    return name
+
+
 @app.get("/watchlist")
 def get_watchlist():
     from concurrent.futures import ThreadPoolExecutor
@@ -888,13 +996,17 @@ def get_watchlist():
     all_tickers = [t for cat in categories for t in cat["tickers"]]
 
     with ThreadPoolExecutor(max_workers=12) as executor:
-        futures = {ticker: executor.submit(_score_one_ticker, ticker) for ticker in all_tickers}
-        scores = {ticker: fut.result() for ticker, fut in futures.items()}
+        score_futures = {t: executor.submit(_score_one_ticker, t) for t in all_tickers}
+        name_futures  = {t: executor.submit(_fetch_name, t)        for t in all_tickers}
+        scores = {t: f.result() for t, f in score_futures.items()}
+        names  = {t: f.result() for t, f in name_futures.items()}
 
     result = []
     for cat in categories:
-        items = [scores.get(t, {"ticker": t, "bull_score": 50, "components": {}, "is_crypto": False})
-                 for t in cat["tickers"]]
+        items = []
+        for t in cat["tickers"]:
+            entry = scores.get(t, {"ticker": t, "bull_score": 50, "components": {}, "is_crypto": False})
+            items.append({**entry, "name": names.get(t, t)})
         result.append({"name": cat["name"], "tickers": items})
 
     return {"categories": result}

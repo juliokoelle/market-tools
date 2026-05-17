@@ -283,9 +283,10 @@ export default function Analyzer() {
                 onClick={() => setSelected(s.ticker)}
               >
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <div>
-                    <p style={{ fontWeight: 700, fontSize: '.95rem' }}>{s.ticker}</p>
-                    <p style={{ fontSize: '.75rem', color: 'var(--text-3)', maxWidth: 100, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.name}</p>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <p style={{ fontWeight: 700, fontSize: '.85rem', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {s.name !== s.ticker ? `${s.name} — ${s.ticker}` : s.ticker}
+                    </p>
                   </div>
                   <BullRing score={s.bull_score} />
                 </div>

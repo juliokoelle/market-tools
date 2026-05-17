@@ -81,7 +81,7 @@ export const getWatchlist = () =>
       category: cat.name,
       stocks: (cat.tickers ?? []).map((t: any): StockDetail => ({
         ticker: t.ticker,
-        name: t.ticker,
+        name: t.name ?? t.ticker,
         price: t.components?.momentum?.details?.price ?? 0,
         change_pct: 0,
         bull_score: t.bull_score ?? 50,
@@ -119,6 +119,9 @@ export const getStockDetail = (ticker: string) =>
       analyst:   d.components?.analyst?.score   ?? 50,
     },
   }))
+
+export const getMarketNames = (tickers: string[]) =>
+  get<Record<string, string>>(`/market/names?tickers=${tickers.join(',')}`)
 
 export const getStockChart = (ticker: string, period: string) =>
   get<any>(`/stock/${ticker}/chart?period=${period}`).then((d: any): ChartPoint[] => d.ohlcv ?? [])

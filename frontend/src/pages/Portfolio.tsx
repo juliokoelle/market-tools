@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { getPortfolio, savePortfolio, analyzePortfolio, getMarketPrices, getStockDetail, searchTickers, type Position, type PortfolioAnalysis, type StockDetail } from '../services/api'
+import { getPortfolio, savePortfolio, analyzePortfolio, getMarketPrices, getMarketNames, getStockDetail, searchTickers, type Position, type PortfolioAnalysis, type StockDetail } from '../services/api'
 
 const UNIVERSE = [
   "AAPL","MSFT","NVDA","GOOG","META","AVGO","AMD","ORCL","CRM","ADBE",
@@ -251,6 +251,7 @@ export default function Portfolio() {
     } catch { return WATCHLIST_SEED }
   })
   const [watchPrices, setWatchPrices] = useState<Record<string, { price: number; change_pct: number }>>({})
+  const [watchNames, setWatchNames]   = useState<Record<string, string>>({})
   const [watchInput, setWatchInput]   = useState('')
   const watchInputRef = useRef<HTMLDivElement>(null)
   const [transferTicker, setTransferTicker] = useState<{ ticker: string; price: number } | null>(null)
@@ -284,9 +285,14 @@ export default function Portfolio() {
       })
   }, [])
 
-  // Persist + load watchlist prices
+  // Persist + load watchlist prices and names
   useEffect(() => {
     localStorage.setItem(WATCHLIST_KEY, JSON.stringify(watchlist))
+  }, [watchlist])
+
+  useEffect(() => {
+    if (!watchlist.length) return
+    getMarketNames(watchlist).then(setWatchNames).catch(() => {})
   }, [watchlist])
 
   useEffect(() => {
@@ -489,7 +495,7 @@ export default function Portfolio() {
               <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                    {['Ticker', 'Price', 'Change', ''].map(h => (
+                    {['Stock', 'Price', 'Change', ''].map(h => (
                       <th key={h} style={{ padding: '.75rem 1.25rem', textAlign: 'left', fontSize: '.65rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
                     ))}
                   </tr>
@@ -500,7 +506,11 @@ export default function Portfolio() {
                     const inPortfolio = portfolioTickers.has(ticker)
                     return (
                       <tr key={ticker} style={{ borderBottom: i < watchlist.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                        <td style={{ padding: '.85rem 1.25rem', fontWeight: 700, fontSize: '.9rem' }}>{ticker}</td>
+                        <td style={{ padding: '.85rem 1.25rem', fontWeight: 600, fontSize: '.875rem' }}>
+                          {watchNames[ticker] && watchNames[ticker] !== ticker
+                            ? `${watchNames[ticker]} — ${ticker}`
+                            : ticker}
+                        </td>
                         <td style={{ padding: '.85rem 1.25rem', fontSize: '.9rem', color: 'var(--text-2)' }}>
                           {d ? `$${d.price.toFixed(2)}` : <span style={{ color: 'var(--text-3)' }}>···</span>}
                         </td>

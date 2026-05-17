@@ -67,7 +67,7 @@ export default function HotStocks() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem', minWidth: 500 }}>
           <thead>
             <tr style={{ background: 'var(--surface-alt)', borderBottom: '1px solid var(--border)' }}>
-              {['#', 'Ticker', 'Name', 'Price', 'Change', tab.startsWith('bull') ? 'Bull Score' : ''].filter(Boolean).map(h => (
+              {['#', 'Stock', 'Price', 'Change', tab.startsWith('bull') ? 'Bull Score' : ''].filter(Boolean).map(h => (
                 <th key={h} style={thStyle}>{h}</th>
               ))}
             </tr>
@@ -82,9 +82,10 @@ export default function HotStocks() {
                     <td style={tdStyle}><span style={{ color: 'var(--text-faint)', fontSize: '.8rem' }}>{page * PAGE_SIZE + i + 1}</span></td>
                     <td style={tdStyle}>
                       <a href={`https://finance.yahoo.com/quote/${s.ticker}`} target="_blank" rel="noopener noreferrer"
-                        style={{ fontWeight: 700, color: 'var(--primary)' }}>{s.ticker}</a>
+                        style={{ fontWeight: 600, color: 'var(--primary)' }}>
+                        {s.name !== s.ticker ? `${s.name} — ${s.ticker}` : s.ticker}
+                      </a>
                     </td>
-                    <td style={{ ...tdStyle, color: 'var(--text-muted)' }}>{s.name}</td>
                     <td style={tdStyle}>${s.price.toFixed(2)}</td>
                     <td style={tdStyle}>
                       <span style={{ color: s.change_pct >= 0 ? '#059669' : '#dc2626', fontWeight: 600 }}>
