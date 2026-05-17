@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "deploy": "tsc -b && vite build && cd .. && git add frontend/dist && git commit -m 'build: update dist' && git push",
     "lint": "eslint .",
     "preview": "vite preview"
   },
