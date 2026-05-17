@@ -7,7 +7,7 @@ function classicScript() {
     name: 'classic-script',
     transformIndexHtml(html: string) {
       return html
-        .replace(/ type="module"/g, '')
+        .replace(/ type="module"/g, ' defer')
         .replace(/ crossorigin/g, '')
     },
   }
