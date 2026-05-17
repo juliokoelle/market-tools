@@ -24,7 +24,25 @@ export const getMarketPrices = (tickers: string) =>
   get<Record<string, { price: number; change: number; change_pct: number }>>(`/market/prices?tickers=${tickers}`)
 
 export const getHotStocks = () =>
-  get<{ gainers: StockRow[]; losers: StockRow[]; bull_high: StockRow[]; bull_low: StockRow[] }>('/market/hot-stocks')
+  get<any>('/market/hot-stocks').then((d: any) => {
+    const stocks: StockRow[] = (d.stocks ?? [])
+      .filter((s: any) => s.price != null)
+      .map((s: any): StockRow => ({
+        ticker: s.ticker,
+        name: s.name ?? s.ticker,
+        price: s.price ?? 0,
+        change_pct: s.change_pct ?? 0,
+        bull_score: s.bull_score ?? 50,
+      }))
+    const byChange = [...stocks].sort((a, b) => b.change_pct - a.change_pct)
+    const byBull   = [...stocks].sort((a, b) => (b.bull_score ?? 50) - (a.bull_score ?? 50))
+    return {
+      gainers:  byChange.slice(0, 5),
+      losers:   byChange.slice(-5).reverse(),
+      bull_high: byBull.slice(0, 5),
+      bull_low:  byBull.slice(-5).reverse(),
+    }
+  })
 
 // Briefing
 export const getBriefingPreview = () =>
@@ -51,13 +69,52 @@ export const analyzePortfolio = (holdings: Holding[]) =>
 
 // Stocks
 export const getWatchlist = () =>
-  get<WatchlistCategory[]>('/watchlist')
+  get<any>('/watchlist').then((data: any): WatchlistCategory[] =>
+    (data.categories ?? []).map((cat: any) => ({
+      category: cat.name,
+      stocks: (cat.tickers ?? []).map((t: any): StockDetail => ({
+        ticker: t.ticker,
+        name: t.ticker,
+        price: t.components?.momentum?.details?.price ?? 0,
+        change_pct: 0,
+        bull_score: t.bull_score ?? 50,
+        sector: '',
+        market_cap: 0,
+        pe_ratio: null,
+        week_52_high: 0,
+        week_52_low: 0,
+        components: {
+          momentum:  t.components?.momentum?.score  ?? 50,
+          sentiment: t.components?.sentiment?.score ?? 50,
+          valuation: t.components?.valuation?.score ?? 50,
+          analyst:   t.components?.analyst?.score   ?? 50,
+        },
+      })),
+    }))
+  )
 
 export const getStockDetail = (ticker: string) =>
-  get<StockDetail>(`/stock/${ticker}/detail`)
+  get<any>(`/stock/${ticker}/detail`).then((d: any): StockDetail => ({
+    ticker: d.ticker,
+    name: d.name ?? d.company_name ?? d.ticker,
+    price: d.price ?? 0,
+    change_pct: d.change_pct ?? 0,
+    bull_score: d.bull_score ?? 50,
+    sector: d.sector ?? '',
+    market_cap: d.market_cap ?? 0,
+    pe_ratio: d.pe_ratio ?? null,
+    week_52_high: d.week_52_high ?? 0,
+    week_52_low: d.week_52_low ?? 0,
+    components: {
+      momentum:  d.components?.momentum?.score  ?? 50,
+      sentiment: d.components?.sentiment?.score ?? 50,
+      valuation: d.components?.valuation?.score ?? 50,
+      analyst:   d.components?.analyst?.score   ?? 50,
+    },
+  }))
 
 export const getStockChart = (ticker: string, period: string) =>
-  get<ChartPoint[]>(`/stock/${ticker}/chart?period=${period}`)
+  get<any>(`/stock/${ticker}/chart?period=${period}`).then((d: any): ChartPoint[] => d.ohlcv ?? [])
 
 export const getStockAiSummary = (ticker: string) =>
   get<{ summary: string }>(`/stock/${ticker}/ai-summary`)

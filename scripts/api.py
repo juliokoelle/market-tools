@@ -589,7 +589,28 @@ def market_prices(
     ticker_list = [t.strip().upper() for t in tickers.split(",") if t.strip()]
     if not ticker_list:
         raise HTTPException(status_code=400, detail="No tickers provided.")
-    return {"prices": get_multiple_prices(ticker_list)}
+
+    import yfinance as yf
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _fetch_one(ticker: str) -> tuple:
+        try:
+            fi    = yf.Ticker(ticker).fast_info
+            price = fi.get("lastPrice") or fi.get("regularMarketPrice")
+            prev  = fi.get("previousClose") or fi.get("regularMarketPreviousClose")
+            chg   = (price - prev) / prev * 100 if price and prev and prev != 0 else 0.0
+            chg_abs = (price - prev) if price and prev else 0.0
+            return ticker, {
+                "price":      round(float(price), 2) if price else None,
+                "change":     round(float(chg_abs), 2),
+                "change_pct": round(float(chg), 2),
+            }
+        except Exception:
+            return ticker, {"price": None, "change": 0.0, "change_pct": 0.0}
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        pairs = list(ex.map(_fetch_one, ticker_list))
+    return dict(pairs)
 
 
 @app.get("/market/history")
@@ -893,10 +914,19 @@ def stock_detail(ticker: str):
     score_data = bull_score(ticker)
 
     try:
-        info = yf.Ticker(ticker).info
+        info  = yf.Ticker(ticker).info
+        price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
+        prev  = info.get("previousClose") or 0
+        chg   = (price - prev) / prev * 100 if prev else 0.0
         detail = {
             **score_data,
+            "name":         info.get("longName") or info.get("shortName") or ticker,
             "company_name": info.get("longName") or info.get("shortName") or ticker,
+            "price":        round(float(price), 2),
+            "change_pct":   round(float(chg), 2),
+            "pe_ratio":     info.get("trailingPE"),
+            "week_52_high": info.get("fiftyTwoWeekHigh"),
+            "week_52_low":  info.get("fiftyTwoWeekLow"),
             "sector":       info.get("sector"),
             "industry":     info.get("industry"),
             "market_cap":   info.get("marketCap"),
@@ -904,7 +934,9 @@ def stock_detail(ticker: str):
             "description":  (info.get("longBusinessSummary") or "")[:500],
         }
     except Exception:
-        detail = {**score_data, "company_name": ticker}
+        detail = {**score_data, "name": ticker, "company_name": ticker,
+                  "price": 0, "change_pct": 0, "pe_ratio": None,
+                  "week_52_high": None, "week_52_low": None}
 
     _cache_set(cache_key, detail)
     return detail
