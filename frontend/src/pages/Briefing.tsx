@@ -92,7 +92,7 @@ export default function Briefing() {
           <p style={{ fontSize: '.65rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.75rem' }}>
             Archive
           </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '.1rem', maxHeight: '70vh', overflowY: 'auto' }}>
+          <div className="briefing-archive-list" style={{ display: 'flex', flexDirection: 'column', gap: '.1rem', maxHeight: '70vh', overflowY: 'auto' }}>
             {list.length === 0
               ? <p style={{ fontSize: '.8rem', color: 'var(--text-3)' }}>No briefings yet.</p>
               : list.map(b => (
