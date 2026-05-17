@@ -29,6 +29,12 @@ function IconMoon() {
 function IconChevron({ collapsed }: { collapsed: boolean }) {
   return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transition: 'transform .2s', transform: collapsed ? 'rotate(180deg)' : 'none' }}><polyline points="15 18 9 12 15 6"/></svg>
 }
+function IconHamburger() {
+  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+}
+function IconClose() {
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+}
 
 const NAV_MARKET = [
   { to: '/market',            label: 'Dashboard',      icon: <IconDashboard />, end: true },
@@ -41,12 +47,34 @@ const NAV_MARKET = [
 export default function Navigation() {
   const { theme, toggle } = useTheme()
   const [collapsed, setCollapsed] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  const closeDrawer = () => setMobileOpen(false)
 
   return (
     <>
-      <aside className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}`}>
+      {/* Mobile hamburger button — hidden on desktop */}
+      <button
+        className="hamburger-btn"
+        onClick={() => setMobileOpen(o => !o)}
+        aria-label="Open navigation"
+      >
+        <IconHamburger />
+      </button>
+
+      {/* Mobile overlay — closes drawer on tap */}
+      {mobileOpen && (
+        <div className="sidebar-overlay" onClick={closeDrawer} />
+      )}
+
+      <aside className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}${mobileOpen ? ' sidebar--mobile-open' : ''}`}>
+        {/* Mobile close button — only visible inside drawer */}
+        <button className="sidebar-mobile-close" onClick={closeDrawer} aria-label="Close navigation">
+          <IconClose />
+        </button>
+
         {/* Logo */}
-        <Link to="/" className="sidebar-logo" style={{ textDecoration: 'none' }}>
+        <Link to="/" className="sidebar-logo" onClick={closeDrawer} style={{ textDecoration: 'none' }}>
           <div className="sidebar-logo-mark">JK</div>
           {!collapsed && <span className="sidebar-logo-name">Intelligence OS</span>}
         </Link>
@@ -61,6 +89,7 @@ export default function Navigation() {
               end={l.end}
               title={collapsed ? l.label : undefined}
               className={({ isActive }) => `sidebar-item${isActive ? ' active' : ''}`}
+              onClick={closeDrawer}
             >
               <span className="sidebar-item-icon">{l.icon}</span>
               {!collapsed && l.label}
@@ -77,6 +106,7 @@ export default function Navigation() {
             to="/ideas"
             title={collapsed ? 'Ideas' : undefined}
             className={({ isActive }) => `sidebar-item${isActive ? ' active' : ''}`}
+            onClick={closeDrawer}
           >
             <span className="sidebar-item-icon"><IconIdeas /></span>
             {!collapsed && 'Ideas'}
@@ -92,7 +122,7 @@ export default function Navigation() {
         </div>
       </aside>
 
-      {/* Collapse toggle tab */}
+      {/* Desktop collapse toggle tab — hidden on mobile */}
       <button
         className="sidebar-collapse-btn"
         onClick={() => setCollapsed(c => !c)}
