@@ -63,8 +63,8 @@ export default function HotStocks() {
         ))}
       </div>
 
-      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
+      <div className="card table-scroll" style={{ padding: 0 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem', minWidth: 500 }}>
           <thead>
             <tr style={{ background: 'var(--surface-alt)', borderBottom: '1px solid var(--border)' }}>
               {['#', 'Ticker', 'Name', 'Price', 'Change', tab.startsWith('bull') ? 'Bull Score' : ''].filter(Boolean).map(h => (

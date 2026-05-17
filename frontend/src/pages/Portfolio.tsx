@@ -384,7 +384,8 @@ export default function Portfolio() {
           <div className="card" style={{ marginBottom: '1.5rem' }}>
             <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>Holdings</h2>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 28px 28px', gap: '.5rem .5rem', marginBottom: '.75rem' }}>
+            <div style={{ overflowX: 'auto', marginBottom: '.75rem', WebkitOverflowScrolling: 'touch' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 28px 28px', gap: '.5rem .5rem', minWidth: 360 }}>
               <p style={labelStyle}>Ticker</p>
               <p style={labelStyle}>Investment (€)</p>
               <span /><span />
@@ -412,6 +413,7 @@ export default function Portfolio() {
                   >×</button>
                 </>
               ))}
+            </div>
             </div>
 
             <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap' }}>
@@ -478,7 +480,7 @@ export default function Portfolio() {
           </div>
 
           {/* Watchlist rows */}
-          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div className="card table-scroll" style={{ padding: 0 }}>
             {watchlist.length === 0 ? (
               <p style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-3)', fontSize: '.875rem' }}>
                 Your watchlist is empty. Search for a ticker above to add.

@@ -94,7 +94,7 @@ export default function Dashboard() {
       </div>
 
       {/* Briefing + Quick links */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: '1rem', marginBottom: '1.5rem' }}>
+      <div className="grid-main-sidebar" style={{ marginBottom: '1.5rem' }}>
         {/* Briefing preview */}
         <div className="card">
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
