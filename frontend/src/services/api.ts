@@ -52,7 +52,11 @@ export const getBriefingList = () =>
   get<BriefingMeta[]>('/briefing/list')
 
 export const getBriefing = (date: string) =>
-  get<{ date: string; content: string; html: string }>(`/briefing/${date}`)
+  get<any>(`/briefing/${date}`).then((d: any) => ({
+    date: d.date,
+    content: d.markdown ?? d.content ?? '',
+    html: d.html_render ?? d.html ?? '',
+  }))
 
 export const getBriefingCost = () =>
   get<{ monthly_total: number; budget: number; entries: CostEntry[] }>('/briefing/cost-summary')
