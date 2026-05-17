@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { getPortfolio, savePortfolio, analyzePortfolio, getMarketPrices, type Position, type PortfolioAnalysis } from '../services/api'
+import { getPortfolio, savePortfolio, analyzePortfolio, getMarketPrices, getStockDetail, type Position, type PortfolioAnalysis, type StockDetail } from '../services/api'
 
 const UNIVERSE = [
   "AAPL","MSFT","NVDA","GOOG","META","AVGO","AMD","ORCL","CRM","ADBE",
@@ -156,6 +156,50 @@ function TransferModal({ ticker, price, onConfirm, onCancel }: {
   )
 }
 
+function HoldingDetailModal({ ticker, onClose }: { ticker: string; onClose: () => void }) {
+  const [detail, setDetail] = useState<StockDetail | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    getStockDetail(ticker).then(setDetail).catch(() => {}).finally(() => setLoading(false))
+  }, [ticker])
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }} onClick={onClose}>
+      <div style={{ background: 'var(--surface)', borderRadius: 'var(--radius)', width: '100%', maxWidth: 480, padding: '1.5rem' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
+          <div>
+            <h2 style={{ fontSize: '1.2rem', fontWeight: 700 }}>{ticker}</h2>
+            {detail && <p style={{ fontSize: '.85rem', color: 'var(--text-3)' }}>{detail.name} · {detail.sector}</p>}
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: 'var(--text-3)', cursor: 'pointer' }}>×</button>
+        </div>
+        {loading && <p style={{ textAlign: 'center', color: 'var(--text-3)', fontSize: '.875rem', padding: '1.5rem 0' }}>Loading…</p>}
+        {detail && (
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '.5rem' }}>
+            {[
+              { label: 'Price',      value: `$${detail.price.toFixed(2)}` },
+              { label: 'Bull Score', value: String(detail.bull_score) },
+              { label: 'Change',     value: `${detail.change_pct >= 0 ? '+' : ''}${detail.change_pct.toFixed(2)}%`, color: detail.change_pct >= 0 ? '#059669' : '#dc2626' },
+              { label: 'P/E Ratio',  value: detail.pe_ratio?.toFixed(1) ?? '—' },
+              { label: 'Market Cap', value: detail.market_cap ? `$${(detail.market_cap / 1e9).toFixed(1)}B` : '—' },
+              { label: '52W High',   value: `$${detail.week_52_high?.toFixed(2) ?? '—'}` },
+              { label: '52W Low',    value: `$${detail.week_52_low?.toFixed(2) ?? '—'}` },
+              { label: 'Sector',     value: detail.sector ?? '—' },
+            ].map(m => (
+              <div key={m.label} style={{ padding: '.55rem .65rem', background: 'var(--surface-alt)', borderRadius: 6 }}>
+                <p style={{ fontSize: '.68rem', color: 'var(--text-3)', marginBottom: '.1rem', textTransform: 'uppercase', letterSpacing: '.03em' }}>{m.label}</p>
+                <p style={{ fontWeight: 700, fontSize: '.9rem', color: (m as any).color ?? 'var(--text)' }}>{m.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function Portfolio() {
   const [tab, setTab] = useState<'holdings' | 'watchlist'>('holdings')
 
@@ -186,6 +230,9 @@ export default function Portfolio() {
   const [watchInput, setWatchInput]   = useState('')
   const watchInputRef = useRef<HTMLDivElement>(null)
   const [transferTicker, setTransferTicker] = useState<{ ticker: string; price: number } | null>(null)
+
+  // ── Detail modal ──
+  const [detailTicker, setDetailTicker] = useState<string | null>(null)
 
   // ── Toast ──
   const [toast, setToast] = useState('')
@@ -313,10 +360,10 @@ export default function Portfolio() {
           <div className="card" style={{ marginBottom: '1.5rem' }}>
             <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>Holdings</h2>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 36px', gap: '.5rem .75rem', marginBottom: '.75rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 28px 28px', gap: '.5rem .5rem', marginBottom: '.75rem' }}>
               <p style={labelStyle}>Ticker</p>
               <p style={labelStyle}>Investment (€)</p>
-              <span />
+              <span /><span />
               {positions.map((p, i) => (
                 <>
                   <TickerInput key={`t${i}`} value={p.ticker} onChange={v => updateTicker(i, v)} />
@@ -328,6 +375,12 @@ export default function Portfolio() {
                     placeholder="5000"
                     style={inputStyle}
                   />
+                  <button
+                    key={`i${i}`}
+                    onClick={() => p.ticker && setDetailTicker(p.ticker)}
+                    title="View details"
+                    style={{ background: 'none', border: 'none', color: p.ticker ? 'var(--teal)' : 'var(--text-3)', fontSize: '.85rem', cursor: p.ticker ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: p.ticker ? 1 : 0.3 }}
+                  >↗</button>
                   <button
                     key={`d${i}`}
                     onClick={() => removeRow(i)}
@@ -460,6 +513,8 @@ export default function Portfolio() {
           </div>
         </div>
       )}
+
+      {detailTicker && <HoldingDetailModal ticker={detailTicker} onClose={() => setDetailTicker(null)} />}
 
       {showSeed && <SeedModal onAccept={acceptSeed} onDecline={declineSeed} />}
 
