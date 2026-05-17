@@ -46,7 +46,7 @@ The system prompt instructs Claude to return **only valid JSON**, no markdown. C
 - `gift_idea` — item intended for a named person ("für Mama", "Nick würde X gefallen")
 - `reminder` — time-anchored note ("erinnere mich", "nicht vergessen", "bis Montag")
 - `task` — concrete action to complete ("Mail schreiben", "anrufen", "erledigen")
-- `question` — something to look up or decide ("wie funktioniert X", "was ist besser")
+- `question` — something to look up or decide ("wie funktioniert X", "was ist besser", "was ist")
 - `idea` — concept, project idea, observation without direct action
 - `note` — everything else
 

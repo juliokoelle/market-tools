@@ -39,3 +39,10 @@ categories:
     tickers:
       - BTC-USD
       - ETH-USD
+
+  - name: On Watch
+    tickers:
+      - MNDY    # monday.com
+      - TTWO    # Take-Two Interactive
+      - HIMS    # Hims & Hers Health
+      - SHOP    # Shopify
