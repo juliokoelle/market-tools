@@ -44,7 +44,7 @@ export default function LandingPage() {
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             <a
-              href="https://www.linkedin.com/in/julio-koelle"
+              href="https://www.linkedin.com/in/julio-koelle-864026180"
               target="_blank"
               rel="noopener noreferrer"
               className="btn btn-primary"
