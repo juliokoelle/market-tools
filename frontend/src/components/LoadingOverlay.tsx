@@ -9,19 +9,19 @@ interface Orb {
   ox: number; oy: number
 }
 
-const COLORS: Array<[number, number, number]> = [
-  [20, 184, 166],   // teal
-  [99, 102, 241],   // indigo
-  [244, 63, 94],    // rose
-  [139, 92, 246],   // violet
-  [6, 182, 212],    // cyan
-  [245, 158, 11],   // amber
-  [34, 197, 94],    // green
-  [249, 115, 22],   // orange
+const DARK_COLORS: Array<[number, number, number]> = [
+  [20, 184, 166], [99, 102, 241], [244, 63, 94], [139, 92, 246],
+  [6, 182, 212], [245, 158, 11], [34, 197, 94], [249, 115, 22],
 ]
 
-function makeOrbs(w: number, h: number): Orb[] {
-  return COLORS.map(color => ({
+const LIGHT_COLORS: Array<[number, number, number]> = [
+  [13, 148, 136], [79, 70, 229], [225, 29, 72], [124, 58, 237],
+  [8, 145, 178], [217, 119, 6], [21, 128, 61], [234, 88, 12],
+]
+
+function makeOrbs(w: number, h: number, isDark: boolean): Orb[] {
+  const palette = isDark ? DARK_COLORS : LIGHT_COLORS
+  return palette.map(color => ({
     x: Math.random() * w,
     y: Math.random() * h,
     vx: (Math.random() - 0.5) * 0.6,
@@ -32,6 +32,10 @@ function makeOrbs(w: number, h: number): Orb[] {
     ox: (Math.random() - 0.5) * w * 0.6,
     oy: (Math.random() - 0.5) * h * 0.6,
   }))
+}
+
+function isDarkTheme() {
+  return document.documentElement.dataset.theme === 'dark'
 }
 
 export function LoadingOverlay({ visible }: { visible: boolean }) {
@@ -45,7 +49,6 @@ export function LoadingOverlay({ visible }: { visible: boolean }) {
   useEffect(() => {
     if (visible) {
       setMounted(true)
-      // allow mount to happen, then fade in
       const t = requestAnimationFrame(() => setShow(true))
       return () => cancelAnimationFrame(t)
     } else {
@@ -60,14 +63,15 @@ export function LoadingOverlay({ visible }: { visible: boolean }) {
 
     const canvas = canvasRef.current
     if (!canvas) return
-    const cv = canvas  // stable non-null ref for closures
+    const cv = canvas
     const ctx = cv.getContext('2d')!
+    const dark = isDarkTheme()
 
     function resize() {
       cv.width = window.innerWidth
       cv.height = window.innerHeight
       if (!orbsRef.current.length)
-        orbsRef.current = makeOrbs(cv.width, cv.height)
+        orbsRef.current = makeOrbs(cv.width, cv.height, dark)
     }
     resize()
     window.addEventListener('resize', resize)
@@ -83,16 +87,11 @@ export function LoadingOverlay({ visible }: { visible: boolean }) {
 
       for (const orb of orbsRef.current) {
         if (mouse.current) {
-          const tx = mouse.current.x + orb.ox
-          const ty = mouse.current.y + orb.oy
-          orb.x += (tx - orb.x) * orb.factor
-          orb.y += (ty - orb.y) * orb.factor
+          orb.x += (mouse.current.x + orb.ox - orb.x) * orb.factor
+          orb.y += (mouse.current.y + orb.oy - orb.y) * orb.factor
         } else {
-          // autonomous drift
-          orb.vx += (Math.random() - 0.5) * 0.03
-          orb.vy += (Math.random() - 0.5) * 0.03
-          orb.vx = Math.max(-0.8, Math.min(0.8, orb.vx))
-          orb.vy = Math.max(-0.8, Math.min(0.8, orb.vy))
+          orb.vx = Math.max(-0.8, Math.min(0.8, orb.vx + (Math.random() - 0.5) * 0.03))
+          orb.vy = Math.max(-0.8, Math.min(0.8, orb.vy + (Math.random() - 0.5) * 0.03))
           orb.x += orb.vx
           orb.y += orb.vy
           if (orb.x < -orb.r) orb.x = W + orb.r
@@ -102,13 +101,15 @@ export function LoadingOverlay({ visible }: { visible: boolean }) {
         }
 
         const [r, g, b] = orb.color
+        const alpha0 = dark ? 0.55 : 0.35
+        const alpha1 = dark ? 0.18 : 0.12
         const g2 = ctx.createRadialGradient(orb.x, orb.y, 0, orb.x, orb.y, orb.r)
-        g2.addColorStop(0, `rgba(${r},${g},${b},0.55)`)
-        g2.addColorStop(0.5, `rgba(${r},${g},${b},0.18)`)
+        g2.addColorStop(0, `rgba(${r},${g},${b},${alpha0})`)
+        g2.addColorStop(0.5, `rgba(${r},${g},${b},${alpha1})`)
         g2.addColorStop(1, `rgba(${r},${g},${b},0)`)
 
         ctx.save()
-        ctx.globalCompositeOperation = 'screen'
+        ctx.globalCompositeOperation = dark ? 'screen' : 'multiply'
         ctx.fillStyle = g2
         ctx.beginPath()
         ctx.arc(orb.x, orb.y, orb.r, 0, Math.PI * 2)
@@ -130,26 +131,32 @@ export function LoadingOverlay({ visible }: { visible: boolean }) {
 
   if (!mounted) return null
 
+  const dark = isDarkTheme()
+  const bg = dark ? 'rgba(4, 7, 14, 0.92)' : 'rgba(245, 244, 240, 0.92)'
+  const spinBorder = dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)'
+  const spinAccent = 'rgba(20,184,166,0.85)'
+  const textColor = dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'
+
   return (
     <div style={{
       position: 'fixed', inset: 0, zIndex: 1000,
-      background: 'rgba(4, 7, 14, 0.93)',
+      background: bg,
       opacity: show ? 1 : 0,
       transition: 'opacity 0.35s ease',
-      pointerEvents: visible ? 'all' : 'none',
+      pointerEvents: 'none',  // never blocks clicks — purely visual
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />
       <div style={{ position: 'relative', textAlign: 'center', userSelect: 'none' }}>
         <div style={{
           display: 'inline-block', width: 32, height: 32,
-          border: '2px solid rgba(255,255,255,0.15)',
-          borderTopColor: 'rgba(20,184,166,0.8)',
+          border: `2px solid ${spinBorder}`,
+          borderTopColor: spinAccent,
           borderRadius: '50%',
           animation: 'spin 0.9s linear infinite',
         }} />
         <p style={{
-          marginTop: '.75rem', color: 'rgba(255,255,255,0.35)',
+          marginTop: '.75rem', color: textColor,
           fontSize: '.7rem', letterSpacing: '.12em', textTransform: 'uppercase',
         }}>Loading</p>
       </div>
