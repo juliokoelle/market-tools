@@ -82,12 +82,11 @@ export default function Briefing() {
 
   return (
     <main className="page page-enter">
-      <LoadingOverlay visible={loading} />
       <div className="page-header">
         <h1 className="page-title">Daily Briefing</h1>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: '1.5rem', alignItems: 'start' }}>
+      <div className="grid-briefing">
 
         <div className="card" style={{ padding: '1rem', position: 'sticky', top: '1rem' }}>
           <p style={{ fontSize: '.65rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: '.75rem' }}>
@@ -115,7 +114,8 @@ export default function Briefing() {
           </div>
         </div>
 
-        <div className="card">
+        <div className="card" style={{ position: 'relative' }}>
+          <LoadingOverlay visible={loading} />
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.25rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
             <div>
               <p style={{ fontSize: '1rem', fontWeight: 700 }}>{selected ?? '—'}</p>

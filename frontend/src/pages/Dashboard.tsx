@@ -77,7 +77,6 @@ export default function Dashboard() {
 
   return (
     <main className="page page-enter">
-      <LoadingOverlay visible={loading} />
       {/* Header */}
       <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>
@@ -87,10 +86,13 @@ export default function Dashboard() {
       </div>
 
       {/* Market snapshot */}
-      <div className="grid-5" style={{ marginBottom: '1.5rem' }}>
-        {tickers.map(t => (
-          <MarketStatCard key={t} ticker={t} data={prices[t]} />
-        ))}
+      <div style={{ position: 'relative', marginBottom: '1.5rem', borderRadius: 'var(--radius)' }}>
+        <LoadingOverlay visible={loading} />
+        <div className="grid-5">
+          {tickers.map(t => (
+            <MarketStatCard key={t} ticker={t} data={prices[t]} />
+          ))}
+        </div>
       </div>
 
       {/* Briefing + Quick links */}

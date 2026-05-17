@@ -40,7 +40,7 @@ function isDarkTheme() {
 
 export function LoadingOverlay({ visible }: { visible: boolean }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const mouse = useRef<{ x: number; y: number } | null>(null)
+  const overlayRef = useRef<HTMLDivElement>(null)
   const orbsRef = useRef<Orb[]>([])
   const rafRef = useRef(0)
   const [mounted, setMounted] = useState(false)
@@ -62,43 +62,36 @@ export function LoadingOverlay({ visible }: { visible: boolean }) {
     if (!mounted) return
 
     const canvas = canvasRef.current
-    if (!canvas) return
+    const overlay = overlayRef.current
+    if (!canvas || !overlay) return
     const cv = canvas
     const ctx = cv.getContext('2d')!
     const dark = isDarkTheme()
 
     function resize() {
-      cv.width = window.innerWidth
-      cv.height = window.innerHeight
-      if (!orbsRef.current.length)
+      cv.width = overlay!.offsetWidth
+      cv.height = overlay!.offsetHeight
+      if (cv.width > 0 && cv.height > 0 && !orbsRef.current.length)
         orbsRef.current = makeOrbs(cv.width, cv.height, dark)
     }
-    resize()
-    window.addEventListener('resize', resize)
 
-    function onMouse(e: MouseEvent) {
-      mouse.current = { x: e.clientX, y: e.clientY }
-    }
-    window.addEventListener('mousemove', onMouse)
+    const ro = new ResizeObserver(resize)
+    ro.observe(overlay)
+    resize()
 
     function tick() {
       const W = cv.width, H = cv.height
       ctx.clearRect(0, 0, W, H)
 
       for (const orb of orbsRef.current) {
-        if (mouse.current) {
-          orb.x += (mouse.current.x + orb.ox - orb.x) * orb.factor
-          orb.y += (mouse.current.y + orb.oy - orb.y) * orb.factor
-        } else {
-          orb.vx = Math.max(-0.8, Math.min(0.8, orb.vx + (Math.random() - 0.5) * 0.03))
-          orb.vy = Math.max(-0.8, Math.min(0.8, orb.vy + (Math.random() - 0.5) * 0.03))
-          orb.x += orb.vx
-          orb.y += orb.vy
-          if (orb.x < -orb.r) orb.x = W + orb.r
-          if (orb.x > W + orb.r) orb.x = -orb.r
-          if (orb.y < -orb.r) orb.y = H + orb.r
-          if (orb.y > H + orb.r) orb.y = -orb.r
-        }
+        orb.vx = Math.max(-0.8, Math.min(0.8, orb.vx + (Math.random() - 0.5) * 0.03))
+        orb.vy = Math.max(-0.8, Math.min(0.8, orb.vy + (Math.random() - 0.5) * 0.03))
+        orb.x += orb.vx
+        orb.y += orb.vy
+        if (orb.x < -orb.r) orb.x = W + orb.r
+        if (orb.x > W + orb.r) orb.x = -orb.r
+        if (orb.y < -orb.r) orb.y = H + orb.r
+        if (orb.y > H + orb.r) orb.y = -orb.r
 
         const [r, g, b] = orb.color
         const alpha0 = dark ? 0.55 : 0.35
@@ -122,8 +115,7 @@ export function LoadingOverlay({ visible }: { visible: boolean }) {
     tick()
 
     return () => {
-      window.removeEventListener('resize', resize)
-      window.removeEventListener('mousemove', onMouse)
+      ro.disconnect()
       cancelAnimationFrame(rafRef.current)
       orbsRef.current = []
     }
@@ -138,12 +130,14 @@ export function LoadingOverlay({ visible }: { visible: boolean }) {
   const textColor = dark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)'
 
   return (
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 1000,
+    <div ref={overlayRef} style={{
+      position: 'absolute', inset: 0, zIndex: 10,
       background: bg,
+      borderRadius: 'inherit',
+      overflow: 'hidden',
       opacity: show ? 1 : 0,
       transition: 'opacity 0.35s ease',
-      pointerEvents: 'none',  // never blocks clicks — purely visual
+      pointerEvents: 'none',
       display: 'flex', alignItems: 'center', justifyContent: 'center',
     }}>
       <canvas ref={canvasRef} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }} />

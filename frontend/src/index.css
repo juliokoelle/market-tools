@@ -347,6 +347,7 @@ button { cursor: pointer; font-family: inherit; }
 .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
 .grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 1rem; }
 .grid-main-sidebar { display: grid; grid-template-columns: 1fr 300px; gap: 1rem; }
+.grid-briefing { display: grid; grid-template-columns: 200px 1fr; gap: 1.5rem; align-items: start; }
 
 /* ── Table scroll wrapper ── */
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
@@ -395,6 +396,8 @@ button { cursor: pointer; font-family: inherit; }
 @media (max-width: 768px) {
   .grid-2, .grid-3, .grid-4, .grid-5 { grid-template-columns: 1fr; }
   .grid-main-sidebar { grid-template-columns: 1fr; }
+  .grid-briefing { grid-template-columns: 1fr; }
+  .grid-briefing > .card:first-child { position: static !important; }
   .page { padding: 1.25rem 1rem; }
   .section { padding: 1.25rem 1rem; }
   .sidebar { transform: translateX(-100%); }

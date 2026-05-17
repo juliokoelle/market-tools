@@ -36,7 +36,6 @@ export default function HotStocks() {
 
   return (
     <main className="page-enter section">
-      <LoadingOverlay visible={loading} />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
         <h1 style={{ fontSize: '1.4rem', fontWeight: 700 }}>Hot Stocks</h1>
         <button onClick={load} className="btn btn-outline" style={{ fontSize: '.8rem' }} disabled={loading}>
@@ -63,7 +62,8 @@ export default function HotStocks() {
         ))}
       </div>
 
-      <div className="card table-scroll" style={{ padding: 0 }}>
+      <div className="card table-scroll" style={{ padding: 0, position: 'relative' }}>
+        <LoadingOverlay visible={loading} />
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem', minWidth: 500 }}>
           <thead>
             <tr style={{ background: 'var(--surface-alt)', borderBottom: '1px solid var(--border)' }}>
