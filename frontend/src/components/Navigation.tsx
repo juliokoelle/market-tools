@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, Link } from 'react-router-dom'
 import { useState } from 'react'
 import { useTheme } from '../hooks/useTheme'
 
@@ -46,10 +46,10 @@ export default function Navigation() {
     <>
       <aside className={`sidebar${collapsed ? ' sidebar--collapsed' : ''}`}>
         {/* Logo */}
-        <div className="sidebar-logo">
+        <Link to="/" className="sidebar-logo" style={{ textDecoration: 'none' }}>
           <div className="sidebar-logo-mark">JK</div>
           {!collapsed && <span className="sidebar-logo-name">Intelligence OS</span>}
-        </div>
+        </Link>
 
         {/* Market section */}
         <div className="sidebar-section">

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { getPortfolio, savePortfolio, analyzePortfolio, type Position, type PortfolioAnalysis } from '../services/api'
+import { getPortfolio, savePortfolio, analyzePortfolio, getMarketPrices, type Position, type PortfolioAnalysis } from '../services/api'
 
 const UNIVERSE = [
   "AAPL","MSFT","NVDA","GOOG","META","AVGO","AMD","ORCL","CRM","ADBE",
@@ -26,8 +26,11 @@ const PORTFOLIO_SEED: Position[] = [
   { ticker: "4GLD.DE", investment: 570 },
 ]
 
-const SEED_KEY      = 'mt_portfolio_seed_seen'
-const POSITIONS_KEY = 'mt_portfolio_positions'
+const WATCHLIST_SEED = ['AAPL', 'AMZN', 'META', 'TSLA', 'SAP', 'BAYN.DE', 'SIE.DE', 'BMW.DE', 'AMD', 'ORCL', 'CRM']
+
+const SEED_KEY       = 'mt_portfolio_seed_seen'
+const POSITIONS_KEY  = 'mt_portfolio_positions'
+const WATCHLIST_KEY  = 'mt_watchlist_v1'
 
 function TickerInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [suggestions, setSuggestions] = useState<string[]>([])
@@ -73,7 +76,7 @@ function TickerInput({ value, onChange }: { value: string; onChange: (v: string)
       {suggestions.length > 0 && (
         <ul style={{
           position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
-          background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+          background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow)',
           listStyle: 'none', margin: 0, padding: '.25rem 0',
         }}>
@@ -82,8 +85,8 @@ function TickerInput({ value, onChange }: { value: string; onChange: (v: string)
               onMouseDown={e => { e.preventDefault(); pick(s) }}
               style={{
                 padding: '.4rem .75rem', fontSize: '.875rem', cursor: 'pointer',
-                background: i === activeIdx ? 'var(--accent-lt)' : 'transparent',
-                color: i === activeIdx ? 'var(--accent)' : 'var(--text-primary)',
+                background: i === activeIdx ? 'var(--teal-light)' : 'transparent',
+                color: i === activeIdx ? 'var(--teal)' : 'var(--text)',
               }}
             >{s}</li>
           ))}
@@ -98,14 +101,14 @@ function SeedModal({ onAccept, onDecline }: { onAccept: () => void; onDecline: (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
       <div className="card" style={{ width: '100%', maxWidth: 380 }}>
         <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '.4rem' }}>Start with a demo portfolio?</h3>
-        <p style={{ fontSize: '.875rem', color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: '1.25rem' }}>
+        <p style={{ fontSize: '.875rem', color: 'var(--text-2)', lineHeight: 1.6, marginBottom: '1.25rem' }}>
           Load a sample portfolio to explore the analysis features.
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '.25rem', marginBottom: '1.25rem', fontSize: '.8rem' }}>
           {PORTFOLIO_SEED.map(p => (
             <div key={p.ticker} style={{ display: 'flex', justifyContent: 'space-between', padding: '.25rem 0', borderBottom: '1px solid var(--border)' }}>
               <span style={{ fontWeight: 700 }}>{p.ticker}</span>
-              <span style={{ color: 'var(--text-secondary)' }}>€{p.investment}</span>
+              <span style={{ color: 'var(--text-2)' }}>€{p.investment}</span>
             </div>
           ))}
         </div>
@@ -118,7 +121,47 @@ function SeedModal({ onAccept, onDecline }: { onAccept: () => void; onDecline: (
   )
 }
 
+function TransferModal({ ticker, price, onConfirm, onCancel }: {
+  ticker: string; price: number
+  onConfirm: (amount: number) => void; onCancel: () => void
+}) {
+  const [amount, setAmount] = useState('')
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+      <div className="card" style={{ width: '100%', maxWidth: 340 }}>
+        <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '.25rem' }}>Add {ticker} to Portfolio</h3>
+        {price > 0 && (
+          <p style={{ fontSize: '.8rem', color: 'var(--text-2)', marginBottom: '1rem' }}>
+            Current price: ${price.toFixed(2)}
+          </p>
+        )}
+        <label style={labelStyle}>Investment amount (€)</label>
+        <input
+          autoFocus
+          type="number"
+          min="1"
+          value={amount}
+          onChange={e => setAmount(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { const n = parseFloat(amount); if (n > 0) onConfirm(n) } }}
+          placeholder="e.g. 500"
+          style={{ ...inputStyle, marginTop: '.35rem', marginBottom: '1rem' }}
+        />
+        <div style={{ display: 'flex', gap: '.75rem' }}>
+          <button
+            onClick={() => { const n = parseFloat(amount); if (n > 0) onConfirm(n) }}
+            className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}
+          >Add to Portfolio</button>
+          <button onClick={onCancel} className="btn btn-outline" style={{ flex: 1, justifyContent: 'center' }}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function Portfolio() {
+  const [tab, setTab] = useState<'holdings' | 'watchlist'>('holdings')
+
+  // ── Holdings ──
   const [positions, setPositions] = useState<Position[]>(() => {
     try {
       const saved = localStorage.getItem(POSITIONS_KEY)
@@ -127,48 +170,69 @@ export default function Portfolio() {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed
       }
     } catch {}
-    return [
-      { ticker: 'AAPL', investment: 5000 },
-      { ticker: 'MSFT', investment: 3000 },
-      { ticker: 'TSLA', investment: 2000 },
-    ]
+    return []
   })
   const [analysis, setAnalysis]   = useState<PortfolioAnalysis | null>(null)
   const [saving, setSaving]       = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
-  const [toast, setToast]         = useState('')
   const [showSeed, setShowSeed]   = useState(false)
 
-  // Persist positions to localStorage on every change
+  // ── Watchlist ──
+  const [watchlist, setWatchlist] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem(WATCHLIST_KEY)
+      return saved ? JSON.parse(saved) : WATCHLIST_SEED
+    } catch { return WATCHLIST_SEED }
+  })
+  const [watchPrices, setWatchPrices] = useState<Record<string, { price: number; change_pct: number }>>({})
+  const [watchInput, setWatchInput]   = useState('')
+  const watchInputRef = useRef<HTMLDivElement>(null)
+  const [transferTicker, setTransferTicker] = useState<{ ticker: string; price: number } | null>(null)
+
+  // ── Toast ──
+  const [toast, setToast] = useState('')
+  function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 3000) }
+
+  // Persist + load positions
   useEffect(() => {
-    localStorage.setItem(POSITIONS_KEY, JSON.stringify(positions))
+    if (positions.length > 0) localStorage.setItem(POSITIONS_KEY, JSON.stringify(positions))
   }, [positions])
 
-  // Load from API (authoritative saved state overrides local)
   useEffect(() => {
     getPortfolio()
       .then(d => {
-        if (d.positions?.length) {
+        const hasLocal = !!localStorage.getItem(POSITIONS_KEY)
+        if (d.positions?.length && !hasLocal) {
           setPositions(d.positions)
-        } else if (!localStorage.getItem(SEED_KEY) && !localStorage.getItem(POSITIONS_KEY)) {
+        } else if (!hasLocal && !localStorage.getItem(SEED_KEY)) {
           setShowSeed(true)
         }
       })
       .catch(() => {
-        if (!localStorage.getItem(SEED_KEY) && !localStorage.getItem(POSITIONS_KEY)) {
+        if (!localStorage.getItem(POSITIONS_KEY) && !localStorage.getItem(SEED_KEY)) {
           setShowSeed(true)
         }
       })
   }, [])
 
-  function showToast(msg: string) {
-    setToast(msg); setTimeout(() => setToast(''), 3000)
-  }
+  // Persist + load watchlist prices
+  useEffect(() => {
+    localStorage.setItem(WATCHLIST_KEY, JSON.stringify(watchlist))
+  }, [watchlist])
 
-  function addRow() { setPositions(p => [...p, { ticker: '', investment: 0 }]) }
-  function removeRow(i: number) { setPositions(p => p.filter((_, j) => j !== i)) }
-  function updateTicker(i: number, v: string)      { setPositions(p => p.map((r, j) => j === i ? { ...r, ticker: v } : r)) }
-  function updateInvestment(i: number, v: number)  { setPositions(p => p.map((r, j) => j === i ? { ...r, investment: v } : r)) }
+  useEffect(() => {
+    if (!watchlist.length) return
+    const load = () => getMarketPrices(watchlist.join(',')).then(setWatchPrices).catch(() => {})
+    load()
+    const id = setInterval(load, 60_000)
+    return () => clearInterval(id)
+  }, [watchlist])
+
+  // Holdings helpers
+  function addRow()                                 { setPositions(p => [...p, { ticker: '', investment: 0 }]) }
+  function removeRow(i: number)                     { setPositions(p => p.filter((_, j) => j !== i)) }
+  function updateTicker(i: number, v: string)       { setPositions(p => p.map((r, j) => j === i ? { ...r, ticker: v } : r)) }
+  function updateInvestment(i: number, v: number)   { setPositions(p => p.map((r, j) => j === i ? { ...r, investment: v } : r)) }
 
   function acceptSeed() {
     localStorage.setItem(SEED_KEY, '1')
@@ -183,7 +247,7 @@ export default function Portfolio() {
 
   async function handleSave() {
     setSaving(true)
-    try { await savePortfolio(positions.filter(p => p.ticker)); showToast('Portfolio saved ✓') }
+    try { await savePortfolio(positions.filter(p => p.ticker)); showToast('Portfolio saved') }
     catch { showToast('Save failed') }
     finally { setSaving(false) }
   }
@@ -197,51 +261,218 @@ export default function Portfolio() {
     finally { setAnalyzing(false) }
   }
 
+  // Watchlist helpers
+  function addToWatchlist(ticker: string) {
+    const t = ticker.trim().toUpperCase()
+    if (t && !watchlist.includes(t)) setWatchlist(w => [...w, t])
+    setWatchInput('')
+  }
+
+  function removeFromWatchlist(ticker: string) {
+    setWatchlist(w => w.filter(t => t !== ticker))
+  }
+
+  function confirmTransfer(amount: number) {
+    if (!transferTicker) return
+    const { ticker } = transferTicker
+    setPositions(p => {
+      const idx = p.findIndex(x => x.ticker === ticker)
+      if (idx >= 0) return p.map((x, i) => i === idx ? { ...x, investment: x.investment + amount } : x)
+      return [...p, { ticker, investment: amount }]
+    })
+    removeFromWatchlist(ticker)
+    setTransferTicker(null)
+    setTab('holdings')
+    showToast(`${ticker} moved to portfolio`)
+  }
+
+  const portfolioTickers = new Set(positions.map(p => p.ticker))
+
   return (
-    <main className="page-enter section">
-      <h1 style={{ fontSize: '1.4rem', fontWeight: 700, marginBottom: '1.5rem' }}>Portfolio</h1>
-
-      <div className="card" style={{ marginBottom: '1.5rem' }}>
-        <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>Holdings</h2>
-
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 36px', gap: '.5rem .75rem', marginBottom: '.75rem' }}>
-          <p style={labelStyle}>Ticker</p>
-          <p style={labelStyle}>Investment (€)</p>
-          <span />
-          {positions.map((p, i) => (
-            <>
-              <TickerInput key={`t${i}`} value={p.ticker} onChange={v => updateTicker(i, v)} />
-              <input
-                key={`v${i}`}
-                type="number"
-                value={p.investment || ''}
-                onChange={e => updateInvestment(i, parseFloat(e.target.value) || 0)}
-                placeholder="5000"
-                style={inputStyle}
-              />
-              <button
-                key={`d${i}`}
-                onClick={() => removeRow(i)}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-              >×</button>
-            </>
-          ))}
-        </div>
-
-        <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap' }}>
-          <button onClick={addRow} className="btn btn-outline" style={{ fontSize: '.8rem' }}>+ Add row</button>
-          <button onClick={handleSave} disabled={saving} className="btn btn-outline" style={{ fontSize: '.8rem' }}>
-            {saving ? 'Saving…' : '↑ Save to GitHub'}
-          </button>
-          <button onClick={handleAnalyze} disabled={analyzing} className="btn btn-primary" style={{ fontSize: '.8rem' }}>
-            {analyzing ? 'Analyzing…' : '⚡ Analyze'}
-          </button>
-        </div>
+    <main className="page page-enter">
+      <div className="page-header">
+        <h1 className="page-title">Portfolio</h1>
       </div>
 
-      {analysis && <AnalysisCard a={analysis} />}
+      {/* Tabs */}
+      <div className="tabs" style={{ marginBottom: '1.5rem' }}>
+        <button className={`tab${tab === 'holdings' ? ' active' : ''}`} onClick={() => setTab('holdings')}>
+          Holdings
+        </button>
+        <button className={`tab${tab === 'watchlist' ? ' active' : ''}`} onClick={() => setTab('watchlist')}>
+          Watchlist
+          {watchlist.length > 0 && (
+            <span style={{ marginLeft: '.4rem', fontSize: '.65rem', fontWeight: 700, background: 'var(--teal-light)', color: 'var(--teal)', borderRadius: 999, padding: '.05rem .4rem' }}>
+              {watchlist.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ── Holdings tab ── */}
+      {tab === 'holdings' && (
+        <>
+          <div className="card" style={{ marginBottom: '1.5rem' }}>
+            <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>Holdings</h2>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 36px', gap: '.5rem .75rem', marginBottom: '.75rem' }}>
+              <p style={labelStyle}>Ticker</p>
+              <p style={labelStyle}>Investment (€)</p>
+              <span />
+              {positions.map((p, i) => (
+                <>
+                  <TickerInput key={`t${i}`} value={p.ticker} onChange={v => updateTicker(i, v)} />
+                  <input
+                    key={`v${i}`}
+                    type="number"
+                    value={p.investment || ''}
+                    onChange={e => updateInvestment(i, parseFloat(e.target.value) || 0)}
+                    placeholder="5000"
+                    style={inputStyle}
+                  />
+                  <button
+                    key={`d${i}`}
+                    onClick={() => removeRow(i)}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '1.1rem', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  >×</button>
+                </>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '.75rem', flexWrap: 'wrap' }}>
+              <button onClick={addRow} className="btn btn-outline" style={{ fontSize: '.8rem' }}>+ Add row</button>
+              <button onClick={handleSave} disabled={saving} className="btn btn-outline" style={{ fontSize: '.8rem' }}>
+                {saving ? 'Saving…' : '↑ Save'}
+              </button>
+              <button onClick={handleAnalyze} disabled={analyzing} className="btn btn-primary" style={{ fontSize: '.8rem' }}>
+                {analyzing ? 'Analyzing…' : 'Analyze'}
+              </button>
+            </div>
+          </div>
+
+          {analyzing && (
+            <div className="card" style={{ marginBottom: '1.5rem', padding: '2rem', textAlign: 'center' }}>
+              <p style={{ color: 'var(--text-3)', fontSize: '.875rem' }}>Running portfolio analysis…</p>
+            </div>
+          )}
+
+          {analysis && <AnalysisCard a={analysis} />}
+        </>
+      )}
+
+      {/* ── Watchlist tab ── */}
+      {tab === 'watchlist' && (
+        <div>
+          {/* Add ticker row */}
+          <div className="card" style={{ marginBottom: '1rem', padding: '1rem 1.25rem' }}>
+            <div style={{ display: 'flex', gap: '.75rem', alignItems: 'center' }}>
+              <div ref={watchInputRef} style={{ position: 'relative', flex: 1 }}>
+                <input
+                  value={watchInput}
+                  onChange={e => setWatchInput(e.target.value.toUpperCase().replace(/\s/g, ''))}
+                  onKeyDown={e => { if (e.key === 'Enter') addToWatchlist(watchInput) }}
+                  placeholder="Search ticker (e.g. AAPL)"
+                  autoComplete="off"
+                  spellCheck={false}
+                  style={inputStyle}
+                />
+                {watchInput.length >= 1 && (() => {
+                  const matches = UNIVERSE.filter(t => t.startsWith(watchInput)).slice(0, 6)
+                  if (!matches.length) return null
+                  return (
+                    <ul style={{
+                      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
+                      background: 'var(--surface)', border: '1px solid var(--border)',
+                      borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow)',
+                      listStyle: 'none', margin: 0, padding: '.25rem 0',
+                    }}>
+                      {matches.map(s => (
+                        <li key={s}
+                          onMouseDown={e => { e.preventDefault(); addToWatchlist(s) }}
+                          style={{ padding: '.4rem .75rem', fontSize: '.875rem', cursor: 'pointer', color: 'var(--text)' }}
+                        >{s}</li>
+                      ))}
+                    </ul>
+                  )
+                })()}
+              </div>
+              <button onClick={() => addToWatchlist(watchInput)} className="btn btn-outline" style={{ fontSize: '.8rem', flexShrink: 0 }}>
+                + Add
+              </button>
+            </div>
+          </div>
+
+          {/* Watchlist rows */}
+          <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+            {watchlist.length === 0 ? (
+              <p style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-3)', fontSize: '.875rem' }}>
+                Your watchlist is empty. Search for a ticker above to add.
+              </p>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    {['Ticker', 'Price', 'Change', ''].map(h => (
+                      <th key={h} style={{ padding: '.75rem 1.25rem', textAlign: 'left', fontSize: '.65rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {watchlist.map((ticker, i) => {
+                    const d = watchPrices[ticker]
+                    const inPortfolio = portfolioTickers.has(ticker)
+                    return (
+                      <tr key={ticker} style={{ borderBottom: i < watchlist.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                        <td style={{ padding: '.85rem 1.25rem', fontWeight: 700, fontSize: '.9rem' }}>{ticker}</td>
+                        <td style={{ padding: '.85rem 1.25rem', fontSize: '.9rem', color: 'var(--text-2)' }}>
+                          {d ? `$${d.price.toFixed(2)}` : <span style={{ color: 'var(--text-3)' }}>···</span>}
+                        </td>
+                        <td style={{ padding: '.85rem 1.25rem' }}>
+                          {d ? (
+                            <span style={{ fontSize: '.8rem', fontWeight: 700, color: d.change_pct >= 0 ? 'var(--positive)' : 'var(--negative)' }}>
+                              {d.change_pct >= 0 ? '+' : ''}{d.change_pct.toFixed(2)}%
+                            </span>
+                          ) : <span style={{ color: 'var(--text-3)', fontSize: '.8rem' }}>···</span>}
+                        </td>
+                        <td style={{ padding: '.85rem 1.25rem' }}>
+                          <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end' }}>
+                            {inPortfolio ? (
+                              <span className="badge badge-teal" style={{ fontSize: '.65rem' }}>In Portfolio</span>
+                            ) : (
+                              <button
+                                onClick={() => setTransferTicker({ ticker, price: d?.price ?? 0 })}
+                                className="btn btn-outline"
+                                style={{ fontSize: '.75rem', padding: '.3rem .65rem' }}
+                              >
+                                → Portfolio
+                              </button>
+                            )}
+                            <button
+                              onClick={() => removeFromWatchlist(ticker)}
+                              style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '1rem', cursor: 'pointer', padding: '.2rem .4rem', borderRadius: 4 }}
+                            >×</button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
 
       {showSeed && <SeedModal onAccept={acceptSeed} onDecline={declineSeed} />}
+
+      {transferTicker && (
+        <TransferModal
+          ticker={transferTicker.ticker}
+          price={transferTicker.price}
+          onConfirm={confirmTransfer}
+          onCancel={() => setTransferTicker(null)}
+        />
+      )}
 
       {toast && (
         <div className="toast-container">
@@ -258,7 +489,7 @@ function AnalysisCard({ a }: { a: PortfolioAnalysis }) {
   const div    = (a.diversification_score ?? 0) * 100
   const lgPos  = (a.largest_position ?? 0) * 100
   const riskLabel = vol < 15 ? 'Conservative' : vol < 25 ? 'Moderate' : 'Aggressive'
-  const riskColor = vol < 15 ? 'var(--positive)' : vol < 25 ? 'var(--neutral)' : 'var(--negative)'
+  const riskColor = vol < 15 ? 'var(--positive)' : vol < 25 ? 'var(--warn)' : 'var(--negative)'
 
   return (
     <div className="card">
@@ -271,9 +502,9 @@ function AnalysisCard({ a }: { a: PortfolioAnalysis }) {
           { label: 'Volatility',   value: `${vol.toFixed(1)}%`, color: undefined },
           { label: 'Risk Profile', value: riskLabel, color: riskColor },
         ].map(m => (
-          <div key={m.label} style={{ padding: '.75rem', background: 'var(--bg-tertiary)', borderRadius: 8 }}>
-            <p style={{ fontSize: '.75rem', color: 'var(--text-secondary)', marginBottom: '.25rem' }}>{m.label}</p>
-            <p style={{ fontSize: '1.1rem', fontWeight: 700, color: m.color ?? 'var(--text-primary)' }}>{m.value}</p>
+          <div key={m.label} style={{ padding: '.75rem', background: 'var(--surface-alt)', borderRadius: 8 }}>
+            <p style={{ fontSize: '.75rem', color: 'var(--text-2)', marginBottom: '.25rem' }}>{m.label}</p>
+            <p style={{ fontSize: '1.1rem', fontWeight: 700, color: m.color ?? 'var(--text)' }}>{m.value}</p>
           </div>
         ))}
       </div>
@@ -284,28 +515,28 @@ function AnalysisCard({ a }: { a: PortfolioAnalysis }) {
           { label: 'Positions',       value: String(a.number_of_positions ?? 0) },
           { label: 'Largest Position', value: `${lgPos.toFixed(1)}%` },
         ].map(m => (
-          <div key={m.label} style={{ padding: '.6rem .75rem', background: 'var(--bg-tertiary)', borderRadius: 8 }}>
-            <p style={{ fontSize: '.7rem', color: 'var(--text-secondary)', marginBottom: '.2rem' }}>{m.label}</p>
+          <div key={m.label} style={{ padding: '.6rem .75rem', background: 'var(--surface-alt)', borderRadius: 8 }}>
+            <p style={{ fontSize: '.7rem', color: 'var(--text-2)', marginBottom: '.2rem' }}>{m.label}</p>
             <p style={{ fontSize: '1rem', fontWeight: 700 }}>{m.value}</p>
           </div>
         ))}
       </div>
 
       {a.commentary && (
-        <p style={{ fontSize: '.875rem', color: 'var(--text-secondary)', lineHeight: 1.7, marginBottom: '1.25rem', padding: '1rem', background: 'var(--accent-lt)', borderRadius: 8, borderLeft: `3px solid var(--accent)` }}>
+        <p style={{ fontSize: '.875rem', color: 'var(--text-2)', lineHeight: 1.7, marginBottom: '1.25rem', padding: '1rem', background: 'var(--teal-light)', borderRadius: 8, borderLeft: `3px solid var(--teal)` }}>
           {a.commentary}
         </p>
       )}
 
       {a.assets?.length > 0 && (
         <div>
-          <p style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '.5rem', textTransform: 'uppercase', letterSpacing: '.04em' }}>Asset Breakdown</p>
+          <p style={{ fontSize: '.75rem', fontWeight: 600, color: 'var(--text-3)', marginBottom: '.5rem', textTransform: 'uppercase', letterSpacing: '.04em' }}>Asset Breakdown</p>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
               <thead>
                 <tr>
                   {['Ticker', 'Weight', 'Exp. Return p.a.', 'Volatility p.a.'].map(h => (
-                    <th key={h} style={{ textAlign: 'left', padding: '.35rem .5rem', fontSize: '.7rem', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '.04em', borderBottom: '2px solid var(--border)' }}>{h}</th>
+                    <th key={h} style={{ textAlign: 'left', padding: '.35rem .5rem', fontSize: '.7rem', fontWeight: 600, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', borderBottom: '2px solid var(--border)' }}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -316,11 +547,11 @@ function AnalysisCard({ a }: { a: PortfolioAnalysis }) {
                   return (
                     <tr key={asset.ticker}>
                       <td style={{ padding: '.4rem .5rem', fontWeight: 700, borderBottom: '1px solid var(--border)' }}>{asset.ticker}</td>
-                      <td style={{ padding: '.4rem .5rem', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }}>{(asset.weight * 100).toFixed(1)}%</td>
+                      <td style={{ padding: '.4rem .5rem', color: 'var(--text-2)', borderBottom: '1px solid var(--border)' }}>{(asset.weight * 100).toFixed(1)}%</td>
                       <td style={{ padding: '.4rem .5rem', color: assetRet >= 0 ? 'var(--positive)' : 'var(--negative)', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>
                         {assetRet >= 0 ? '+' : ''}{assetRet.toFixed(1)}%
                       </td>
-                      <td style={{ padding: '.4rem .5rem', color: 'var(--text-secondary)', borderBottom: '1px solid var(--border)' }}>{assetVol.toFixed(1)}%</td>
+                      <td style={{ padding: '.4rem .5rem', color: 'var(--text-2)', borderBottom: '1px solid var(--border)' }}>{assetVol.toFixed(1)}%</td>
                     </tr>
                   )
                 })}
@@ -334,11 +565,12 @@ function AnalysisCard({ a }: { a: PortfolioAnalysis }) {
 }
 
 const labelStyle: React.CSSProperties = {
-  fontSize: '.75rem', fontWeight: 600, color: 'var(--text-secondary)',
+  fontSize: '.75rem', fontWeight: 600, color: 'var(--text-3)',
   textTransform: 'uppercase', letterSpacing: '.04em',
 }
 const inputStyle: React.CSSProperties = {
   padding: '.45rem .6rem', border: '1px solid var(--border)',
   borderRadius: 6, fontSize: '.875rem', outline: 'none', width: '100%',
-  background: 'var(--bg-tertiary)', color: 'var(--text-primary)',
+  background: 'var(--surface-alt)', color: 'var(--text)',
+  fontFamily: 'inherit',
 }

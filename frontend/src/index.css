@@ -410,7 +410,7 @@ button { cursor: pointer; font-family: inherit; }
   color: #d4d4d4;
   padding: 0 1rem;
 }
-.ticker-animate { animation: ticker-scroll 40s linear infinite; }
+.ticker-animate { animation: ticker-scroll 28s linear infinite; }
 @keyframes ticker-scroll {
   from { transform: translateX(0); }
   to   { transform: translateX(-50%); }

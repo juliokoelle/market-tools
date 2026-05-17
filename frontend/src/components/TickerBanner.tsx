@@ -28,14 +28,14 @@ export default function TickerBanner() {
   const segments = tickers.map(t => {
     const d = prices[t]
     const label = LABELS[t]
-    if (!d) return `${label}  ···`
+    if (!d) return `<span style="color:#888;margin-right:.3rem">${label}</span><span style="color:#555">···</span>`
     const sign = d.change_pct >= 0 ? '▲' : '▼'
     const color = d.change_pct >= 0 ? '#4ade80' : '#f87171'
     const changeStr = `${sign} ${Math.abs(d.change_pct).toFixed(2)}%`
-    return `<span style="color:#e5e5e5;margin-right:.4rem">${label}</span><span style="color:#fff;font-weight:700;margin-right:.4rem">${fmt(t, d.price)}</span><span style="color:${color}">${changeStr}</span>`
+    return `<span style="color:#aaa;margin-right:.3rem">${label}</span><span style="color:#fff;font-weight:700;margin-right:.35rem">${fmt(t, d.price)}</span><span style="color:${color}">${changeStr}</span>`
   })
 
-  const separator = `<span style="color:#555;margin:0 1.1rem">·</span>`
+  const separator = `<span style="color:#444;margin:0 .8rem">|</span>`
   const track = segments.join(separator)
   const repeated = `${track}${separator}${track}${separator}`
 
