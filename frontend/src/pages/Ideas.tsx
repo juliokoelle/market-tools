@@ -2,7 +2,7 @@ const apps = [
   {
     title: 'HorseFinder',
     description: 'Equestrian event finder for Germany. Search tournaments by discipline, location, and date. Data scraped daily from nennung-online.de.',
-    url: 'https://horsefinder-frontend.onrender.com',
+    url: 'https://horsefinder-v2.vercel.app',
     tags: ['FastAPI', 'React', 'Supabase'],
     status: 'Live' as const,
     emoji: '🐴',
