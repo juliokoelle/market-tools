@@ -5,14 +5,11 @@ const TICKERS = '^GSPC,GC=F,EURUSD=X,CL=F,^VIX'
 const LABELS: Record<string, string> = {
   '^GSPC': 'S&P 500', 'GC=F': 'Gold', 'EURUSD=X': 'EUR/USD', 'CL=F': 'Brent', '^VIX': 'VIX',
 }
-const UNITS: Record<string, string> = {
-  '^GSPC': 'pts', 'GC=F': 'USD/oz', 'EURUSD=X': '', 'CL=F': 'USD/bbl', '^VIX': '',
-}
 
 function fmt(ticker: string, price: number) {
   if (ticker === 'EURUSD=X') return price.toFixed(4)
   if (ticker === '^GSPC') return price.toLocaleString('en-US', { maximumFractionDigits: 0 })
-  return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return price.toFixed(2)
 }
 
 export default function TickerBanner() {
@@ -27,23 +24,24 @@ export default function TickerBanner() {
   }, [])
 
   const tickers = TICKERS.split(',')
-  const hasData = tickers.some(t => prices[t])
 
-  const items = tickers.map(t => {
+  const segments = tickers.map(t => {
     const d = prices[t]
-    if (!d) return `${LABELS[t]}  —`
-    const unit = UNITS[t] ? ` ${UNITS[t]}` : ''
+    const label = LABELS[t]
+    if (!d) return `${label}  ···`
     const sign = d.change_pct >= 0 ? '▲' : '▼'
-    return `${LABELS[t]}  ${fmt(t, d.price)}${unit}  ${sign} ${Math.abs(d.change_pct).toFixed(2)}%`
-  }).join('     ·     ')
+    const color = d.change_pct >= 0 ? '#4ade80' : '#f87171'
+    const changeStr = `${sign} ${Math.abs(d.change_pct).toFixed(2)}%`
+    return `<span style="color:#e5e5e5;margin-right:.4rem">${label}</span><span style="color:#fff;font-weight:700;margin-right:.4rem">${fmt(t, d.price)}</span><span style="color:${color}">${changeStr}</span>`
+  })
 
-  const repeated = `${items}     ·     ${items}`
+  const separator = `<span style="color:#555;margin:0 1.1rem">·</span>`
+  const track = segments.join(separator)
+  const repeated = `${track}${separator}${track}${separator}`
 
   return (
     <div className="ticker-banner">
-      <div className={`ticker-track${hasData ? ' ticker-animate' : ''}`}>
-        <span>{repeated}</span>
-      </div>
+      <div className="ticker-track ticker-animate" dangerouslySetInnerHTML={{ __html: repeated }} />
     </div>
   )
 }

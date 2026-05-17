@@ -12,7 +12,7 @@ const projects = [
   {
     title: 'HorseFinder',
     description: 'Equestrian event finder for Germany — search tournaments by discipline, location, and date, powered by nennung-online.de data.',
-    link: 'https://horsefinder-frontend.onrender.com',
+    link: 'https://horsefinder-v2.vercel.app',
     external: true,
     tags: ['FastAPI', 'React', 'Supabase'],
     status: 'Live',
@@ -20,10 +20,10 @@ const projects = [
   {
     title: 'MyWardrobe',
     description: 'Smart wardrobe management app — catalog your clothing, build outfits, and track what you actually wear.',
-    link: '#',
-    external: false,
+    link: 'https://mywardrobe-dun.vercel.app',
+    external: true,
     tags: ['React Native', 'AI'],
-    status: 'In Progress',
+    status: 'Live',
   },
 ]
 
@@ -33,13 +33,13 @@ export default function LandingPage() {
       {/* Hero */}
       <section style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
         <div className="section" style={{ paddingTop: '4rem', paddingBottom: '4rem' }}>
-          <p style={{ fontSize: '.875rem', fontWeight: 600, color: 'var(--primary)', marginBottom: '.75rem', letterSpacing: '.05em', textTransform: 'uppercase' }}>
+          <p style={{ fontSize: '.875rem', fontWeight: 600, color: 'var(--teal)', marginBottom: '.75rem', letterSpacing: '.05em', textTransform: 'uppercase' }}>
             Hey, I'm
           </p>
           <h1 style={{ fontSize: 'clamp(2rem, 5vw, 3.25rem)', fontWeight: 800, letterSpacing: '-1.5px', lineHeight: 1.1, marginBottom: '1.25rem' }}>
             Julio Koelle
           </h1>
-          <p style={{ fontSize: '1.125rem', color: 'var(--text-muted)', maxWidth: 540, lineHeight: 1.65, marginBottom: '2rem' }}>
+          <p style={{ fontSize: '1.125rem', color: 'var(--text-2)', maxWidth: 540, lineHeight: 1.65, marginBottom: '2rem' }}>
             Engineering student at KIT · Co-founder at a stealth startup in Berlin ·
             Building tools at the intersection of finance, data, and software.
           </p>
@@ -65,7 +65,7 @@ export default function LandingPage() {
       {/* Projects */}
       <section className="section">
         <h2 style={{ fontSize: '1.25rem', fontWeight: 700, marginBottom: '.4rem' }}>Projects</h2>
-        <p style={{ color: 'var(--text-muted)', fontSize: '.9rem', marginBottom: '1.75rem' }}>
+        <p style={{ color: 'var(--text-2)', fontSize: '.9rem', marginBottom: '1.75rem' }}>
           Tools I build and use.
         </p>
 
@@ -86,11 +86,11 @@ function ProjectCard({ title, description, link, external, tags, status }: typeo
     <div className="card" style={{ height: '100%', display: 'flex', flexDirection: 'column', gap: '.75rem', transition: 'box-shadow .15s, transform .15s', cursor: isComingSoon ? 'default' : 'pointer' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '.5rem' }}>
         <h3 style={{ fontSize: '1rem', fontWeight: 700 }}>{title}</h3>
-        <span className={`badge ${status === 'Live' ? 'badge-green' : 'badge-blue'}`}>
+        <span className={`badge ${status === 'Live' ? 'badge-teal' : 'badge-gray'}`}>
           {status}
         </span>
       </div>
-      <p style={{ fontSize: '.875rem', color: 'var(--text-muted)', lineHeight: 1.6, flex: 1 }}>
+      <p style={{ fontSize: '.875rem', color: 'var(--text-2)', lineHeight: 1.6, flex: 1 }}>
         {description}
       </p>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '.35rem' }}>
@@ -99,7 +99,7 @@ function ProjectCard({ title, description, link, external, tags, status }: typeo
         ))}
       </div>
       {!isComingSoon && (
-        <p style={{ fontSize: '.8rem', fontWeight: 600, color: 'var(--primary)' }}>
+        <p style={{ fontSize: '.8rem', fontWeight: 600, color: 'var(--teal)' }}>
           {external ? 'Open app →' : 'Open dashboard →'}
         </p>
       )}
