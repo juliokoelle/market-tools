@@ -40,8 +40,7 @@ export default function LandingPage() {
             Julio Koelle
           </h1>
           <p style={{ fontSize: '1.125rem', color: 'var(--text-2)', maxWidth: 540, lineHeight: 1.65, marginBottom: '2rem' }}>
-            Engineering student at KIT · Co-founder at a stealth startup in Berlin ·
-            Building tools at the intersection of finance, data, and software.
+            Engineering student at KIT · Building tools at the intersection of finance, data, and software.
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             <a

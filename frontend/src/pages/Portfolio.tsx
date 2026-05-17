@@ -170,7 +170,7 @@ export default function Portfolio() {
         if (Array.isArray(parsed) && parsed.length > 0) return parsed
       }
     } catch {}
-    return []
+    return PORTFOLIO_SEED
   })
   const [analysis, setAnalysis]   = useState<PortfolioAnalysis | null>(null)
   const [saving, setSaving]       = useState(false)
