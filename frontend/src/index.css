@@ -14,10 +14,10 @@
   --text-2:      #5c5b57;
   --text-3:      #9c9a93;
 
-  --teal:        #1a6e5e;
-  --teal-mid:    #2a8a77;
-  --teal-light:  #e8f5f2;
-  --teal-muted:  #c2dfd9;
+  --teal:        #8b1a1a;
+  --teal-mid:    #a82020;
+  --teal-light:  #fdf2f2;
+  --teal-muted:  #e8b4b4;
 
   --positive:    #16a34a;
   --negative:    #dc2626;
@@ -43,10 +43,10 @@
   --text:        #f5f4f0;
   --text-2:      #a8a6a0;
   --text-3:      #6a6863;
-  --teal:        #2a8a77;
-  --teal-mid:    #34a490;
-  --teal-light:  #0e2622;
-  --teal-muted:  #1b4038;
+  --teal:        #c0392b;
+  --teal-mid:    #e74c3c;
+  --teal-light:  #2d1010;
+  --teal-muted:  #3d1515;
 }
 
 html { font-size: 16px; -webkit-font-smoothing: antialiased; }
@@ -342,3 +342,41 @@ button { cursor: pointer; font-family: inherit; }
 .toast-success { background: #f0fdf4; color: #166534; border: 1px solid #bbf7d0; }
 .toast-error   { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
 .toast-info    { background: var(--teal-light); color: var(--teal); border: 1px solid var(--teal-muted); }
+
+/* ── Ticker banner ── */
+.ticker-banner {
+  height: 34px;
+  background: #111;
+  border-bottom: 1px solid #2a2a2a;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+[data-theme="light"] .ticker-banner { background: #1a1a1a; }
+.ticker-track {
+  white-space: nowrap;
+  font-size: .72rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  color: #d4d4d4;
+  padding: 0 1rem;
+}
+.ticker-animate { animation: ticker-scroll 40s linear infinite; }
+@keyframes ticker-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.app-shell-inner {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+.app-with-ticker {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.app-with-ticker .app-shell {
+  flex: 1;
+}

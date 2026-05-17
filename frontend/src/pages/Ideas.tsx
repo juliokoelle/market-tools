@@ -10,9 +10,9 @@ const apps = [
   {
     title: 'MyWardrobe',
     description: 'Smart wardrobe management — catalog your clothing, plan outfits, and discover what you actually wear.',
-    url: null,
+    url: 'https://mywardrobe-dun.vercel.app',
     tags: ['React Native', 'AI', 'Mobile'],
-    status: 'In Progress' as const,
+    status: 'Live' as const,
     emoji: '👔',
   },
 ]
@@ -30,7 +30,7 @@ export default function Ideas() {
           <div key={app.title} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
               <p style={{ fontSize: '2rem' }}>{app.emoji}</p>
-              <span className={`badge ${app.status === 'Live' ? 'badge-green' : 'badge-blue'}`}>
+              <span className={`badge ${app.status === 'Live' ? 'badge-teal' : 'badge-gray'}`}>
                 {app.status}
               </span>
             </div>

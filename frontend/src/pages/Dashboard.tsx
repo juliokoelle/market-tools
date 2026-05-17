@@ -53,10 +53,10 @@ function MarketStatCard({ ticker, data }: { ticker: string; data?: { price: numb
 }
 
 const QUICK_LINKS = [
-  { to: '/market/portfolio',  label: 'Portfolio',      desc: 'Analyze your holdings',      icon: '📈' },
-  { to: '/market/hot-stocks', label: 'Hot Stocks',     desc: 'Top movers & gainers',        icon: '🔥' },
-  { to: '/market/analyzer',   label: 'Stock Analyzer', desc: 'Watchlist & bull scores',     icon: '📊' },
-  { to: '/market/briefing',   label: 'Full Briefing',  desc: 'Today\'s economic analysis',  icon: '📰' },
+  { to: '/market/portfolio',  label: 'Portfolio',      desc: 'Analyze your holdings'      },
+  { to: '/market/hot-stocks', label: 'Hot Stocks',     desc: 'Top movers & gainers'       },
+  { to: '/market/analyzer',   label: 'Stock Analyzer', desc: 'Watchlist & bull scores'    },
+  { to: '/market/briefing',   label: 'Full Briefing',  desc: "Today's economic analysis"  },
 ]
 
 export default function Dashboard() {
@@ -136,7 +136,7 @@ export default function Dashboard() {
                   ;(e.currentTarget as HTMLDivElement).style.boxShadow = ''
                 }}
               >
-                <span style={{ fontSize: '1.25rem', lineHeight: 1 }}>{l.icon}</span>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--teal)', flexShrink: 0 }} />
                 <div>
                   <p style={{ fontSize: '.875rem', fontWeight: 600, color: 'var(--text)' }}>{l.label}</p>
                   <p style={{ fontSize: '.75rem', color: 'var(--text-3)', marginTop: '.1rem' }}>{l.desc}</p>

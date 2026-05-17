@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import Navigation from './components/Navigation'
+import TickerBanner from './components/TickerBanner'
 import PasswordGate from './components/PasswordGate'
 import LandingPage from './pages/LandingPage'
 import Dashboard from './pages/Dashboard'
@@ -18,18 +19,21 @@ export default function App() {
 
   return (
     <PasswordGate>
-      <div className="app-shell">
-        <Navigation />
-        <div className="main-content">
-          <Routes>
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/market" element={<Dashboard />} />
-            <Route path="/market/briefing" element={<Briefing />} />
-            <Route path="/market/portfolio" element={<Portfolio />} />
-            <Route path="/market/hot-stocks" element={<HotStocks />} />
-            <Route path="/market/analyzer" element={<Analyzer />} />
-            <Route path="/ideas" element={<Ideas />} />
-          </Routes>
+      <div className="app-with-ticker">
+        <TickerBanner />
+        <div className="app-shell">
+          <Navigation />
+          <div className="main-content">
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/market" element={<Dashboard />} />
+              <Route path="/market/briefing" element={<Briefing />} />
+              <Route path="/market/portfolio" element={<Portfolio />} />
+              <Route path="/market/hot-stocks" element={<HotStocks />} />
+              <Route path="/market/analyzer" element={<Analyzer />} />
+              <Route path="/ideas" element={<Ideas />} />
+            </Routes>
+          </div>
         </div>
       </div>
     </PasswordGate>

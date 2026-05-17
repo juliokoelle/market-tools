@@ -1,4 +1,7 @@
-const BASE = import.meta.env.VITE_API_URL ?? '/api'
+const BASE = import.meta.env.VITE_API_URL
+  ?? (window.location.hostname === 'localhost'
+    ? '/api'
+    : 'https://market-tools-backend-my0v.onrender.com')
 
 async function get<T>(path: string): Promise<T> {
   const r = await fetch(`${BASE}${path}`)
