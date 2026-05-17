@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getMarketPrices, getBriefingPreview } from '../services/api'
+import { LoadingOverlay } from '../components/LoadingOverlay'
 
 const MARKET_TICKERS = '^GSPC,GC=F,EURUSD=X,CL=F,^VIX'
 const TICKER_META: Record<string, { label: string; unit: string; prefix: string }> = {
@@ -76,6 +77,7 @@ export default function Dashboard() {
 
   return (
     <main className="page page-enter">
+      <LoadingOverlay visible={loading} />
       {/* Header */}
       <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
         <div>

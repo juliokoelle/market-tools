@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { getWatchlist, getStockDetail, getStockAiSummary, getStockChart, type WatchlistCategory, type StockDetail, type ChartPoint } from '../services/api'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { getWatchlist, getStockDetail, getStockAiSummary, getStockChart, searchTickers, type WatchlistCategory, type StockDetail, type ChartPoint } from '../services/api'
 
 const SEARCH_UNIVERSE = [
   "AAPL","MSFT","NVDA","GOOGL","GOOG","META","AVGO","AMD","ORCL","AMZN",
@@ -71,15 +71,37 @@ function CandlestickChart({ data }: { data: ChartPoint[] }) {
   )
 }
 
+interface Suggestion { ticker: string; name: string }
+
 function SearchBar({ onSearch }: { onSearch: (ticker: string) => void }) {
   const [q, setQ] = useState('')
-  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [suggestions, setSuggestions] = useState<Suggestion[]>([])
   const ref = useRef<HTMLDivElement>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  function filter(v: string) {
-    const upper = v.toUpperCase()
-    setSuggestions(upper.length >= 1 ? SEARCH_UNIVERSE.filter(t => t.startsWith(upper)).slice(0, 8) : [])
-  }
+  const runSearch = useCallback((v: string) => {
+    const upper = v.toUpperCase().trim()
+    if (!upper) { setSuggestions([]); return }
+
+    // Instant local prefix-match
+    const local = SEARCH_UNIVERSE
+      .filter(t => t.startsWith(upper))
+      .slice(0, 5)
+      .map(t => ({ ticker: t, name: t }))
+    setSuggestions(local)
+
+    // Debounced remote search (name + ticker)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      searchTickers(v).then(results => {
+        const remote = results.map(r => ({ ticker: r.ticker, name: r.name }))
+        setSuggestions(prev => {
+          const seen = new Set(prev.map(s => s.ticker))
+          return [...prev, ...remote.filter(r => !seen.has(r.ticker))].slice(0, 8)
+        })
+      }).catch(() => {})
+    }, 320)
+  }, [])
 
   function pick(ticker: string) {
     setQ('')
@@ -96,15 +118,15 @@ function SearchBar({ onSearch }: { onSearch: (ticker: string) => void }) {
   }, [])
 
   return (
-    <div ref={ref} style={{ position: 'relative', maxWidth: 300, marginBottom: '1.75rem' }}>
+    <div ref={ref} style={{ position: 'relative', maxWidth: 320, marginBottom: '1.75rem' }}>
       <input
         value={q}
-        onChange={e => { const v = e.target.value.toUpperCase().replace(/\s/g, ''); setQ(v); filter(v) }}
+        onChange={e => { setQ(e.target.value); runSearch(e.target.value) }}
         onKeyDown={e => {
-          if (e.key === 'Enter' && q.trim()) pick(q.trim())
+          if (e.key === 'Enter' && q.trim()) pick(q.trim().toUpperCase())
           else if (e.key === 'Escape') setSuggestions([])
         }}
-        placeholder="Search any ticker…"
+        placeholder="Search ticker or company name…"
         autoComplete="off"
         spellCheck={false}
         style={{
@@ -126,10 +148,13 @@ function SearchBar({ onSearch }: { onSearch: (ticker: string) => void }) {
           listStyle: 'none', margin: '.25rem 0 0', padding: '.25rem 0',
         }}>
           {suggestions.map(s => (
-            <li key={s}
-              onMouseDown={e => { e.preventDefault(); pick(s) }}
-              style={{ padding: '.4rem .75rem', fontSize: '.875rem', cursor: 'pointer', color: 'var(--text)' }}
-            >{s}</li>
+            <li key={s.ticker}
+              onMouseDown={e => { e.preventDefault(); pick(s.ticker) }}
+              style={{ padding: '.4rem .75rem', fontSize: '.85rem', cursor: 'pointer', color: 'var(--text)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem' }}
+            >
+              <span style={{ color: 'var(--text-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name !== s.ticker ? s.name : ''}</span>
+              <span style={{ fontWeight: 700, flexShrink: 0, color: 'var(--text)' }}>{s.ticker}</span>
+            </li>
           ))}
         </ul>
       )}

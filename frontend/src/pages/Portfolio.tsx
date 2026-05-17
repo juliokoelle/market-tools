@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { getPortfolio, savePortfolio, analyzePortfolio, getMarketPrices, getStockDetail, type Position, type PortfolioAnalysis, type StockDetail } from '../services/api'
+import { useEffect, useRef, useState, useCallback } from 'react'
+import { getPortfolio, savePortfolio, analyzePortfolio, getMarketPrices, getStockDetail, searchTickers, type Position, type PortfolioAnalysis, type StockDetail } from '../services/api'
 
 const UNIVERSE = [
   "AAPL","MSFT","NVDA","GOOG","META","AVGO","AMD","ORCL","CRM","ADBE",
@@ -30,20 +30,40 @@ const SEED_KEY       = 'mt_portfolio_seed_seen'
 const POSITIONS_KEY  = 'mt_portfolio_v2'
 const WATCHLIST_KEY  = 'mt_watchlist_v2'
 
+interface TickerSuggestion { ticker: string; name: string }
+
 function TickerInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-  const [suggestions, setSuggestions] = useState<string[]>([])
+  const [suggestions, setSuggestions] = useState<TickerSuggestion[]>([])
   const [activeIdx, setActiveIdx] = useState(-1)
   const ref = useRef<HTMLDivElement>(null)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  function filter(q: string) {
+  const runSearch = useCallback((q: string) => {
+    if (!q.trim()) { setSuggestions([]); setActiveIdx(-1); return }
     const upper = q.toUpperCase()
-    setSuggestions(upper ? UNIVERSE.filter(t => t.startsWith(upper)).slice(0, 6) : [])
+    const local = UNIVERSE
+      .filter(t => t.startsWith(upper))
+      .slice(0, 5)
+      .map(t => ({ ticker: t, name: t }))
+    setSuggestions(local)
     setActiveIdx(-1)
-  }
+
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      searchTickers(q).then(results => {
+        const remote = results.map(r => ({ ticker: r.ticker, name: r.name }))
+        setSuggestions(prev => {
+          const seen = new Set(prev.map(s => s.ticker))
+          return [...prev, ...remote.filter(r => !seen.has(r.ticker))].slice(0, 8)
+        })
+      }).catch(() => {})
+    }, 320)
+  }, [])
 
   function pick(ticker: string) {
     onChange(ticker)
     setSuggestions([])
+    setActiveIdx(-1)
   }
 
   useEffect(() => {
@@ -58,15 +78,15 @@ function TickerInput({ value, onChange }: { value: string; onChange: (v: string)
     <div ref={ref} style={{ position: 'relative' }}>
       <input
         value={value}
-        onChange={e => { const v = e.target.value.toUpperCase().replace(/\s/g, ''); onChange(v); filter(v) }}
+        onChange={e => { onChange(e.target.value.toUpperCase().replace(/\s/g, '')); runSearch(e.target.value) }}
         onKeyDown={e => {
           if (!suggestions.length) return
           if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, suggestions.length - 1)) }
           else if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, -1)) }
-          else if (e.key === 'Enter' && activeIdx >= 0) { e.preventDefault(); pick(suggestions[activeIdx]) }
+          else if (e.key === 'Enter' && activeIdx >= 0) { e.preventDefault(); pick(suggestions[activeIdx].ticker) }
           else if (e.key === 'Escape') setSuggestions([])
         }}
-        placeholder="e.g. AAPL"
+        placeholder="Ticker or company name…"
         autoComplete="off"
         spellCheck={false}
         style={inputStyle}
@@ -79,14 +99,18 @@ function TickerInput({ value, onChange }: { value: string; onChange: (v: string)
           listStyle: 'none', margin: 0, padding: '.25rem 0',
         }}>
           {suggestions.map((s, i) => (
-            <li key={s}
-              onMouseDown={e => { e.preventDefault(); pick(s) }}
+            <li key={s.ticker}
+              onMouseDown={e => { e.preventDefault(); pick(s.ticker) }}
               style={{
-                padding: '.4rem .75rem', fontSize: '.875rem', cursor: 'pointer',
+                padding: '.4rem .75rem', fontSize: '.85rem', cursor: 'pointer',
                 background: i === activeIdx ? 'var(--teal-light)' : 'transparent',
                 color: i === activeIdx ? 'var(--teal)' : 'var(--text)',
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem',
               }}
-            >{s}</li>
+            >
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: i === activeIdx ? 'var(--teal)' : 'var(--text-2)' }}>{s.name !== s.ticker ? s.name : ''}</span>
+              <span style={{ fontWeight: 700, flexShrink: 0 }}>{s.ticker}</span>
+            </li>
           ))}
         </ul>
       )}

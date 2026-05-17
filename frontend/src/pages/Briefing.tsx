@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getBriefingList, getBriefing, type BriefingMeta } from '../services/api'
+import { LoadingOverlay } from '../components/LoadingOverlay'
 
 const BACKEND = window.location.hostname === 'localhost'
   ? '/api'
@@ -81,6 +82,7 @@ export default function Briefing() {
 
   return (
     <main className="page page-enter">
+      <LoadingOverlay visible={loading} />
       <div className="page-header">
         <h1 className="page-title">Daily Briefing</h1>
       </div>

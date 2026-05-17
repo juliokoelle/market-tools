@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { getHotStocks, type StockRow } from '../services/api'
+import { LoadingOverlay } from '../components/LoadingOverlay'
 
 type Tab = 'gainers' | 'losers' | 'bull_high' | 'bull_low'
 
@@ -35,6 +36,7 @@ export default function HotStocks() {
 
   return (
     <main className="page-enter section">
+      <LoadingOverlay visible={loading} />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
         <h1 style={{ fontSize: '1.4rem', fontWeight: 700 }}>Hot Stocks</h1>
         <button onClick={load} className="btn btn-outline" style={{ fontSize: '.8rem' }} disabled={loading}>

@@ -61,6 +61,9 @@ export const getBriefing = (date: string) =>
 export const getBriefingCost = () =>
   get<{ monthly_total: number; budget: number; entries: CostEntry[] }>('/briefing/cost-summary')
 
+export const searchTickers = (q: string) =>
+  get<Array<{ ticker: string; name: string; exchange: string; type: string }>>(`/market/search-ticker?q=${encodeURIComponent(q)}`)
+
 // Portfolio
 export const getPortfolio = () =>
   get<{ positions: Position[]; total_value: number }>('/portfolio')
