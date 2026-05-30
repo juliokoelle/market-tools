@@ -15,6 +15,7 @@ categories:
       - NVDA
       - ASML
       - AVGO
+      - TSM      # TSMC — global foundry monopoly, complements NVDA/ASML thesis
       - ASM.AS   # ASMI (ASM International, Euronext Amsterdam)
 
   - name: Energy
