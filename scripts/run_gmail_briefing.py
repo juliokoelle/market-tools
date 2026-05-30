@@ -30,8 +30,11 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import time
 from datetime import date, datetime, timezone
 from pathlib import Path
+
+import requests as _requests
 
 from dotenv import load_dotenv
 
@@ -43,6 +46,10 @@ from scripts.utils import today                                 # noqa: E402
 
 OUTPUTS_DIR = Path("outputs")
 LATEST_FILE = OUTPUTS_DIR / "latest-briefing.md"
+
+_GH_TOKEN  = os.getenv("GITHUB_TOKEN", "")
+_GH_OWNER  = os.getenv("JULIO_BRAIN_OWNER", "juliokoelle")
+_GH_REPO   = os.getenv("JULIO_BRAIN_REPO_NAME", "julio-brain")
 
 
 def _log(msg: str) -> None:
@@ -57,11 +64,49 @@ def _check_env() -> None:
         sys.exit(1)
 
 
+def _already_synced(run_date: str) -> bool:
+    """Return True if today's briefing already exists in GitHub — skip re-run."""
+    if not _GH_TOKEN:
+        return False
+    try:
+        url = (f"https://api.github.com/repos/{_GH_OWNER}/{_GH_REPO}"
+               f"/contents/10_Daily/{run_date}.md")
+        resp = _requests.get(url, headers={"Authorization": f"Bearer {_GH_TOKEN}",
+                                           "Accept": "application/vnd.github.v3+json"}, timeout=8)
+        return resp.status_code == 200
+    except Exception:
+        return False
+
+
+def _wait_for_network(max_attempts: int = 6, delay: int = 30) -> bool:
+    """Wait until DNS resolves. Returns True when network is up, False on timeout."""
+    import socket
+    for attempt in range(max_attempts):
+        try:
+            socket.getaddrinfo("imap.gmail.com", 993)
+            return True
+        except OSError:
+            if attempt < max_attempts - 1:
+                _log(f"Network not ready (attempt {attempt + 1}/{max_attempts}), retrying in {delay}s…")
+                time.sleep(delay)
+    return False
+
+
 def run(run_date_str: str | None = None) -> None:
     _check_env()
 
     run_date = run_date_str or today()
     _log(f"=== Gmail briefing pipeline started for {run_date} ===")
+
+    # Idempotency: skip if this date is already in GitHub (safe for multiple daily triggers)
+    if run_date_str is None and _already_synced(run_date):
+        _log(f"Briefing for {run_date} already in julio-brain — skipping.")
+        sys.exit(0)
+
+    # Wait for network if DNS is not yet available (common after Mac wake-from-sleep)
+    if not _wait_for_network():
+        _log("ERROR — network unavailable after retries. Exiting.")
+        sys.exit(1)
 
     # Parse target_date for backfill (ON search) vs today (SINCE yesterday search)
     target: date | None = None
