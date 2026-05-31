@@ -23,6 +23,7 @@ categories:
       - CVX
       - GLD      # SPDR Gold Shares ETF — no P/E, scored 50/50 Momentum+Sentiment
       - SLV      # iShares Silver Trust ETF — no P/E, scored 50/50 Momentum+Sentiment
+      - 4GLD.DE  # Xetra-Gold (Deutsche Börse) — physical gold ETC, portfolio position
 
   - name: Clean Energy
     tickers:
