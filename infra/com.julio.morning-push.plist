@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.julio.morning-push</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/juliokoelle/projects/automation/venv/bin/python</string>
+        <string>-m</string>
+        <string>scripts.morning_push</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/juliokoelle/projects/automation</string>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>8</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>TELEGRAM_BOT_TOKEN</key>
+        <string>PLACEHOLDER_TOKEN</string>
+        <key>TELEGRAM_CHAT_ID</key>
+        <string>PLACEHOLDER_CHAT_ID</string>
+        <key>GITHUB_TOKEN</key>
+        <string>PLACEHOLDER_GITHUB_TOKEN</string>
+        <key>JULIO_BRAIN_OWNER</key>
+        <string>juliokoelle</string>
+        <key>JULIO_BRAIN_REPO_NAME</key>
+        <string>julio-brain</string>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/juliokoelle/projects/automation/logs/morning-push.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/juliokoelle/projects/automation/logs/morning-push.log</string>
+</dict>
+</plist>
