@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { getPortfolio, savePortfolio, analyzePortfolio, getMarketPrices, getMarketNames, getStockDetail, searchTickers, type Position, type PortfolioAnalysis, type StockDetail } from '../services/api'
+import { getPortfolio, savePortfolio, analyzePortfolio, getMarketPrices, getMarketNames, getStockDetail, searchTickers, getStockWatchlist, addStockToWatchlist, removeStockFromWatchlist, type Position, type PortfolioAnalysis, type StockDetail } from '../services/api'
 
 const UNIVERSE = [
   "AAPL","MSFT","NVDA","GOOG","META","AVGO","AMD","ORCL","CRM","ADBE",
@@ -24,11 +24,8 @@ const PORTFOLIO_SEED: Position[] = [
   { ticker: "GOOGL",   investment: 120 },
 ]
 
-const WATCHLIST_SEED = ['TSM', 'META', 'AAPL', 'AMZN', 'TSLA', 'PLTR', 'AMD', 'SAP']
-
 const SEED_KEY       = 'mt_portfolio_seed_seen'
 const POSITIONS_KEY  = 'mt_portfolio_v2'
-const WATCHLIST_KEY  = 'mt_watchlist_v2'
 
 interface TickerSuggestion { ticker: string; name: string }
 
@@ -243,13 +240,9 @@ export default function Portfolio() {
   const [analyzing, setAnalyzing] = useState(false)
   const [showSeed, setShowSeed]   = useState(false)
 
-  // ── Watchlist ──
-  const [watchlist, setWatchlist] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem(WATCHLIST_KEY)
-      return saved ? JSON.parse(saved) : WATCHLIST_SEED
-    } catch { return WATCHLIST_SEED }
-  })
+  // ── Watchlist (backed by /stock-watchlist API) ──
+  const [watchlist, setWatchlist] = useState<string[]>([])
+  const [watchLoading, setWatchLoading] = useState(true)
   const [watchPrices, setWatchPrices] = useState<Record<string, { price: number; change_pct: number }>>({})
   const [watchNames, setWatchNames]   = useState<Record<string, string>>({})
   const [watchInput, setWatchInput]   = useState('')
@@ -285,10 +278,13 @@ export default function Portfolio() {
       })
   }, [])
 
-  // Persist + load watchlist prices and names
+  // Load watchlist from API on mount
   useEffect(() => {
-    localStorage.setItem(WATCHLIST_KEY, JSON.stringify(watchlist))
-  }, [watchlist])
+    getStockWatchlist()
+      .then(items => setWatchlist(items.map(i => i.ticker)))
+      .catch(() => setWatchlist([]))
+      .finally(() => setWatchLoading(false))
+  }, [])
 
   useEffect(() => {
     if (!watchlist.length) return
@@ -336,15 +332,22 @@ export default function Portfolio() {
     finally { setAnalyzing(false) }
   }
 
-  // Watchlist helpers
-  function addToWatchlist(ticker: string) {
+  // Watchlist helpers (API-backed)
+  async function addToWatchlist(ticker: string) {
     const t = ticker.trim().toUpperCase()
-    if (t && !watchlist.includes(t)) setWatchlist(w => [...w, t])
+    if (!t || watchlist.includes(t)) { setWatchInput(''); return }
+    try {
+      await addStockToWatchlist(t)
+      setWatchlist(w => [...w, t])
+    } catch { showToast('Failed to add ticker') }
     setWatchInput('')
   }
 
-  function removeFromWatchlist(ticker: string) {
-    setWatchlist(w => w.filter(t => t !== ticker))
+  async function removeFromWatchlist(ticker: string) {
+    try {
+      await removeStockFromWatchlist(ticker)
+      setWatchlist(w => w.filter(t => t !== ticker))
+    } catch { showToast('Failed to remove ticker') }
   }
 
   function confirmTransfer(amount: number) {
@@ -487,7 +490,9 @@ export default function Portfolio() {
 
           {/* Watchlist rows */}
           <div className="card table-scroll" style={{ padding: 0 }}>
-            {watchlist.length === 0 ? (
+            {watchLoading ? (
+              <p style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-3)', fontSize: '.875rem' }}>Loading…</p>
+            ) : watchlist.length === 0 ? (
               <p style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-3)', fontSize: '.875rem' }}>
                 Your watchlist is empty. Search for a ticker above to add.
               </p>

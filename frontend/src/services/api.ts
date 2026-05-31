@@ -132,6 +132,19 @@ export const getStockAiSummary = (ticker: string) =>
 export const getTickerProfile = (ticker: string) =>
   get<TickerProfile>(`/ticker/${ticker}/profile`)
 
+// Personal Watchlist (Portfolio page — backed by /stock-watchlist API)
+export interface WatchlistEntry { ticker: string; company: string; notes: string; added: string }
+
+export const getStockWatchlist = () =>
+  get<WatchlistEntry[]>('/stock-watchlist')
+
+export const addStockToWatchlist = (ticker: string, company = '') =>
+  post<WatchlistEntry[]>('/stock-watchlist', { ticker, company, notes: '', added: '' })
+
+export const removeStockFromWatchlist = (ticker: string) =>
+  fetch(`${BASE}/stock-watchlist/${encodeURIComponent(ticker)}`, { method: 'DELETE' })
+    .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json() as Promise<WatchlistEntry[]> })
+
 // Types
 export interface StockRow { ticker: string; name: string; price: number; change_pct: number; bull_score?: number }
 export interface BriefingMeta { date: string; has_pdf: boolean }
