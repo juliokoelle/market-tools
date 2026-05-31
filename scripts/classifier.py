@@ -69,6 +69,12 @@ def classify_text(text: str) -> list[CapturedItem]:
             messages=[{"role": "user", "content": text}],
         )
         raw = response.content[0].text.strip()
+        # Strip markdown code fences (model sometimes wraps JSON in ```json ... ```)
+        if raw.startswith("```"):
+            raw = raw.split("```", 2)[1]
+            if raw.startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
         parsed = json.loads(raw)
         result: list[CapturedItem] = []
         for item in parsed:
