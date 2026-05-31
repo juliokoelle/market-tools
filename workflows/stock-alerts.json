@@ -1,0 +1,67 @@
+{
+  "name": "Stock Alerts",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{ "triggerAtHour": 20, "triggerAtMinute": 0 }]
+        }
+      },
+      "id": "sa-schedule-1",
+      "name": "Schedule (20:00)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.MARKET_TOOLS_BACKEND_URL }}/watchlist"
+      },
+      "id": "get-watchlist-1",
+      "name": "Fetch Watchlist Scores",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const categories = items[0].json.categories || [];\nconst alerts = [];\nfor (const cat of categories) {\n  for (const t of (cat.tickers || [])) {\n    const score = t.bull_score ?? 50;\n    if (score >= 75) {\n      alerts.push(`🟢 *${t.ticker}* — Bull Score ${score} (STARK BULLISH)`);\n    } else if (score <= 25) {\n      alerts.push(`🔴 *${t.ticker}* — Bull Score ${score} (STARK BEARISH)`);\n    }\n  }\n}\nif (alerts.length === 0) return [];\nconst msg = '📊 *Stock Alerts — ' + new Date().toLocaleDateString('de-DE') + '*\\n\\n' + alerts.join('\\n');\nreturn [{ json: { message: msg, count: alerts.length } }];"
+      },
+      "id": "filter-alerts-1",
+      "name": "Filter Extremes (≥75 / ≤25)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": { "parse_mode": "Markdown" }
+      },
+      "id": "send-alerts-1",
+      "name": "Send Alerts",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1000, 300],
+      "credentials": {
+        "telegramApi": { "id": "1", "name": "Telegram Bot" }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule (20:00)": {
+      "main": [[{ "node": "Fetch Watchlist Scores", "type": "main", "index": 0 }]]
+    },
+    "Fetch Watchlist Scores": {
+      "main": [[{ "node": "Filter Extremes (≥75 / ≤25)", "type": "main", "index": 0 }]]
+    },
+    "Filter Extremes (≥75 / ≤25)": {
+      "main": [[{ "node": "Send Alerts", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" },
+  "notes": "NEW: Every evening at 20:00, fetches all bull scores from market-tools. Sends Telegram alert if any ticker scores ≥75 (strong buy signal) or ≤25 (strong sell signal). Only fires when extreme scores exist."
+}

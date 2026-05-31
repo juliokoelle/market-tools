@@ -163,6 +163,11 @@ class StockWatchlistEntry(BaseModel):
     added: str = ""
 
 
+class CaptureRequest(BaseModel):
+    text: str
+    chat_id: str | None = None
+
+
 # ---------------------------------------------------------------------------
 # GitHub portfolio helpers
 # ---------------------------------------------------------------------------
@@ -941,6 +946,25 @@ def stock_watchlist_remove(ticker: str):
     data = [e for e in data if e["ticker"] != ticker.upper()]
     _write_stock_watchlist(data)
     return data
+
+
+# ---------------------------------------------------------------------------
+# Capture endpoint — called by n8n Telegram workflow
+# ---------------------------------------------------------------------------
+
+@app.post("/capture")
+async def capture_message(req: CaptureRequest):
+    """Classify and route a Telegram message. Returns optional reply string for the user."""
+    from scripts.classifier import classify_text
+    from scripts.capture_router import route_item
+
+    items = classify_text(req.text)
+    replies: list[str] = []
+    for item in items:
+        result = await route_item(item)
+        if result:
+            replies.append(result)
+    return {"reply": "\n\n".join(replies) if replies else None}
 
 
 # ---------------------------------------------------------------------------

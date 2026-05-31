@@ -1,0 +1,52 @@
+{
+  "name": "Gmail Briefing",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "triggerAtHour": 8,  "triggerAtMinute": 15 },
+            { "triggerAtHour": 9,  "triggerAtMinute": 0  },
+            { "triggerAtHour": 10, "triggerAtMinute": 0  }
+          ]
+        }
+      },
+      "id": "schedule-1",
+      "name": "Schedule (08:15 / 09:00 / 10:00)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "command": "cd /app/automation && /app/automation/venv/bin/python -m scripts.run_gmail_briefing 2>&1"
+      },
+      "id": "run-briefing-1",
+      "name": "Run Briefing Script",
+      "type": "n8n-nodes-base.executeCommand",
+      "typeVersion": 1,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const output = items[0].json.stdout || '';\nconst isSkipped = output.includes('already in julio-brain');\nconst isError   = output.includes('ERROR');\nconst status    = isSkipped ? 'skipped' : isError ? 'error' : 'success';\nreturn [{ json: { status, output: output.slice(0, 500) } }];"
+      },
+      "id": "parse-output-1",
+      "name": "Parse Output",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [750, 300]
+    }
+  ],
+  "connections": {
+    "Schedule (08:15 / 09:00 / 10:00)": {
+      "main": [[{ "node": "Run Briefing Script", "type": "main", "index": 0 }]]
+    },
+    "Run Briefing Script": {
+      "main": [[{ "node": "Parse Output", "type": "main", "index": 0 }]]
+    }
+  },
+  "active": true,
+  "settings": { "executionOrder": "v1" },
+  "notes": "Replaces Mac LaunchAgent com.julio.gmail-briefing. Runs the Python briefing script directly on the VPS. Idempotency is handled inside the script (checks GitHub before running)."
+}
