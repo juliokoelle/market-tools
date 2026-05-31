@@ -993,6 +993,13 @@ def get_watchlist():
     if not categories:
         raise HTTPException(status_code=503, detail="Watchlist config not found.")
 
+    # Merge Telegram-added picks as a "Meine Picks" category (dedup against static list)
+    existing_tickers = {t for cat in categories for t in cat["tickers"]}
+    personal_picks = _read_stock_watchlist()
+    new_tickers = [p["ticker"] for p in personal_picks if p["ticker"] not in existing_tickers]
+    if new_tickers:
+        categories = categories + [{"name": "Meine Picks", "tickers": new_tickers}]
+
     all_tickers = [t for cat in categories for t in cat["tickers"]]
 
     with ThreadPoolExecutor(max_workers=12) as executor:
