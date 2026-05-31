@@ -106,3 +106,72 @@ def test_classify_never_returns_empty_array(monkeypatch):
         from scripts.classifier import classify_text
         items = classify_text("something")
     assert len(items) >= 1
+
+
+def test_classify_code_fence_json_still_parsed(monkeypatch):
+    """Haiku sometimes returns ```json ... ``` — must not fall back to note."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-key")
+    with patch("scripts.classifier.anthropic.Anthropic") as MockClient:
+        MockClient.return_value.messages.create.return_value = _mock_anthropic_response(
+            '```json\n[{"type": "stock_pick", "text": "NVDA", '
+            '"metadata": {"ticker": "NVDA", "company": "NVIDIA", "notes": null}}]\n```'
+        )
+        from scripts.classifier import classify_text
+        items = classify_text("NVDA auf Watchlist")
+    assert items[0].type == "stock_pick"
+    assert items[0].metadata["ticker"] == "NVDA"
+
+
+def test_classify_stock_by_company_name(monkeypatch):
+    """Company names like 'monday.com' should resolve to their ticker."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-key")
+    with patch("scripts.classifier.anthropic.Anthropic") as MockClient:
+        MockClient.return_value.messages.create.return_value = _mock_anthropic_response(
+            '[{"type": "stock_pick", "text": "monday.com", '
+            '"metadata": {"ticker": "MNDY", "company": "monday.com", "notes": null}}]'
+        )
+        from scripts.classifier import classify_text
+        items = classify_text("monday.com beobachten")
+    assert items[0].type == "stock_pick"
+    assert items[0].metadata["ticker"] == "MNDY"
+
+
+def test_classify_multiple_stocks(monkeypatch):
+    """A message with 4 stocks should produce 4 stock_pick items."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-key")
+    payload = '[{"type":"stock_pick","text":"monday.com","metadata":{"ticker":"MNDY","company":"monday.com","notes":null}},' \
+              '{"type":"stock_pick","text":"take-two","metadata":{"ticker":"TTWO","company":"Take-Two Interactive","notes":null}},' \
+              '{"type":"stock_pick","text":"Hims","metadata":{"ticker":"HIMS","company":"Hims & Hers","notes":null}},' \
+              '{"type":"stock_pick","text":"Shopify","metadata":{"ticker":"SHOP","company":"Shopify","notes":null}}]'
+    with patch("scripts.classifier.anthropic.Anthropic") as MockClient:
+        MockClient.return_value.messages.create.return_value = _mock_anthropic_response(payload)
+        from scripts.classifier import classify_text
+        items = classify_text("Aktien: monday.com, take-two, Hims, Shopify")
+    assert len(items) == 4
+    assert all(i.type == "stock_pick" for i in items)
+    tickers = {i.metadata["ticker"] for i in items}
+    assert tickers == {"MNDY", "TTWO", "HIMS", "SHOP"}
+
+
+def test_classify_reminder(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-key")
+    with patch("scripts.classifier.anthropic.Anthropic") as MockClient:
+        MockClient.return_value.messages.create.return_value = _mock_anthropic_response(
+            '[{"type": "reminder", "text": "Zahnarzt anrufen", '
+            '"metadata": {"text": "Zahnarzt anrufen", "date": "2026-06-01"}}]'
+        )
+        from scripts.classifier import classify_text
+        items = classify_text("Morgen Zahnarzt anrufen nicht vergessen")
+    assert items[0].type == "reminder"
+    assert items[0].metadata["date"] == "2026-06-01"
+
+
+def test_classify_task(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "dummy-key")
+    with patch("scripts.classifier.anthropic.Anthropic") as MockClient:
+        MockClient.return_value.messages.create.return_value = _mock_anthropic_response(
+            '[{"type": "task", "text": "PR review abschließen", "metadata": {}}]'
+        )
+        from scripts.classifier import classify_text
+        items = classify_text("muss noch PR review abschließen")
+    assert items[0].type == "task"

@@ -23,7 +23,8 @@ import logging
 import os
 import re
 import time as _time_mod
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import openai
@@ -337,6 +338,53 @@ async def cmd_note(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(f"Fehler: {e}")
 
 
+async def cmd_health(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    if not _authorized(update):
+        return
+    log_dir = Path(__file__).parent.parent / "logs"
+    cutoff = datetime.now() - timedelta(hours=24)
+    files = {
+        "telegram-bot": log_dir / "telegram-bot.log",
+        "gmail-briefing": log_dir / "gmail-briefing.log",
+    }
+    parts: list[str] = ["🩺 *System Health — letzte 24h*\n"]
+    total_errors = 0
+    for name, path in files.items():
+        errors: list[str] = []
+        warnings: list[str] = []
+        if path.exists():
+            for line in path.read_text(errors="replace").splitlines():
+                # Lines look like: 2026-05-31 08:15:42,123 ERROR ...
+                try:
+                    ts_str = line[:19]
+                    ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
+                except ValueError:
+                    continue
+                if ts < cutoff:
+                    continue
+                upper = line.upper()
+                if " ERROR " in upper:
+                    errors.append(line[line.upper().find(" ERROR ") + 7:][:120])
+                elif " WARNING " in upper:
+                    warnings.append(line[line.upper().find(" WARNING ") + 9:][:120])
+        status = "✅" if not errors else "🔴"
+        parts.append(f"{status} *{name}*")
+        if errors:
+            total_errors += len(errors)
+            for e in errors[-3:]:
+                parts.append(f"  ❌ {e}")
+            if len(errors) > 3:
+                parts.append(f"  … +{len(errors) - 3} weitere")
+        if warnings:
+            for w in warnings[-2:]:
+                parts.append(f"  ⚠️ {w}")
+        if not errors and not warnings:
+            parts.append("  Keine Probleme")
+        parts.append("")
+    parts.append("_Alles OK_ ✅" if total_errors == 0 else f"_⚠️ {total_errors} Fehler gefunden_")
+    await update.message.reply_text("\n".join(parts), parse_mode="Markdown")
+
+
 async def cmd_frage(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not _authorized(update):
         return
@@ -497,9 +545,10 @@ def main() -> None:
         raise RuntimeError("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set.")
 
     app = Application.builder().token(_TOKEN).build()
-    app.add_handler(CommandHandler("task",  cmd_task))
-    app.add_handler(CommandHandler("note",  cmd_note))
-    app.add_handler(CommandHandler("frage", cmd_frage))
+    app.add_handler(CommandHandler("task",   cmd_task))
+    app.add_handler(CommandHandler("note",   cmd_note))
+    app.add_handler(CommandHandler("frage",  cmd_frage))
+    app.add_handler(CommandHandler("health", cmd_health))
     app.add_handler(MessageHandler(filters.VOICE,                     handle_voice))
     app.add_handler(MessageHandler(filters.PHOTO,                     handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,   plain_text))

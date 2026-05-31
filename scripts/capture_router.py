@@ -72,7 +72,7 @@ async def route_item(item: CapturedItem) -> str | None:
         return await _dispatch(item)
     except Exception as e:
         log.error("route_item failed for type=%s text=%r: %s", item.type, item.text, e)
-    return None
+        return f"⚠️ Speichern fehlgeschlagen ({item.type}): {type(e).__name__}. Tippe /health für Details."
 
 
 def _format_stock_snapshot(data: dict) -> str:
