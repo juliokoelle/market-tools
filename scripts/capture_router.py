@@ -169,8 +169,9 @@ async def _dispatch(item: CapturedItem) -> str | None:
         await asyncio.to_thread(github_read_modify_write, path, mutate, f"capture: stock pick ({today()})")
 
         # Post to watchlist backend (non-fatal if down)
+        # 35s timeout to survive Render cold starts (~30s)
         try:
-            async with httpx.AsyncClient(timeout=8) as client:
+            async with httpx.AsyncClient(timeout=35) as client:
                 resp = await client.post(
                     f"{_MARKET_TOOLS}/stock-watchlist",
                     json={"ticker": ticker, "company": company, "notes": notes, "added": today()},
