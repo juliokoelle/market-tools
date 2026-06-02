@@ -66,10 +66,23 @@ export const searchTickers = (q: string) =>
 
 // Portfolio
 export const getPortfolio = () =>
-  get<{ positions: Position[]; total_value: number }>('/portfolio')
+  get<any>('/portfolio').then((d: any) => ({
+    positions: (d.positions ?? []).map((p: any): Position => ({
+      ticker: p.ticker,
+      investment: p.investment ?? p.amount_eur ?? 0,
+    })),
+    total_value: d.total_eur ?? d.total_value ?? 0,
+  }))
 
 export const savePortfolio = (positions: Position[]) =>
-  post<{ ok: boolean }>('/portfolio', { positions })
+  post<{ ok: boolean }>('/portfolio', {
+    positions: positions.map(p => ({
+      ticker: p.ticker,
+      amount_eur: p.investment,
+      category: 'stock',
+      note: '',
+    })),
+  })
 
 export const analyzePortfolio = (holdings: Holding[]) =>
   post<PortfolioAnalysis>('/portfolio/analyze', { holdings })
