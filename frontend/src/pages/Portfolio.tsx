@@ -254,7 +254,7 @@ export default function Portfolio() {
 
   // ── Toast ──
   const [toast, setToast] = useState('')
-  function showToast(msg: string) { setToast(msg); setTimeout(() => setToast(''), 3000) }
+  function showToast(msg: string, ms = 3000) { setToast(msg); setTimeout(() => setToast(''), ms) }
 
   // Persist + load positions
   useEffect(() => {
@@ -325,10 +325,15 @@ export default function Portfolio() {
 
   async function handleAnalyze() {
     const valid = positions.filter(p => p.ticker && p.investment > 0)
-    if (!valid.length) return
+    if (!valid.length) { showToast('Add at least one ticker with an investment amount'); return }
     setAnalyzing(true)
     try { setAnalysis(await analyzePortfolio(valid)) }
-    catch { showToast('Analysis failed') }
+    catch (err) {
+      const isNetwork = err instanceof TypeError
+      showToast(isNetwork
+        ? 'Backend is waking up — wait 30 s and try again'
+        : 'Analysis failed — check your tickers and try again', isNetwork ? 6000 : 3000)
+    }
     finally { setAnalyzing(false) }
   }
 
