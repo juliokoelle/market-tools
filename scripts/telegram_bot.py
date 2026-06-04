@@ -338,6 +338,25 @@ async def cmd_note(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(f"Fehler: {e}")
 
 
+async def cmd_tasks(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Return current open tasks on demand via /tasks."""
+    if not _authorized(update):
+        return
+    run_date = today()
+    try:
+        daily_text  = github_read(f"10_Daily/{run_date}.md") or ""
+        daily_tasks = _extract_open_items(daily_text, "Tasks")
+        vault_tasks = _get_vault_tasks()
+        tasks       = daily_tasks + vault_tasks
+        q_text      = github_read("40_Knowledge/open-questions.md") or ""
+        questions   = [l.strip() for l in q_text.splitlines() if l.strip().startswith("- [ ]")]
+        msg = _format_summary(tasks, questions, run_date)
+        await update.message.reply_text(msg, parse_mode="MarkdownV2")
+    except Exception as e:
+        log.error("cmd_tasks failed: %s", e)
+        await update.message.reply_text(f"Fehler: {e}")
+
+
 async def cmd_health(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not _authorized(update):
         return
@@ -494,11 +513,20 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 # Evening summary job
 # ---------------------------------------------------------------------------
 
+
+def _get_vault_tasks() -> list[str]:
+    """Read all open tasks from 00_Inbox/OPEN_TASKS.md."""
+    text = github_read("00_Inbox/OPEN_TASKS.md") or ""
+    return [l.strip() for l in text.splitlines() if l.strip().startswith("- [ ]")]
+
+
 async def send_evening_summary(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     run_date = today()
     try:
         daily_text  = github_read(f"10_Daily/{run_date}.md") or ""
-        tasks       = _extract_open_items(daily_text, "Tasks")
+        daily_tasks = _extract_open_items(daily_text, "Tasks")
+        vault_tasks = _get_vault_tasks()
+        tasks       = daily_tasks + vault_tasks
         q_text      = github_read("40_Knowledge/open-questions.md") or ""
         questions   = [l.strip() for l in q_text.splitlines() if l.strip().startswith("- [ ]")]
         msg = _format_summary(tasks, questions, run_date)
@@ -548,6 +576,7 @@ def main() -> None:
     app.add_handler(CommandHandler("task",   cmd_task))
     app.add_handler(CommandHandler("note",   cmd_note))
     app.add_handler(CommandHandler("frage",  cmd_frage))
+    app.add_handler(CommandHandler("tasks",  cmd_tasks))
     app.add_handler(CommandHandler("health", cmd_health))
     app.add_handler(MessageHandler(filters.VOICE,                     handle_voice))
     app.add_handler(MessageHandler(filters.PHOTO,                     handle_photo))
