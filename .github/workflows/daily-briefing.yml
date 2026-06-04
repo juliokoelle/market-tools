@@ -1,9 +1,7 @@
 name: Daily Economic Briefing
 
 on:
-  schedule:
-    - cron: '0 4 * * *'   # 04:00 UTC = 06:00 CEST — 2.5h vor morning-push
-  workflow_dispatch:        # manueller Trigger zum Testen
+  workflow_dispatch:        # nur manuell — automatischer Cron deaktiviert (ersetzt durch gmail-briefing)
 
 jobs:
   run-briefing:
