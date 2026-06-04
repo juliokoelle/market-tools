@@ -1,0 +1,22 @@
+name: Create Daily Note
+on:
+  schedule:
+    - cron: '45 5 * * *'  # 05:45 UTC = 07:45 CEST
+  workflow_dispatch:
+jobs:
+  create-note:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Create daily note
+        env:
+          GITHUB_TOKEN: ${{ secrets.BRAIN_GITHUB_TOKEN }}
+          JULIO_BRAIN_OWNER: ${{ secrets.JULIO_BRAIN_OWNER }}
+          JULIO_BRAIN_REPO_NAME: ${{ secrets.JULIO_BRAIN_REPO_NAME }}
+        run: python -m scripts.create_daily_note --mode create --cloud

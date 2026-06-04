@@ -6,7 +6,11 @@ Modes:
   --mode create  → writes fresh template (fails if file already exists)
   --mode append  → appends template with --- separator (safe when briefing is already in file)
 
-Local git commit is done after write. Push is handled by Obsidian Git plugin.
+Flags:
+  --cloud        → GitHub Actions mode: skips AppleScript/osascript, skips local git commit,
+                   creates the daily note via GitHub API only (idempotent — skips if exists).
+
+Local git commit is done after write (unless --cloud). Push is handled by Obsidian Git plugin.
 """
 
 from __future__ import annotations
@@ -85,6 +89,28 @@ def _build_template(date_str: str, calendar_events: list[str], has_briefing: boo
 """
 
 
+def _build_cloud_template(date_str: str) -> str:
+    """Build the canonical daily note template for cloud/GitHub Actions mode.
+
+    Matches vault_utils.make_daily_note sections but with a GitHub Actions footer
+    instead of the old briefing footer line.
+    """
+    return (
+        f"---\ndate: {date_str}\ntype: daily\n---\n\n"
+        f"# {date_str}\n\n"
+        "## Tasks\n\n"
+        "## Notes\n\n"
+        "## Shopping List\n\n"
+        "## Focus\n\n"
+        "## Log\n\n"
+        "## Open Questions\n\n"
+        "## People\n\n"
+        "## Follow-ups\n\n"
+        "---\n\n"
+        "*Daily Note auto-created by GitHub Actions.*\n"
+    )
+
+
 def _git_commit(target: Path, date_str: str) -> None:
     try:
         subprocess.run(["git", "add", str(target)], cwd=BRAIN_DIR, check=True, capture_output=True)
@@ -96,11 +122,62 @@ def _git_commit(target: Path, date_str: str) -> None:
         print(f"Warning: git commit failed (non-fatal): {e.stderr or e}", file=sys.stderr)
 
 
+def _cloud_create(date_str: str) -> None:
+    """Create the daily note via GitHub API (idempotent). Skips if the file already exists."""
+    # Import here so local-only usage doesn't require sync_to_brain dependencies.
+    import importlib.util
+    import os
+
+    sync_path = Path(__file__).parent / "sync_to_brain.py"
+    spec = importlib.util.spec_from_file_location("sync_to_brain", sync_path)
+    sync_mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+    spec.loader.exec_module(sync_mod)  # type: ignore[union-attr]
+
+    gh_path = f"10_Daily/{date_str}.md"
+
+    # Idempotency: check if the file already exists on GitHub.
+    existing = sync_mod.github_read(gh_path)
+    if existing is not None:
+        print(f"Daily Note {date_str} already exists on GitHub — skipping.")
+        sys.exit(0)
+
+    template = _build_cloud_template(date_str)
+
+    def _create_fresh(current: str) -> str:
+        # github_read_modify_write calls this with "" when file doesn't exist.
+        # If by a race condition it now exists, leave it untouched.
+        if current.strip():
+            return current
+        return template
+
+    sync_mod.github_read_modify_write(
+        path=gh_path,
+        mutate_fn=_create_fresh,
+        commit_msg=f"daily-note: {date_str}",
+    )
+    print(f"Daily Note created on GitHub: {gh_path}")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--date", default=datetime.date.today().isoformat())
     parser.add_argument("--mode", choices=["check", "create", "append"], default="check")
+    parser.add_argument(
+        "--cloud",
+        action="store_true",
+        help=(
+            "GitHub Actions mode: skip AppleScript/osascript and local git commit; "
+            "create the daily note via GitHub API only (idempotent)."
+        ),
+    )
     args = parser.parse_args()
+
+    # --cloud mode: entirely GitHub-API-based, no local filesystem needed.
+    if args.cloud:
+        _cloud_create(args.date)
+        return
+
+    # --- Local modes below (unchanged behaviour) ---
 
     if not BRAIN_DIR.exists():
         print(f"ERROR: julio-brain not found at {BRAIN_DIR}", file=sys.stderr)

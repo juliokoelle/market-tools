@@ -10,6 +10,7 @@ Commands:
   <photo>        → analyzed via GPT-4o Vision, auto-categorized
 
 Daily job at 20:30 Europe/Berlin: open tasks + open questions summary.
+Daily job at 21:00 Europe/Berlin: evening recap prompt.
 
 Only accepts messages from TELEGRAM_CHAT_ID.
 """
@@ -29,6 +30,7 @@ from zoneinfo import ZoneInfo
 
 import openai
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -426,6 +428,30 @@ async def plain_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     text = (update.message.text or "").strip()
     if not text:
         return
+
+    # Feature 2: Check if this is a reply to the evening recap prompt
+    if (
+        update.message.reply_to_message is not None
+        and update.message.reply_to_message.message_id
+            == ctx.application.bot_data.get("recap_msg_id")
+    ):
+        run_date = today()
+        entry = _note_entry(text)
+        path = f"10_Daily/{run_date}.md"
+
+        def mutate(current: str) -> str:
+            if not current:
+                current = _make_daily_note(run_date)
+            return insert_into_section(current, "Log", entry)
+
+        try:
+            github_read_modify_write(path, mutate, f"capture: recap ({run_date})")
+            await update.message.reply_text("✅ Tages-Recap gespeichert.")
+        except Exception as e:
+            log.error("recap save failed: %s", e)
+            await update.message.reply_text(f"Fehler: {e}")
+        return
+
     await update.message.reply_text("🔍 Erkenne…")
     items = classify_text(text)
     await _send_confirmations(update, ctx, items)
@@ -452,6 +478,30 @@ async def handle_voice(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         if not text:
             await update.message.reply_text("Keine Sprache erkannt.")
             return
+
+        # Feature 2: Check if this voice message is a reply to the evening recap prompt
+        if (
+            update.message.reply_to_message is not None
+            and update.message.reply_to_message.message_id
+                == ctx.application.bot_data.get("recap_msg_id")
+        ):
+            run_date = today()
+            entry = _note_entry(text)
+            path = f"10_Daily/{run_date}.md"
+
+            def mutate(current: str) -> str:
+                if not current:
+                    current = _make_daily_note(run_date)
+                return insert_into_section(current, "Log", entry)
+
+            try:
+                github_read_modify_write(path, mutate, f"capture: recap ({run_date})")
+                await update.message.reply_text("✅ Tages-Recap gespeichert.")
+            except Exception as e:
+                log.error("recap (voice) save failed: %s", e)
+                await update.message.reply_text(f"Fehler: {e}")
+            return
+
         await update.message.reply_text(f'🎙 Erkannt: "{text}"\n🔍 Klassifiziere…')
         items = classify_text(text)
         await _send_confirmations(update, ctx, items)
@@ -539,6 +589,23 @@ async def send_evening_summary(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             pass
 
 
+# ---------------------------------------------------------------------------
+# Evening recap job (Feature 1)
+# ---------------------------------------------------------------------------
+
+async def send_evening_recap_prompt(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Send the daily recap prompt at 21:00 and store the message ID for reply detection."""
+    try:
+        sent = await ctx.bot.send_message(
+            chat_id=_OWNER_ID,
+            text="📔 *Tages-Recap* — Wie war dein Tag? Antworte auf diese Nachricht mit deiner Zusammenfassung.",
+            parse_mode=ParseMode.MARKDOWN,
+        )
+        ctx.application.bot_data["recap_msg_id"] = sent.message_id
+    except Exception as e:
+        log.error("send_evening_recap_prompt failed: %s", e)
+
+
 async def flush_pending(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """Flush unconfirmed items older than 24 h as notes. Runs daily at 23:55."""
     pending: dict = ctx.application.bot_data.get("pending", {})
@@ -586,6 +653,10 @@ def main() -> None:
     app.job_queue.run_daily(
         send_evening_summary,
         time=time(20, 30, tzinfo=_BERLIN),
+    )
+    app.job_queue.run_daily(
+        send_evening_recap_prompt,
+        time=time(21, 0, tzinfo=_BERLIN),
     )
     app.job_queue.run_daily(
         flush_pending,

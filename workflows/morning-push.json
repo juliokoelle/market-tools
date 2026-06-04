@@ -107,7 +107,7 @@
       "main": [[{ "node": "Send to Telegram", "type": "main", "index": 0 }]]
     }
   },
-  "active": true,
+  "active": false,
   "settings": { "executionOrder": "v1" },
-  "notes": "Reads today's Gmail briefing from julio-brain (GitHub) at 08:30 and sends a preview to Telegram. Fires after gmail-briefing-cron (06:00 UTC / 08:00 CEST). Sends warning if no briefing found."
+  "notes": "ARCHIVED: Replaced by GitHub Actions morning-push.yml (runs morning_push.py directly). The Python script provides richer output: tasks, follow-ups, birthday reminders."
 }
