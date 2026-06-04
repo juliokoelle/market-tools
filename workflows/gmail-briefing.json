@@ -46,7 +46,7 @@
       "main": [[{ "node": "Parse Output", "type": "main", "index": 0 }]]
     }
   },
-  "active": true,
+  "active": false,
   "settings": { "executionOrder": "v1" },
-  "notes": "Replaces Mac LaunchAgent com.julio.gmail-briefing. Runs the Python briefing script directly on the VPS. Idempotency is handled inside the script (checks GitHub before running)."
+  "notes": "ARCHIVED: Replaced by Render Cron Job 'gmail-briefing-cron' (render.yaml). Execution via executeCommand does not work on n8n Cloud. Telegram notifications now handled directly by run_gmail_briefing.py. Keep this file as reference only."
 }

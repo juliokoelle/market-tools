@@ -14,3 +14,31 @@ services:
     staticPublishPath: ./frontend/dist
     autoDeploy: true
 
+  # ── Cron: AI Economic Briefing ────────────────────────────────────────────
+  # 04:00 UTC = 06:00 CEST — runs 2.5h before morning-push
+  # Env vars required (set in Render Dashboard):
+  #   ANTHROPIC_API_KEY, TWELVE_DATA_API_KEY, NEWS_API_KEY,
+  #   GITHUB_TOKEN, JULIO_BRAIN_OWNER, JULIO_BRAIN_REPO_NAME,
+  #   TELEGRAM_BOT_TOKEN, TELEGRAM_OWNER_ID
+  - type: cron
+    name: daily-briefing-cron
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m scripts.run_daily
+    schedule: "0 4 * * *"
+
+  # ── Cron: Gmail Newsletter Briefing ──────────────────────────────────────
+  # 06:00 UTC = 08:00 CEST — runs 30min before morning-push
+  # Env vars required (set in Render Dashboard):
+  #   GMAIL_USERNAME, GMAIL_APP_PASSWORD,
+  #   GITHUB_TOKEN, JULIO_BRAIN_OWNER, JULIO_BRAIN_REPO_NAME,
+  #   TELEGRAM_BOT_TOKEN, TELEGRAM_OWNER_ID
+  - type: cron
+    name: gmail-briefing-cron
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m scripts.run_gmail_briefing
+    schedule: "0 6 * * *"
+

@@ -57,6 +57,22 @@ def _log(msg: str) -> None:
     print(f"[{ts}] {msg}", flush=True)
 
 
+def _notify_telegram(msg: str) -> None:
+    """Send a Telegram message to the owner. Non-blocking."""
+    token   = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    chat_id = os.getenv("TELEGRAM_OWNER_ID", "")
+    if not token or not chat_id:
+        return
+    try:
+        _requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": msg},
+            timeout=10,
+        )
+    except Exception as e:
+        _log(f"Telegram notify failed (non-fatal): {e}")
+
+
 def _check_env() -> None:
     missing = [v for v in ("GMAIL_USERNAME", "GMAIL_APP_PASSWORD") if not os.getenv(v)]
     if missing:
@@ -132,13 +148,19 @@ def run(run_date_str: str | None = None) -> None:
     archive.write_text(content, encoding="utf-8")
     _log(f"Saved archive → {archive}")
 
+    sync_ok = False
     try:
         brain_sync(run_date, content)
         _log("Synced to julio-brain.")
+        sync_ok = True
     except Exception as e:
         _log(f"Brain sync failed (non-blocking): {e}")
 
     _log("=== Pipeline complete. ===")
+    if sync_ok:
+        _notify_telegram(f"✅ Gmail Briefing {run_date} in julio-brain gespeichert")
+    else:
+        _notify_telegram(f"⚠️ Gmail Briefing {run_date} gespeichert, aber Brain-Sync fehlgeschlagen. Render Logs prüfen.")
 
 
 if __name__ == "__main__":
@@ -150,4 +172,12 @@ if __name__ == "__main__":
         help="Target date for backfill (default: today, uses SINCE-yesterday IMAP search)",
     )
     args = parser.parse_args()
-    run(args.date)
+    try:
+        run(args.date)
+    except SystemExit as e:
+        if e.code and int(e.code) != 0:
+            _notify_telegram("❌ Gmail Briefing fehlgeschlagen — Render Logs prüfen")
+        raise
+    except Exception as e:
+        _notify_telegram(f"❌ Gmail Briefing crashed: {e}")
+        raise

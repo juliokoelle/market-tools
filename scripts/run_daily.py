@@ -53,6 +53,23 @@ def log(msg: str):
     print(f"[{ts}] {msg}", flush=True)
 
 
+def _notify_telegram(msg: str) -> None:
+    """Send a Telegram message to the owner. Non-blocking — errors are logged only."""
+    import requests as _req
+    token   = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    chat_id = os.getenv("TELEGRAM_OWNER_ID", "")
+    if not token or not chat_id:
+        return
+    try:
+        _req.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": msg},
+            timeout=10,
+        )
+    except Exception as e:
+        log(f"Telegram notify failed (non-fatal): {e}")
+
+
 def check_env():
     missing = [
         name for name, val in [
@@ -136,8 +153,32 @@ def run():
     archive.write_text(content, encoding="utf-8")
     log(f"Saved archive copy   → {archive}")
 
+    # ── Step 5: Sync to julio-brain ─────────────────────────────────────────
+    log("Syncing to julio-brain…")
+    sync_ok = False
+    try:
+        from scripts.sync_to_brain import sync as brain_sync
+        brain_sync(run_date, content, path=f"10_Daily/{run_date}-economic.md")
+        log("Synced to julio-brain.")
+        sync_ok = True
+    except Exception as e:
+        log(f"Brain sync failed (non-blocking): {e}")
+
     log("=== Pipeline complete. ===")
+    word_count = len(briefing.split())
+    if sync_ok:
+        _notify_telegram(f"✅ Economic Briefing {run_date} — {word_count} Wörter generiert & in julio-brain gespeichert")
+    else:
+        _notify_telegram(f"⚠️ Economic Briefing {run_date} — {word_count} Wörter generiert, aber Brain-Sync fehlgeschlagen. Render Logs prüfen.")
 
 
 if __name__ == "__main__":
-    run()
+    try:
+        run()
+    except SystemExit as e:
+        if e.code and int(e.code) != 0:
+            _notify_telegram("❌ Economic Briefing fehlgeschlagen — Render Logs prüfen")
+        raise
+    except Exception as e:
+        _notify_telegram(f"❌ Economic Briefing crashed: {e}")
+        raise

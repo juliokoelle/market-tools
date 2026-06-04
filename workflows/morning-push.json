@@ -73,6 +73,21 @@
       "credentials": {
         "telegramApi": { "id": "1", "name": "Telegram Bot" }
       }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "⚠️ Morning Push: Kein Briefing für heute in julio-brain gefunden. Render Logs prüfen.",
+        "additionalFields": {}
+      },
+      "id": "send-warn-1",
+      "name": "Send Warning",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [1000, 420],
+      "credentials": {
+        "telegramApi": { "id": "1", "name": "Telegram Bot" }
+      }
     }
   ],
   "connections": {
@@ -84,8 +99,8 @@
     },
     "Briefing Ready?": {
       "main": [
-        [{ "node": "Format Message", "type": "main", "index": 0 }],
-        []
+        [{ "node": "Format Message",  "type": "main", "index": 0 }],
+        [{ "node": "Send Warning",    "type": "main", "index": 0 }]
       ]
     },
     "Format Message": {
@@ -94,5 +109,5 @@
   },
   "active": true,
   "settings": { "executionOrder": "v1" },
-  "notes": "NEW: Reads today's briefing from julio-brain (GitHub) at 08:30 and sends a preview to Telegram. Fires after the Gmail Briefing workflow (08:15) has had time to run."
+  "notes": "Reads today's Gmail briefing from julio-brain (GitHub) at 08:30 and sends a preview to Telegram. Fires after gmail-briefing-cron (06:00 UTC / 08:00 CEST). Sends warning if no briefing found."
 }

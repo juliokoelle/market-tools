@@ -39,12 +39,10 @@ def _gh_config() -> tuple[str, str, str] | None:
     return token, owner, repo
 
 
-def _github_put(token: str, owner: str, repo: str, run_date: str, content: str) -> None:
-    """Create or update 10_Daily/{run_date}.md via GitHub Contents API."""
-    api_url = (
-        f"https://api.github.com/repos/{owner}/{repo}"
-        f"/contents/10_Daily/{run_date}.md"
-    )
+def _github_put(token: str, owner: str, repo: str, run_date: str, content: str, path: str | None = None) -> None:
+    """Create or update a file in julio-brain via GitHub Contents API."""
+    actual_path = path or f"10_Daily/{run_date}.md"
+    api_url = f"https://api.github.com/repos/{owner}/{repo}/contents/{actual_path}"
     headers = {
         "Authorization": f"Bearer {token}",
         "Accept": "application/vnd.github.v3+json",
@@ -76,7 +74,7 @@ def _github_put(token: str, owner: str, repo: str, run_date: str, content: str) 
     put_resp = requests.put(api_url, headers=headers, json=body, timeout=30)
     if put_resp.status_code in (200, 201):
         action = "updated" if sha else "created"
-        log.info("[brain] GitHub push OK — %s %s.md.", action, run_date)
+        log.info("[brain] GitHub push OK — %s %s.", action, actual_path)
     else:
         log.warning(
             "[brain] GitHub PUT failed: HTTP %s — %s",
@@ -85,14 +83,15 @@ def _github_put(token: str, owner: str, repo: str, run_date: str, content: str) 
         )
 
 
-def _local_commit(run_date: str, content: str) -> None:
+def _local_commit(run_date: str, content: str, path: str | None = None) -> None:
     """Write briefing to local julio-brain vault and commit (dev machine only)."""
     if not BRAIN_DIR.exists():
         log.warning("[brain] Local BRAIN_DIR not found (%s) — skipping local commit.", BRAIN_DIR)
         return
 
-    DAILY_DIR.mkdir(parents=True, exist_ok=True)
-    target = DAILY_DIR / f"{run_date}.md"
+    actual_path = path or f"10_Daily/{run_date}.md"
+    target = BRAIN_DIR / actual_path
+    target.parent.mkdir(parents=True, exist_ok=True)
 
     if target.exists():
         existing = target.read_text(encoding="utf-8")
@@ -194,20 +193,20 @@ def github_read_modify_write(
     log.info("[brain] github_read_modify_write OK — %s %s", action, path)
 
 
-def sync(run_date: str, content: str) -> None:
+def sync(run_date: str, content: str, path: str | None = None) -> None:
     """
     Push briefing to GitHub (if token available) and commit locally (if path exists).
-    Logs warnings on failure — never raises.
+    path defaults to '10_Daily/{run_date}.md'. Logs warnings on failure — never raises.
     """
     cfg = _gh_config()
     if cfg:
         token, owner, repo = cfg
-        _github_put(token, owner, repo, run_date, content)
+        _github_put(token, owner, repo, run_date, content, path)
     else:
         log.warning("[brain] GITHUB_TOKEN not set — skipping GitHub push.")
 
     try:
-        _local_commit(run_date, content)
+        _local_commit(run_date, content, path)
     except subprocess.CalledProcessError as e:
         log.warning("[brain] Local commit failed (non-fatal): %s", e.stderr or e)
     except Exception as e:
