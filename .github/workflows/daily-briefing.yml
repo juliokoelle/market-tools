@@ -1,0 +1,32 @@
+name: Daily Economic Briefing
+
+on:
+  schedule:
+    - cron: '0 4 * * *'   # 04:00 UTC = 06:00 CEST — 2.5h vor morning-push
+  workflow_dispatch:        # manueller Trigger zum Testen
+
+jobs:
+  run-briefing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run daily briefing
+        env:
+          ANTHROPIC_API_KEY:    ${{ secrets.ANTHROPIC_API_KEY }}
+          TWELVE_DATA_API_KEY:  ${{ secrets.TWELVE_DATA_API_KEY }}
+          NEWS_API_KEY:         ${{ secrets.NEWS_API_KEY }}
+          GITHUB_TOKEN:         ${{ secrets.BRAIN_GITHUB_TOKEN }}
+          JULIO_BRAIN_OWNER:    ${{ secrets.JULIO_BRAIN_OWNER }}
+          JULIO_BRAIN_REPO_NAME: ${{ secrets.JULIO_BRAIN_REPO_NAME }}
+          TELEGRAM_BOT_TOKEN:   ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_OWNER_ID:    ${{ secrets.TELEGRAM_OWNER_ID }}
+        run: python -m scripts.run_daily

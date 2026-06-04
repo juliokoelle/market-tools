@@ -1,0 +1,31 @@
+name: Gmail Briefing
+
+on:
+  schedule:
+    - cron: '0 6 * * *'   # 06:00 UTC = 08:00 CEST — 30min vor morning-push
+  workflow_dispatch:        # manueller Trigger zum Testen
+
+jobs:
+  run-briefing:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run gmail briefing
+        env:
+          GMAIL_USERNAME:       ${{ secrets.GMAIL_USERNAME }}
+          GMAIL_APP_PASSWORD:   ${{ secrets.GMAIL_APP_PASSWORD }}
+          GITHUB_TOKEN:         ${{ secrets.BRAIN_GITHUB_TOKEN }}
+          JULIO_BRAIN_OWNER:    ${{ secrets.JULIO_BRAIN_OWNER }}
+          JULIO_BRAIN_REPO_NAME: ${{ secrets.JULIO_BRAIN_REPO_NAME }}
+          TELEGRAM_BOT_TOKEN:   ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_OWNER_ID:    ${{ secrets.TELEGRAM_OWNER_ID }}
+        run: python -m scripts.run_gmail_briefing
