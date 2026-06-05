@@ -517,9 +517,11 @@ export default function Portfolio() {
                     return (
                       <tr key={ticker} style={{ borderBottom: i < watchlist.length - 1 ? '1px solid var(--border)' : 'none' }}>
                         <td style={{ padding: '.85rem 1.25rem', fontWeight: 600, fontSize: '.875rem' }}>
-                          {watchNames[ticker] && watchNames[ticker] !== ticker
-                            ? `${watchNames[ticker]} — ${ticker}`
-                            : ticker}
+                          <a href={`https://finance.yahoo.com/quote/${encodeURIComponent(ticker)}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
+                            {watchNames[ticker] && watchNames[ticker] !== ticker
+                              ? `${watchNames[ticker]} — ${ticker}`
+                              : ticker}
+                          </a>
                         </td>
                         <td style={{ padding: '.85rem 1.25rem', fontSize: '.9rem', color: 'var(--text-2)' }}>
                           {d ? `$${d.price.toFixed(2)}` : <span style={{ color: 'var(--text-3)' }}>···</span>}
@@ -645,7 +647,9 @@ function AnalysisCard({ a }: { a: PortfolioAnalysis }) {
                   const assetVol = (asset.volatility ?? 0) * 100
                   return (
                     <tr key={asset.ticker}>
-                      <td style={{ padding: '.4rem .5rem', fontWeight: 700, borderBottom: '1px solid var(--border)' }}>{asset.ticker}</td>
+                      <td style={{ padding: '.4rem .5rem', fontWeight: 700, borderBottom: '1px solid var(--border)' }}>
+                        <a href={`https://finance.yahoo.com/quote/${encodeURIComponent(asset.ticker)}`} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--teal)', textDecoration: 'none' }}>{asset.ticker}</a>
+                      </td>
                       <td style={{ padding: '.4rem .5rem', color: 'var(--text-2)', borderBottom: '1px solid var(--border)' }}>{(asset.weight * 100).toFixed(1)}%</td>
                       <td style={{ padding: '.4rem .5rem', color: assetRet >= 0 ? 'var(--positive)' : 'var(--negative)', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>
                         {assetRet >= 0 ? '+' : ''}{assetRet.toFixed(1)}%
