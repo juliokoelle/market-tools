@@ -162,6 +162,35 @@ function SearchBar({ onSearch }: { onSearch: (ticker: string) => void }) {
   )
 }
 
+const METRIC_INFO: Record<string, string> = {
+  'Price':      'Last traded price from the market.',
+  'Bull Score': 'Composite score 0–100: Momentum 30% + Sentiment 30% + Valuation 20% + Analyst ratings 20%.',
+  'Change':     'Price change vs. previous market close.',
+  '52W High':   'Highest closing price over the last 52 weeks.',
+  '52W Low':    'Lowest closing price over the last 52 weeks.',
+  'P/E':        'Price ÷ Earnings per share (trailing 12 months). Higher = more expensive relative to earnings.',
+  'Market Cap': 'Total market value = share price × shares outstanding.',
+  'Sector':     'Industry classification (source: Yahoo Finance).',
+}
+
+function MetricTip({ text }: { text: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <span style={{ position: 'relative', display: 'inline-flex', verticalAlign: 'middle' }}>
+      <span
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        style={{ cursor: 'help', color: 'var(--text-3)', fontSize: '.6rem', border: '1px solid currentColor', borderRadius: '50%', width: 11, height: 11, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}
+      >i</span>
+      {open && (
+        <span style={{ position: 'absolute', bottom: '140%', left: '50%', transform: 'translateX(-50%)', background: 'var(--text)', color: 'var(--surface)', fontSize: '.7rem', lineHeight: 1.45, padding: '.4rem .55rem', borderRadius: 6, width: 180, zIndex: 300, boxShadow: '0 2px 8px rgba(0,0,0,.25)', pointerEvents: 'none' }}>
+          {text}
+        </span>
+      )}
+    </span>
+  )
+}
+
 function StockModal({ ticker, onClose }: { ticker: string; onClose: () => void }) {
   const [detail, setDetail] = useState<StockDetail | null>(null)
   const [summary, setSummary] = useState<string>('')
@@ -190,7 +219,9 @@ function StockModal({ ticker, onClose }: { ticker: string; onClose: () => void }
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
           <div>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>{ticker}</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 700 }}>
+              <a href={`https://finance.yahoo.com/quote/${encodeURIComponent(ticker)}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>{ticker} ↗</a>
+            </h2>
             {detail && <p style={{ fontSize: '.85rem', color: 'var(--text-3)' }}>{detail.name} · {detail.sector}</p>}
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '1.5rem', color: 'var(--text-3)', cursor: 'pointer' }}>×</button>
@@ -210,7 +241,10 @@ function StockModal({ ticker, onClose }: { ticker: string; onClose: () => void }
               { label: 'Sector',     value: detail.sector ?? '—' },
             ].map(m => (
               <div key={m.label} style={{ padding: '.55rem .65rem', background: 'var(--surface-alt)', borderRadius: 6 }}>
-                <p style={{ fontSize: '.68rem', color: 'var(--text-3)', marginBottom: '.1rem', textTransform: 'uppercase', letterSpacing: '.03em' }}>{m.label}</p>
+                <p style={{ fontSize: '.68rem', color: 'var(--text-3)', marginBottom: '.1rem', textTransform: 'uppercase', letterSpacing: '.03em', display: 'flex', alignItems: 'center', gap: '.3rem' }}>
+                  {m.label}
+                  {METRIC_INFO[m.label] && <MetricTip text={METRIC_INFO[m.label]} />}
+                </p>
                 <p style={{ fontWeight: 700, fontSize: '.9rem', color: (m as any).color ?? 'var(--text)' }}>{m.value}</p>
               </div>
             ))}

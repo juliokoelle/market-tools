@@ -807,19 +807,26 @@ def market_hot_stocks():
     def _enrich(s: dict) -> dict:
         ticker = s["ticker"]
         try:
-            info  = yf.Ticker(ticker).info
-            price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
-            prev  = info.get("previousClose") or 0
+            yf_ticker = yf.Ticker(ticker)
+            fast  = yf_ticker.fast_info
+            price = getattr(fast, "last_price", None) or 0
+            prev  = getattr(fast, "previous_close", None) or getattr(fast, "regular_market_previous_close", None) or 0
             chg   = (price - prev) / prev * 100 if prev else s.get("return", 0) * 100
+            name  = ticker
+            try:
+                info = yf_ticker.info
+                name = info.get("shortName") or info.get("longName") or ticker
+            except Exception:
+                pass
             return {
                 **s,
-                "name":           info.get("shortName") or info.get("longName") or ticker,
+                "name":           name,
                 "price":          round(float(price), 2) if price else None,
                 "change_pct":     round(float(chg), 2),
-                "pe_ratio":       info.get("trailingPE"),
-                "week_52_high":   info.get("fiftyTwoWeekHigh"),
-                "week_52_low":    info.get("fiftyTwoWeekLow"),
-                "analyst_rating": info.get("recommendationKey"),
+                "pe_ratio":       None,
+                "week_52_high":   None,
+                "week_52_low":    None,
+                "analyst_rating": None,
                 "sparkline":      _sparkline(ticker, period="1mo", interval="1d"),
             }
         except Exception:
@@ -1057,24 +1064,41 @@ def stock_detail(ticker: str):
     score_data = bull_score(ticker)
 
     try:
-        info  = yf.Ticker(ticker).info
-        price = info.get("currentPrice") or info.get("regularMarketPrice") or 0
-        prev  = info.get("previousClose") or 0
-        chg   = (price - prev) / prev * 100 if prev else 0.0
+        yf_ticker    = yf.Ticker(ticker)
+        fast         = yf_ticker.fast_info
+        price        = getattr(fast, "last_price", None) or 0
+        prev         = getattr(fast, "previous_close", None) or getattr(fast, "regular_market_previous_close", None) or 0
+        chg          = (price - prev) / prev * 100 if prev else 0.0
+        week_52_high = getattr(fast, "year_high", None)
+        week_52_low  = getattr(fast, "year_low", None)
+        market_cap   = getattr(fast, "market_cap", None)
+        name         = ticker
+        sector       = None
+        pe_ratio     = None
+        try:
+            info         = yf_ticker.info
+            name         = info.get("longName") or info.get("shortName") or ticker
+            sector       = info.get("sector")
+            pe_ratio     = info.get("trailingPE")
+            if not market_cap:
+                market_cap = info.get("marketCap")
+            if not week_52_high:
+                week_52_high = info.get("fiftyTwoWeekHigh")
+            if not week_52_low:
+                week_52_low = info.get("fiftyTwoWeekLow")
+        except Exception:
+            pass
         detail = {
             **score_data,
-            "name":         info.get("longName") or info.get("shortName") or ticker,
-            "company_name": info.get("longName") or info.get("shortName") or ticker,
+            "name":         name,
+            "company_name": name,
             "price":        round(float(price), 2),
             "change_pct":   round(float(chg), 2),
-            "pe_ratio":     info.get("trailingPE"),
-            "week_52_high": info.get("fiftyTwoWeekHigh"),
-            "week_52_low":  info.get("fiftyTwoWeekLow"),
-            "sector":       info.get("sector"),
-            "industry":     info.get("industry"),
-            "market_cap":   info.get("marketCap"),
-            "currency":     info.get("currency", "USD"),
-            "description":  (info.get("longBusinessSummary") or "")[:500],
+            "pe_ratio":     pe_ratio,
+            "week_52_high": week_52_high,
+            "week_52_low":  week_52_low,
+            "sector":       sector,
+            "market_cap":   market_cap,
         }
     except Exception:
         detail = {**score_data, "name": ticker, "company_name": ticker,
