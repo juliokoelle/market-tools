@@ -68,13 +68,13 @@ _BERLIN = ZoneInfo("Europe/Berlin")
 
 _TYPE_EMOJI: dict[str, str] = {
     "wishlist": "🛍️", "stock_pick": "📈", "gift_idea": "🎁",
-    "reminder": "⏰", "task": "📋", "question": "❓",
+    "reminder": "⏰", "task": "📋", "task_done": "✅", "question": "❓",
     "idea": "💡", "note": "📝",
 }
 _TYPE_LABEL: dict[str, str] = {
     "wishlist": "Wishlist", "stock_pick": "Stock Pick", "gift_idea": "Geschenkidee",
-    "reminder": "Reminder", "task": "Task", "question": "Frage",
-    "idea": "Idee", "note": "Note",
+    "reminder": "Reminder", "task": "Task", "task_done": "Erledigt",
+    "question": "Frage", "idea": "Idee", "note": "Note",
 }
 
 

@@ -11,7 +11,7 @@ import httpx
 
 from scripts.classifier import CapturedItem
 from scripts.sync_to_brain import github_read_modify_write
-from scripts.vault_utils import insert_into_section, make_daily_note, note_entry
+from scripts.vault_utils import insert_into_section, make_daily_note, mark_tasks_done, note_entry
 from scripts.utils import today
 
 log = logging.getLogger(__name__)
@@ -106,7 +106,33 @@ def _format_stock_snapshot(data: dict) -> str:
 
 
 async def _dispatch(item: CapturedItem) -> str | None:
-    if item.type == "task":
+    if item.type == "task_done":
+        task_ref = item.metadata.get("task_ref") or item.text
+        run_date = today()
+        matched: list[str] = []
+        no_note = [False]
+
+        def task_done_mutate(current: str) -> str:
+            if not current:
+                no_note[0] = True
+                return make_daily_note(run_date)
+            updated, found = mark_tasks_done([task_ref], current)
+            matched.extend(found)
+            return updated
+
+        await asyncio.to_thread(
+            github_read_modify_write,
+            f"10_Daily/{run_date}.md",
+            task_done_mutate,
+            f"capture: task done ({run_date})",
+        )
+        if no_note[0]:
+            return f"⚠️ Noch keine Daily Note für heute — kein Task markiert."
+        if matched:
+            return f"✅ Erledigt: _{matched[0]}_"
+        return f"⚠️ Kein passender Task gefunden für: _{task_ref}_"
+
+    elif item.type == "task":
         path, mutate = _daily_mutate("Tasks", f"- [ ] {item.text}")
         await asyncio.to_thread(github_read_modify_write, path, mutate, f"capture: task ({today()})")
 

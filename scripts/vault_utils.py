@@ -50,3 +50,33 @@ def make_daily_note(run_date: str) -> str:
 
 def note_entry(text: str) -> str:
     return f"- [{datetime.now(_BERLIN).strftime('%H:%M')}] {text}"
+
+
+def mark_tasks_done(task_refs: list[str], note_text: str) -> tuple[str, list[str]]:
+    """Mark tasks matching task_refs as done ([ ] → [x]). Returns (updated_text, matched_texts)."""
+    lines = note_text.splitlines()
+    matched: list[str] = []
+
+    for ref in task_refs:
+        ref_words = {w.lower() for w in ref.split() if len(w) > 2}
+        if not ref_words:
+            continue
+        threshold = max(1, (len(ref_words) + 1) // 2)
+
+        best_idx: int | None = None
+        best_score = 0
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if not stripped.startswith("- [ ]"):
+                continue
+            line_lower = stripped.lower()
+            score = sum(1 for w in ref_words if w in line_lower)
+            if score > best_score:
+                best_score = score
+                best_idx = i
+
+        if best_idx is not None and best_score >= threshold:
+            lines[best_idx] = lines[best_idx].replace("- [ ]", "- [x]", 1)
+            matched.append(lines[best_idx].strip()[6:])  # strip "- [x] " prefix
+
+    return "\n".join(lines) + "\n", matched

@@ -57,10 +57,8 @@ def _parse_birthday(value: str) -> tuple[int, int] | None:
     parts = value.split("-")
     try:
         if len(parts) == 3:
-            # YYYY-MM-DD
             return int(parts[1]), int(parts[2])
         elif len(parts) == 2:
-            # MM-DD
             return int(parts[0]), int(parts[1])
     except (ValueError, IndexError):
         pass
@@ -111,7 +109,7 @@ def _check_birthdays() -> list[str]:
     Returns list of formatted strings for people with birthdays today or in next 7 days.
     """
     today_date = date.today()
-    upcoming: list[tuple[int, str]] = []  # (days_until, message)
+    upcoming: list[tuple[int, str]] = []
 
     filenames = _list_github_directory("50_People")
     log.info("[birthday] Found %d files in 50_People/", len(filenames))
@@ -132,10 +130,8 @@ def _check_birthdays() -> list[str]:
             continue
         month, day = parsed
 
-        # Derive person name from filename (strip .md, replace hyphens with spaces)
         name = filename[:-3].replace("-", " ").title()
 
-        # Calculate days until next birthday
         current_year = today_date.year
         try:
             bday_this_year = date(current_year, month, day)
@@ -161,7 +157,6 @@ def _check_birthdays() -> list[str]:
             upcoming.append((days_until, msg))
             log.info("[birthday] %s", msg)
 
-    # Sort by days_until ascending
     upcoming.sort(key=lambda x: x[0])
     return [msg for _, msg in upcoming]
 
@@ -171,6 +166,7 @@ def _build_message(
     tasks: list[str],
     followups: list[str],
     birthdays: list[str],
+    subtitle: str = "",
 ) -> str:
     now = datetime.now(tz=_BERLIN)
     day_str = now.strftime("%-d. %B %Y")
@@ -180,6 +176,8 @@ def _build_message(
         f"📅 *{day_str}*",
         "",
     ]
+    if subtitle:
+        lines += [f"_{subtitle}_", ""]
 
     # Tasks section
     lines.append("📋 *Tasks*")
@@ -221,21 +219,36 @@ def send_morning_push() -> None:
     log.info("Morning push for %s", run_date)
 
     text = github_read(f"10_Daily/{run_date}.md")
-
-    # Check birthdays regardless of daily note availability
     birthdays = _check_birthdays()
 
     if text is None:
-        log.warning("No daily note found for %s — sending fallback", run_date)
+        log.warning("No daily note found for %s — trying yesterday", run_date)
+        yesterday = (date.fromisoformat(run_date) - timedelta(days=1)).isoformat()
+        yesterday_text = github_read(f"10_Daily/{yesterday}.md") or ""
         now = datetime.now(tz=_BERLIN)
         day_str = now.strftime("%-d. %B %Y")
-        message = (
-            f"☀️ *Guten Morgen!*\n"
-            f"📅 *{day_str}*\n\n"
-            "Noch keine Daily Note für heute — sie wird in Kürze erstellt."
-        )
-        if birthdays:
-            message += "\n\n🎂 *Geburtstage*\n" + "\n".join(birthdays)
+        if yesterday_text:
+            tasks = _extract_open(yesterday_text, "Tasks")
+            followups = _extract_open(yesterday_text, "Follow-ups")
+            if tasks or followups:
+                message = _build_message(
+                    run_date, tasks, followups, birthdays,
+                    subtitle=f"Noch keine heutige Note — offene Tasks von {yesterday}",
+                )
+            else:
+                message = (
+                    f"☀️ *Guten Morgen!*\n📅 *{day_str}*\n\n"
+                    "Keine offenen Tasks — gestern alles erledigt ✅"
+                )
+                if birthdays:
+                    message += "\n\n🎂 *Geburtstage*\n" + "\n".join(birthdays)
+        else:
+            message = (
+                f"☀️ *Guten Morgen!*\n📅 *{day_str}*\n\n"
+                "Noch keine Daily Note für heute — sie wird in Kürze erstellt."
+            )
+            if birthdays:
+                message += "\n\n🎂 *Geburtstage*\n" + "\n".join(birthdays)
     else:
         tasks     = _extract_open(text, "Tasks")
         followups = _extract_open(text, "Follow-ups")

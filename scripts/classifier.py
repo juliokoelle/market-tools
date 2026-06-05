@@ -13,7 +13,7 @@ log = logging.getLogger(__name__)
 
 VALID_TYPES = frozenset({
     "wishlist", "stock_pick", "gift_idea", "reminder",
-    "task", "question", "idea", "note",
+    "task", "task_done", "question", "idea", "note",
 })
 
 _SYSTEM = """\
@@ -39,6 +39,10 @@ metadata: {"person": "Name", "item": "description"}
 - "reminder": time-anchored or "don't forget". \
 metadata: {"text": "reminder text", "date": "date string or null"}
 - "task": concrete action to complete. metadata: {}
+- "task_done": user reports completing or finishing a task — use when they say \
+"abgeschlossen", "erledigt", "fertig", "gemacht", "abgehakt", "done", "completed", "finished". \
+Return one item per completed task. \
+metadata: {"task_ref": "short task identifier to search for in the open task list"}
 - "question": something to look up, research, or decide. metadata: {}
 - "idea": concept, project idea, observation without direct action. metadata: {}
 - "note": everything else. metadata: {}
