@@ -7,6 +7,7 @@ import logging
 import os
 import unicodedata
 
+import anthropic
 import httpx
 
 from scripts.classifier import CapturedItem
@@ -75,6 +76,29 @@ async def route_item(item: CapturedItem) -> str | None:
         return f"⚠️ Speichern fehlgeschlagen ({item.type}): {type(e).__name__}. Tippe /health für Details."
 
 
+def _answer_question(question: str) -> str:
+    """Answer a question via Claude Haiku. Returns empty string on failure."""
+    api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+    if not api_key:
+        return ""
+    try:
+        client = anthropic.Anthropic(api_key=api_key)
+        resp = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=400,
+            system=(
+                "Du bist ein präziser persönlicher Assistent. "
+                "Beantworte die Frage knapp und klar auf Deutsch. "
+                "Maximal 4 Sätze oder eine kurze Liste. Direkt zur Antwort, kein Intro."
+            ),
+            messages=[{"role": "user", "content": question}],
+        )
+        return resp.content[0].text.strip()
+    except Exception as e:
+        log.warning("_answer_question failed: %s", e)
+        return ""
+
+
 def _format_stock_snapshot(data: dict) -> str:
     ticker  = data["ticker"]
     company = data.get("company", ticker)
@@ -137,6 +161,7 @@ async def _dispatch(item: CapturedItem) -> str | None:
         await asyncio.to_thread(github_read_modify_write, path, mutate, f"capture: task ({today()})")
 
     elif item.type == "question":
+        # Save to global open-questions.md
         entry = f"- [ ] {item.text} ({today()})"
 
         def q_mutate(current: str) -> str:
@@ -148,6 +173,14 @@ async def _dispatch(item: CapturedItem) -> str | None:
             github_read_modify_write,
             "40_Knowledge/open-questions.md", q_mutate, f"capture: question ({today()})"
         )
+
+        # Answer immediately + save Q&A to daily note
+        answer = await asyncio.to_thread(_answer_question, item.text)
+        if answer:
+            qa_entry = f"- ❓ {item.text}\n  → {answer}"
+            path, mutate = _daily_mutate("Open Questions", qa_entry)
+            await asyncio.to_thread(github_read_modify_write, path, mutate, f"capture: Q&A ({today()})")
+            return f"💡 *Antwort:*\n\n{answer}"
 
     elif item.type == "reminder":
         text = item.metadata.get("text") or item.text

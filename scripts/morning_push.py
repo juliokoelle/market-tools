@@ -51,6 +51,61 @@ def _extract_open(text: str, section: str) -> list[str]:
     return [l.strip()[6:] for l in lines[start:end] if l.strip().startswith("- [ ]")]
 
 
+def _extract_priority_backlog(text: str, limit: int = 5) -> list[str]:
+    """Extract top open items from OPEN_TASKS.md: 🔴 urgent first, then 🎯 active."""
+    lines = text.splitlines()
+    urgent: list[str] = []
+    active: list[str] = []
+    bucket = "other"
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("## ") or stripped.startswith("### "):
+            if "🔴" in line:
+                bucket = "urgent"
+            elif "🎯" in line:
+                bucket = "active"
+            else:
+                bucket = "other"
+        if stripped.startswith("- [ ]"):
+            item = stripped[6:]
+            if bucket == "urgent":
+                urgent.append(item)
+            elif bucket == "active":
+                active.append(item)
+
+    combined = urgent + active
+    return combined[:limit]
+
+
+def _extract_qa(text: str, limit: int = 3) -> list[tuple[str, str]]:
+    """Extract Q&A pairs from ## Open Questions section of a daily note."""
+    lines = text.splitlines()
+    try:
+        start = next(i for i, l in enumerate(lines) if l.rstrip() == "## Open Questions")
+    except StopIteration:
+        return []
+    end = len(lines)
+    for i in range(start + 1, len(lines)):
+        if lines[i].startswith("## "):
+            end = i
+            break
+
+    pairs: list[tuple[str, str]] = []
+    i = start + 1
+    while i < end and len(pairs) < limit:
+        stripped = lines[i].strip()
+        if stripped.startswith("- ❓"):
+            question = stripped[4:].strip()
+            answer = ""
+            if i + 1 < end and lines[i + 1].strip().startswith("→"):
+                answer = lines[i + 1].strip()[1:].strip()
+                i += 1
+            pairs.append((question, answer))
+        i += 1
+    return pairs
+
+
 def _parse_birthday(value: str) -> tuple[int, int] | None:
     """Parse birthday field into (month, day). Accepts YYYY-MM-DD or MM-DD."""
     value = value.strip()
@@ -167,42 +222,48 @@ def _build_message(
     followups: list[str],
     birthdays: list[str],
     subtitle: str = "",
+    backlog: list[str] | None = None,
+    qa: list[tuple[str, str]] | None = None,
 ) -> str:
     now = datetime.now(tz=_BERLIN)
     day_str = now.strftime("%-d. %B %Y")
 
-    lines = [
-        f"☀️ *Guten Morgen!*",
+    lines: list[str] = [
+        "☀️ *Guten Morgen!*",
         f"📅 *{day_str}*",
         "",
     ]
     if subtitle:
         lines += [f"_{subtitle}_", ""]
 
-    # Tasks section
-    lines.append("📋 *Tasks*")
+    lines.append("📋 *Tasks heute*")
     if tasks:
-        shown = tasks[:TASK_LIMIT]
-        for t in shown:
+        for t in tasks[:TASK_LIMIT]:
             lines.append(f"• {t}")
         if len(tasks) > TASK_LIMIT:
             lines.append(f"_(+{len(tasks) - TASK_LIMIT} weitere)_")
     else:
         lines.append("Nichts offen ✅")
 
-    # Follow-ups section
-    lines.append("")
-    lines.append("⏰ *Follow-ups*")
+    if backlog:
+        lines += ["", "🎯 *Prioritäten (Backlog)*"]
+        for b in backlog:
+            lines.append(f"• {b}")
+
     if followups:
+        lines += ["", "⏰ *Follow-ups*"]
         for f in followups:
             lines.append(f"• {f}")
-    else:
-        lines.append("Keine ✅")
 
-    # Birthdays section (only if any)
+    if qa:
+        lines += ["", "💡 *Gestrige Fragen & Antworten*"]
+        for question, answer in qa:
+            lines.append(f"❓ _{question}_")
+            if answer:
+                lines.append(f"→ {answer}")
+
     if birthdays:
-        lines.append("")
-        lines.append("🎂 *Geburtstage*")
+        lines += ["", "🎂 *Geburtstage*"]
         for b in birthdays:
             lines.append(b)
 
@@ -218,13 +279,17 @@ def send_morning_push() -> None:
     run_date = today()
     log.info("Morning push for %s", run_date)
 
+    yesterday = (date.fromisoformat(run_date) - timedelta(days=1)).isoformat()
     text = github_read(f"10_Daily/{run_date}.md")
+    yesterday_text = github_read(f"10_Daily/{yesterday}.md") or ""
+    backlog_text = github_read("00_Inbox/OPEN_TASKS.md") or ""
     birthdays = _check_birthdays()
+
+    backlog = _extract_priority_backlog(backlog_text, limit=5) if backlog_text else []
+    yesterday_qa = _extract_qa(yesterday_text) if yesterday_text else []
 
     if text is None:
         log.warning("No daily note found for %s — trying yesterday", run_date)
-        yesterday = (date.fromisoformat(run_date) - timedelta(days=1)).isoformat()
-        yesterday_text = github_read(f"10_Daily/{yesterday}.md") or ""
         now = datetime.now(tz=_BERLIN)
         day_str = now.strftime("%-d. %B %Y")
         if yesterday_text:
@@ -234,14 +299,14 @@ def send_morning_push() -> None:
                 message = _build_message(
                     run_date, tasks, followups, birthdays,
                     subtitle=f"Noch keine heutige Note — offene Tasks von {yesterday}",
+                    backlog=backlog, qa=yesterday_qa,
                 )
             else:
-                message = (
-                    f"☀️ *Guten Morgen!*\n📅 *{day_str}*\n\n"
-                    "Keine offenen Tasks — gestern alles erledigt ✅"
+                message = _build_message(
+                    run_date, [], [], birthdays,
+                    subtitle="Keine offenen Tasks — gestern alles erledigt ✅",
+                    backlog=backlog, qa=yesterday_qa,
                 )
-                if birthdays:
-                    message += "\n\n🎂 *Geburtstage*\n" + "\n".join(birthdays)
         else:
             message = (
                 f"☀️ *Guten Morgen!*\n📅 *{day_str}*\n\n"
@@ -252,7 +317,10 @@ def send_morning_push() -> None:
     else:
         tasks     = _extract_open(text, "Tasks")
         followups = _extract_open(text, "Follow-ups")
-        message   = _build_message(run_date, tasks, followups, birthdays)
+        message   = _build_message(
+            run_date, tasks, followups, birthdays,
+            backlog=backlog, qa=yesterday_qa,
+        )
 
     resp = httpx.post(_SEND_URL, json={
         "chat_id": _OWNER_ID,
