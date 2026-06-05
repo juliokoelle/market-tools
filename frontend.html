@@ -88,6 +88,12 @@
       padding: 24px;
       box-shadow: 0 1px 4px rgba(0,0,0,0.08);
       margin-bottom: 24px;
+      border: 1px solid transparent;
+      transition: box-shadow 0.18s ease, border-color 0.18s ease;
+    }
+    .card:hover {
+      box-shadow: 0 6px 20px -6px rgba(79,70,229,0.12), 0 1px 4px rgba(0,0,0,0.06);
+      border-color: rgba(79,70,229,0.18);
     }
 
     .card h2 {
@@ -171,6 +177,13 @@
       padding: 20px;
       box-shadow: 0 1px 4px rgba(0,0,0,0.08);
       text-align: center;
+      border: 1px solid transparent;
+      transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+    }
+    .metric:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px -6px rgba(79,70,229,0.15), 0 1px 4px rgba(0,0,0,0.06);
+      border-color: rgba(79,70,229,0.25);
     }
 
     .metric .label {
@@ -567,6 +580,10 @@
       background: currentColor;
       flex-shrink: 0;
     }
+
+    /* ── Hot Stocks row hover ── */
+    #hotBody tr { transition: background 0.12s ease; cursor: pointer; }
+    #hotBody tr:hover { background: #f5f3ff; }
 
     /* ── Spinner ── */
     @keyframes spin { to { transform: rotate(360deg); } }
