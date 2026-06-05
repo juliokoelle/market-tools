@@ -41,6 +41,55 @@ app.add_middleware(
 def health():
     return {"status": "ok"}
 
+
+# ---------------------------------------------------------------------------
+# App Registry — all personal apps in the Intelligence OS ecosystem
+# ---------------------------------------------------------------------------
+
+_APPS = [
+    {
+        "id": "market-tools",
+        "name": "Market Tools",
+        "description": "Portfolio tracker, hot stocks screener, stock analyzer & daily briefing.",
+        "url": "https://market-tools-backend-my0v.onrender.com",
+        "status": "live",
+        "category": "finance",
+        "icon": "📈",
+    },
+    {
+        "id": "mywardrobe",
+        "name": "MyWardrobe",
+        "description": "Personal wardrobe manager — outfit tracking, wishlist, and style analytics.",
+        "url": "https://mywardrobe-dun.vercel.app",
+        "status": "live",
+        "category": "lifestyle",
+        "icon": "👔",
+    },
+    {
+        "id": "horsefinder",
+        "name": "Horsefinder",
+        "description": "Horse event finder across Germany — disciplines, regions, date filters.",
+        "url": "https://horsefinder.vercel.app",
+        "status": "live",
+        "category": "sport",
+        "icon": "🐴",
+    },
+    {
+        "id": "cognify-iq",
+        "name": "Cognify IQ",
+        "description": "Scientific IQ assessment across 6 cognitive domains with detailed profile.",
+        "url": "https://cognify-insight-builder.vercel.app",
+        "status": "live",
+        "category": "cognitive",
+        "icon": "🧠",
+    },
+]
+
+
+@app.get("/apps")
+def list_apps():
+    return {"apps": _APPS}
+
 OUTPUT_LATEST.parent.mkdir(parents=True, exist_ok=True)
 
 _DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")

@@ -590,6 +590,7 @@
   <button class="tab-btn active" onclick="switchTab('portfolio', this)">Portfolio</button>
   <button class="tab-btn"        onclick="switchTab('hotstocks', this)">Hot Stocks</button>
   <button class="tab-btn"        onclick="switchTab('stockanalyzer', this)">Stock Analyzer</button>
+  <button class="tab-btn"        onclick="switchTab('apps', this)">Apps</button>
   <div id="backendStatus" title="Backend connectivity">
     <span id="statusDot"></span>
     <span id="statusText">Checking…</span>
@@ -825,6 +826,17 @@
 
   </div><!-- /tab-stockanalyzer -->
 
+  <!-- ── Tab: Apps ── -->
+  <div id="tab-apps" class="tab-panel">
+    <div class="panel-header">
+      <h1>Intelligence OS — Apps</h1>
+      <p>All personal apps in the ecosystem. Click to open.</p>
+    </div>
+    <div id="appsGrid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:20px; margin-top:24px;">
+      <p style="color:#6b7280; font-size:0.9rem;">Loading…</p>
+    </div>
+  </div><!-- /tab-apps -->
+
 </div><!-- /page -->
 
 <!-- ── Explainability Modal ── -->
@@ -889,6 +901,38 @@
     document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
     document.getElementById("tab-" + name).classList.add("active");
     btn.classList.add("active");
+    if (name === "apps") loadApps();
+  }
+
+  /* ── Apps tab ── */
+  let appsLoaded = false;
+  function loadApps() {
+    if (appsLoaded) return;
+    const grid = document.getElementById("appsGrid");
+    fetch(`${API_BASE}/apps`)
+      .then(r => r.json())
+      .then(data => {
+        appsLoaded = true;
+        const categoryLabel = { finance: "Finance", lifestyle: "Lifestyle", sport: "Sport", cognitive: "Cognitive" };
+        grid.innerHTML = data.apps.map(app => `
+          <div style="background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:24px;display:flex;flex-direction:column;gap:12px;">
+            <div style="display:flex;align-items:center;gap:12px;">
+              <span style="font-size:2rem;line-height:1;">${app.icon}</span>
+              <div>
+                <div style="font-weight:700;font-size:1rem;color:#1a1a2e;">${app.name}</div>
+                <div style="font-size:0.75rem;color:#6b7280;text-transform:uppercase;letter-spacing:.05em;">${categoryLabel[app.category] ?? app.category}</div>
+              </div>
+              <span style="margin-left:auto;font-size:0.7rem;padding:3px 8px;border-radius:999px;background:${app.status==='live'?'#d1fae5':'#fef3c7'};color:${app.status==='live'?'#065f46':'#92400e'};font-weight:600;">${app.status}</span>
+            </div>
+            <a href="${app.url}" target="_blank" rel="noopener"
+               style="display:inline-flex;align-items:center;gap:6px;margin-top:4px;padding:9px 16px;background:#4f46e5;color:#fff;border-radius:8px;font-size:0.85rem;font-weight:600;text-decoration:none;width:fit-content;">
+              Open →
+            </a>
+          </div>`).join("");
+      })
+      .catch(() => {
+        grid.innerHTML = `<p style="color:#ef4444;font-size:0.9rem;">Failed to load apps. Is the backend running?</p>`;
+      });
   }
 
   /* ── Formatters ── */
