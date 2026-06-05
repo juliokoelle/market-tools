@@ -81,17 +81,8 @@ def _check_env() -> None:
 
 
 def _already_synced(run_date: str) -> bool:
-    """Return True if today's briefing already exists in GitHub — skip re-run."""
-    if not _GH_TOKEN:
-        return False
-    try:
-        url = (f"https://api.github.com/repos/{_GH_OWNER}/{_GH_REPO}"
-               f"/contents/10_Daily/{run_date}.md")
-        resp = _requests.get(url, headers={"Authorization": f"Bearer {_GH_TOKEN}",
-                                           "Accept": "application/vnd.github.v3+json"}, timeout=8)
-        return resp.status_code == 200
-    except Exception:
-        return False
+    """Return True if today's briefing archive already exists locally — skip re-run."""
+    return (OUTPUTS_DIR / f"{run_date}-briefing.md").exists()
 
 
 def _wait_for_network(max_attempts: int = 6, delay: int = 30) -> bool:

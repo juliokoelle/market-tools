@@ -164,7 +164,7 @@ def _connect_imap() -> imaplib.IMAP4_SSL:
     username = os.environ["GMAIL_USERNAME"].strip()
     # Strip non-ASCII chars (e.g. \xa0 from copy-paste) that IMAP rejects
     password = os.environ["GMAIL_APP_PASSWORD"].encode("ascii", "ignore").decode("ascii").strip()
-    conn = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT)
+    conn = imaplib.IMAP4_SSL(IMAP_HOST, IMAP_PORT, timeout=30)
     conn.login(username, password)
     return conn
 
