@@ -15,6 +15,14 @@ const apps = [
     status: 'Live' as const,
     emoji: '👔',
   },
+  {
+    title: 'Cognify IQ',
+    description: 'Intelligence quotient estimator using adaptive scoring. Measures reasoning across multiple domains with normalized IQ scoring.',
+    url: 'https://cognify-insight-builder.vercel.app',
+    tags: ['TanStack', 'Statistics', 'React'],
+    status: 'Live' as const,
+    emoji: '🧠',
+  },
 ]
 
 export default function Ideas() {

@@ -235,7 +235,9 @@ export default function Portfolio() {
     } catch {}
     return PORTFOLIO_SEED
   })
-  const [analysis, setAnalysis]   = useState<PortfolioAnalysis | null>(null)
+  const [analysis, setAnalysis]   = useState<PortfolioAnalysis | null>(() => {
+    try { return JSON.parse(sessionStorage.getItem('mt_portfolio_analysis') ?? 'null') } catch { return null }
+  })
   const [saving, setSaving]       = useState(false)
   const [analyzing, setAnalyzing] = useState(false)
   const [showSeed, setShowSeed]   = useState(false)
@@ -327,7 +329,11 @@ export default function Portfolio() {
     const valid = positions.filter(p => p.ticker && p.investment > 0)
     if (!valid.length) { showToast('Add at least one ticker with an investment amount'); return }
     setAnalyzing(true)
-    try { setAnalysis(await analyzePortfolio(valid)) }
+    try {
+      const result = await analyzePortfolio(valid)
+      setAnalysis(result)
+      sessionStorage.setItem('mt_portfolio_analysis', JSON.stringify(result))
+    }
     catch (err) {
       const isNetwork = err instanceof TypeError
       showToast(isNetwork

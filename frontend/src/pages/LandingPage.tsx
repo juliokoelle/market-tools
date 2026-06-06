@@ -25,6 +25,14 @@ const projects = [
     tags: ['React Native', 'AI'],
     status: 'Live',
   },
+  {
+    title: 'Cognify IQ',
+    description: 'Scientific cognitive assessment across six domains — pattern recognition, logic, memory, verbal reasoning, numerics, and processing speed.',
+    link: 'https://cognify-insight-builder.vercel.app',
+    external: true,
+    tags: ['TanStack', 'Nitro', 'Scoring'],
+    status: 'Live',
+  },
 ]
 
 export default function LandingPage() {

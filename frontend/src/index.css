@@ -277,8 +277,19 @@ button { cursor: pointer; font-family: inherit; }
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   padding: 1.5rem;
+  transition: box-shadow .18s ease, border-color .18s ease, transform .18s ease;
 }
 .card-sm { padding: 1.1rem 1.25rem; }
+
+/* Clickable card hover */
+a .card, button .card, [style*="cursor: pointer"] .card {
+  cursor: pointer;
+}
+a:hover .card, button:hover .card {
+  box-shadow: var(--shadow), 0 8px 24px -8px rgba(0,0,0,.1);
+  border-color: var(--teal-muted);
+  transform: translateY(-2px);
+}
 
 /* ── Stat card ── */
 .stat-num {
