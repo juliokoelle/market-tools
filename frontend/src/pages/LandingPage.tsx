@@ -33,6 +33,14 @@ const projects = [
     tags: ['TanStack', 'Nitro', 'Scoring'],
     status: 'Live',
   },
+  {
+    title: 'Predict 26',
+    description: 'World Cup 2026 prediction app — rank all 12 groups, pick the best third-placed teams, build your complete knockout bracket, and compete in private leagues.',
+    link: 'https://predict-26-elite.vercel.app',
+    external: true,
+    tags: ['TanStack', 'React', 'WM 2026'],
+    status: 'Live',
+  },
 ]
 
 export default function LandingPage() {
