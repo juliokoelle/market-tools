@@ -23,6 +23,14 @@ const apps = [
     status: 'Live' as const,
     emoji: '🧠',
   },
+  {
+    title: 'Predict 26',
+    description: 'World Cup 2026 prediction app — rank all 12 groups, pick the best third-placed teams, build your knockout bracket, and compete in private leagues.',
+    url: 'https://predict-26-elite.vercel.app',
+    tags: ['TanStack', 'React', 'WM 2026'],
+    status: 'Live' as const,
+    emoji: '🏆',
+  },
 ]
 
 export default function Ideas() {
