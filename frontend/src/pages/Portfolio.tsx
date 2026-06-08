@@ -1,27 +1,48 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { getPortfolio, savePortfolio, analyzePortfolio, getMarketPrices, getMarketNames, getStockDetail, searchTickers, getStockWatchlist, addStockToWatchlist, removeStockFromWatchlist, type Position, type PortfolioAnalysis, type StockDetail } from '../services/api'
 
-function parseTRCsv(text: string): Position[] {
-  const lines = text.trim().split(/\r?\n/)
-  if (lines.length < 2) return []
+function isIsin(s: string) { return /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(s) }
+
+function normalizeHeader(h: string) {
+  return h.toLowerCase()
+    .replace(/ø/g, 'o').replace(/ü/g, 'ue').replace(/ä/g, 'ae').replace(/ö/g, 'oe').replace(/ß/g, 'ss')
+    .replace(/['"]/g, '').replace(/\s+/g, ' ').trim()
+}
+
+function parseTRCsv(text: string): { rows: Position[]; hasIsins: boolean; debugHeaders: string[] } {
+  const clean = text.replace(/^﻿/, '').trim()
+  const lines = clean.split(/\r?\n/)
+  if (lines.length < 2) return { rows: [], hasIsins: false, debugHeaders: [] }
   const sep = lines[0].includes(';') ? ';' : ','
-  const headers = lines[0].split(sep).map(h => h.replace(/"/g, '').toLowerCase().trim())
+  const rawHeaders = lines[0].split(sep).map(h => h.replace(/^"|"$/g, '').trim())
+  const headers = rawHeaders.map(normalizeHeader)
+
   const col = (names: string[]) => names.map(n => headers.indexOf(n)).find(i => i >= 0) ?? -1
-  const tickerCol  = col(['ticker', 'symbol', 'isin', 'wkn', 'name'])
-  const sharesCol  = col(['menge', 'shares', 'anzahl', 'quantity', 'stück'])
-  const priceCol   = col(['einstandspreis', 'avg price', 'average price', 'kurs', 'price'])
-  const investCol  = col(['einstandswert', 'invested', 'investment', 'betrag', 'einstand'])
-  if (tickerCol < 0) return []
-  return lines.slice(1).flatMap(line => {
+  const colPartial = (frags: string[]) => { for (const f of frags) { const i = headers.findIndex(h => h.includes(f)); if (i >= 0) return i } return -1 }
+
+  const isinCol   = col(['isin'])
+  const nameCol   = col(['name', 'titel', 'wertpapier', 'bezeichnung', 'security', 'title'])
+  const sharesCol = col(['menge', 'shares', 'anzahl', 'quantity', 'stucke', 'stuck', 'stueck', 'stk'])
+  const priceCol  = colPartial(['einstandspreis', 'kaufkurs', 'kaufpreis', 'avg price', 'average price'])
+  const investCol = col(['einstandswert', 'invested', 'investment', 'investiert', 'einstand'])
+  const idCol     = isinCol >= 0 ? isinCol : (nameCol >= 0 ? nameCol : col(['ticker', 'symbol', 'wkn']))
+  if (idCol < 0) return { rows: [], hasIsins: false, debugHeaders: rawHeaders }
+
+  const parseNum = (s: string) => parseFloat(s.replace(/\./g, '').replace(',', '.'))
+
+  const rows = lines.slice(1).flatMap(line => {
     if (!line.trim()) return []
-    const cells = line.split(sep).map(c => c.replace(/"/g, '').trim())
-    const ticker = cells[tickerCol]?.toUpperCase().replace(/\s/g, '')
+    const cells = line.split(sep).map(c => c.replace(/^"|"$/g, '').trim())
+    const ticker = cells[idCol]?.toUpperCase().replace(/\s/g, '') ?? ''
     if (!ticker) return []
-    const shares = sharesCol >= 0 ? parseFloat(cells[sharesCol]?.replace(',', '.') ?? '') : NaN
-    const avg_buy = priceCol >= 0 ? parseFloat(cells[priceCol]?.replace(',', '.') ?? '') : NaN
-    const investment = investCol >= 0 ? parseFloat(cells[investCol]?.replace(',', '.') ?? '') : NaN
-    return [{ ticker, investment: isNaN(investment) ? (isNaN(shares * avg_buy) ? 0 : shares * avg_buy) : investment, shares: isNaN(shares) ? undefined : shares, avg_buy: isNaN(avg_buy) ? undefined : avg_buy }] as Position[]
+    const shares  = sharesCol >= 0 ? parseNum(cells[sharesCol]  ?? '') : NaN
+    const avg_buy = priceCol  >= 0 ? parseNum(cells[priceCol]   ?? '') : NaN
+    const invest  = investCol >= 0 ? parseNum(cells[investCol]  ?? '') : NaN
+    const investment = !isNaN(invest) ? invest : (!isNaN(shares) && !isNaN(avg_buy) ? shares * avg_buy : 0)
+    return [{ ticker, investment, shares: isNaN(shares) ? undefined : shares, avg_buy: isNaN(avg_buy) ? undefined : avg_buy }] as Position[]
   })
+
+  return { rows, hasIsins: rows.some(r => isIsin(r.ticker)), debugHeaders: rawHeaders }
 }
 
 function LivePnlCard({ positions, prices }: { positions: Position[]; prices: Record<string, { price: number; change_pct: number }> }) {
@@ -317,9 +338,10 @@ export default function Portfolio() {
   const [analysis, setAnalysis]   = useState<PortfolioAnalysis | null>(() => {
     try { return JSON.parse(sessionStorage.getItem('mt_portfolio_analysis') ?? 'null') } catch { return null }
   })
-  const [saving, setSaving]       = useState(false)
-  const [analyzing, setAnalyzing] = useState(false)
-  const [showSeed, setShowSeed]   = useState(false)
+  const [saving, setSaving]             = useState(false)
+  const [analyzing, setAnalyzing]       = useState(false)
+  const [csvResolving, setCsvResolving] = useState(false)
+  const [showSeed, setShowSeed]         = useState(false)
 
   // ── Watchlist (backed by /stock-watchlist API) ──
   const [watchlist, setWatchlist] = useState<string[]>([])
@@ -401,13 +423,36 @@ export default function Portfolio() {
     const file = e.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = ev => {
+    reader.onload = async ev => {
       const text = ev.target?.result as string
-      const parsed = parseTRCsv(text)
-      if (!parsed.length) { showToast('CSV nicht erkannt — prüfe das Format'); return }
-      localStorage.setItem(SEED_KEY, '1')
-      setPositions(parsed)
-      showToast(`${parsed.length} Positionen importiert`)
+      const { rows, hasIsins, debugHeaders } = parseTRCsv(text)
+      if (!rows.length) {
+        const hint = debugHeaders.length ? ` (Spalten: ${debugHeaders.slice(0, 5).join(', ')})` : ''
+        showToast(`CSV nicht erkannt${hint}`, 6000)
+        return
+      }
+      if (hasIsins) {
+        setCsvResolving(true)
+        showToast(`ISINs erkannt — ${rows.length} Ticker werden aufgelöst…`, 10000)
+        const resolved = await Promise.all(rows.map(async r => {
+          if (!isIsin(r.ticker)) return r
+          try {
+            const results = await searchTickers(r.ticker)
+            return results.length ? { ...r, ticker: results[0].ticker } : r
+          } catch { return r }
+        }))
+        setCsvResolving(false)
+        localStorage.setItem(SEED_KEY, '1')
+        setPositions(resolved)
+        const stillIsins = resolved.filter(r => isIsin(r.ticker)).length
+        showToast(stillIsins
+          ? `${resolved.length} Positionen importiert — ${stillIsins} ISINs nicht aufgelöst, bitte manuell korrigieren`
+          : `${resolved.length} Positionen importiert`, 5000)
+      } else {
+        localStorage.setItem(SEED_KEY, '1')
+        setPositions(rows)
+        showToast(`${rows.length} Positionen importiert`)
+      }
     }
     reader.readAsText(file, 'UTF-8')
     if (csvInputRef.current) csvInputRef.current.value = ''
@@ -547,8 +592,8 @@ export default function Portfolio() {
               <button onClick={handleSave} disabled={saving} className="btn btn-outline" style={{ fontSize: '.8rem' }}>
                 {saving ? 'Saving…' : '↑ Save'}
               </button>
-              <button onClick={() => csvInputRef.current?.click()} className="btn btn-outline" style={{ fontSize: '.8rem' }} title="CSV aus Trade Republic importieren">
-                ↑ CSV Import (TR)
+              <button onClick={() => csvInputRef.current?.click()} disabled={csvResolving} className="btn btn-outline" style={{ fontSize: '.8rem' }} title="CSV aus Trade Republic importieren">
+                {csvResolving ? 'Auflösen…' : '↑ CSV Import (TR)'}
               </button>
               <button onClick={handleAnalyze} disabled={analyzing} className="btn btn-primary" style={{ fontSize: '.8rem' }}>
                 {analyzing ? 'Analyzing…' : 'Analyze'}
@@ -556,7 +601,7 @@ export default function Portfolio() {
               <input ref={csvInputRef} type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={handleCsvImport} />
             </div>
             <p style={{ fontSize: '.72rem', color: 'var(--text-3)', marginTop: '.5rem' }}>
-              TR CSV Export: Depot → Exportieren → CSV. Spalten: Ticker, Menge, Einstandspreis werden erkannt.
+              TR: Depot → Exportieren → CSV. ISINs werden automatisch in Ticker aufgelöst.
             </p>
           </div>
 

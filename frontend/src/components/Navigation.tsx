@@ -51,15 +51,15 @@ const NAV_TOP = [
 
 const NAV_MARKET = [
   { to: '/market',            label: 'Dashboard',      icon: <IconDashboard />, end: true },
-  { to: '/market/briefing',   label: 'Briefing',       icon: <IconBriefing />,  end: false },
   { to: '/market/portfolio',  label: 'Portfolio',      icon: <IconPortfolio />, end: false },
   { to: '/market/hot-stocks', label: 'Hot Stocks',     icon: <IconHot />,       end: false },
   { to: '/market/analyzer',   label: 'Stock Analyzer', icon: <IconAnalyzer />,  end: false },
 ]
 
-const NAV_LIFE = [
-  { to: '/life/training', label: 'Training', icon: <IconTraining />, end: false },
-  { to: '/life/podcasts', label: 'Podcasts', icon: <IconPodcast />,  end: false },
+const NAV_LIVE = [
+  { to: '/market/briefing',  label: 'Briefing',  icon: <IconBriefing />,  end: false },
+  { to: '/life/training',    label: 'Training',  icon: <IconTraining />, end: false },
+  { to: '/life/podcasts',    label: 'Podcasts',  icon: <IconPodcast />,  end: false },
 ]
 
 export default function Navigation() {
@@ -136,10 +136,10 @@ export default function Navigation() {
 
         <div className="sidebar-divider" />
 
-        {/* Life section */}
+        {/* Live section */}
         <div className="sidebar-section">
-          {!collapsed && <p className="sidebar-section-label">Life</p>}
-          {NAV_LIFE.map(l => (
+          {!collapsed && <p className="sidebar-section-label">Live</p>}
+          {NAV_LIVE.map(l => (
             <NavLink
               key={l.to}
               to={l.to}
