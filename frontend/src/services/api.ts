@@ -162,8 +162,8 @@ export const removeStockFromWatchlist = (ticker: string) =>
 export interface StockRow { ticker: string; name: string; price: number; change_pct: number; bull_score?: number }
 export interface BriefingMeta { date: string; has_pdf: boolean }
 export interface CostEntry { date: string; provider: string; cost: number }
-export interface Position { ticker: string; investment: number }
-export interface Holding { ticker: string; investment: number }
+export interface Position { ticker: string; investment: number; shares?: number; avg_buy?: number }
+export interface Holding { ticker: string; investment: number; shares?: number; avg_buy?: number }
 export interface PortfolioAnalysis {
   total_value: number
   annualized_return: number

@@ -1,6 +1,85 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { getPortfolio, savePortfolio, analyzePortfolio, getMarketPrices, getMarketNames, getStockDetail, searchTickers, getStockWatchlist, addStockToWatchlist, removeStockFromWatchlist, type Position, type PortfolioAnalysis, type StockDetail } from '../services/api'
 
+function parseTRCsv(text: string): Position[] {
+  const lines = text.trim().split(/\r?\n/)
+  if (lines.length < 2) return []
+  const sep = lines[0].includes(';') ? ';' : ','
+  const headers = lines[0].split(sep).map(h => h.replace(/"/g, '').toLowerCase().trim())
+  const col = (names: string[]) => names.map(n => headers.indexOf(n)).find(i => i >= 0) ?? -1
+  const tickerCol  = col(['ticker', 'symbol', 'isin', 'wkn', 'name'])
+  const sharesCol  = col(['menge', 'shares', 'anzahl', 'quantity', 'stück'])
+  const priceCol   = col(['einstandspreis', 'avg price', 'average price', 'kurs', 'price'])
+  const investCol  = col(['einstandswert', 'invested', 'investment', 'betrag', 'einstand'])
+  if (tickerCol < 0) return []
+  return lines.slice(1).flatMap(line => {
+    if (!line.trim()) return []
+    const cells = line.split(sep).map(c => c.replace(/"/g, '').trim())
+    const ticker = cells[tickerCol]?.toUpperCase().replace(/\s/g, '')
+    if (!ticker) return []
+    const shares = sharesCol >= 0 ? parseFloat(cells[sharesCol]?.replace(',', '.') ?? '') : NaN
+    const avg_buy = priceCol >= 0 ? parseFloat(cells[priceCol]?.replace(',', '.') ?? '') : NaN
+    const investment = investCol >= 0 ? parseFloat(cells[investCol]?.replace(',', '.') ?? '') : NaN
+    return [{ ticker, investment: isNaN(investment) ? (isNaN(shares * avg_buy) ? 0 : shares * avg_buy) : investment, shares: isNaN(shares) ? undefined : shares, avg_buy: isNaN(avg_buy) ? undefined : avg_buy }] as Position[]
+  })
+}
+
+function LivePnlCard({ positions, prices }: { positions: Position[]; prices: Record<string, { price: number; change_pct: number }> }) {
+  const rows = positions.filter(p => p.ticker && p.shares && p.avg_buy)
+  if (!rows.length) return null
+  let totalCost = 0, totalValue = 0
+  const items = rows.map(p => {
+    const cost = (p.shares ?? 0) * (p.avg_buy ?? 0)
+    const curr = prices[p.ticker]?.price ?? 0
+    const value = curr > 0 ? curr * (p.shares ?? 0) : cost
+    totalCost += cost; totalValue += value
+    const pnl = curr > 0 ? value - cost : 0
+    const pnlPct = cost > 0 && curr > 0 ? (pnl / cost) * 100 : 0
+    return { ticker: p.ticker, shares: p.shares ?? 0, avg_buy: p.avg_buy ?? 0, curr, value, pnl, pnlPct }
+  })
+  const totalPnl = totalValue - totalCost
+  const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0
+  return (
+    <div className="card" style={{ marginBottom: '1.5rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+        <h2 style={{ fontSize: '1rem', fontWeight: 700 }}>Live P&L</h2>
+        <div style={{ textAlign: 'right' }}>
+          <p style={{ fontSize: '1.3rem', fontWeight: 800, color: totalPnl >= 0 ? 'var(--positive)' : 'var(--negative)' }}>
+            {totalPnl >= 0 ? '+' : ''}€{totalPnl.toLocaleString('de-DE', { maximumFractionDigits: 0 })}
+          </p>
+          <p style={{ fontSize: '.75rem', fontWeight: 600, color: totalPnlPct >= 0 ? 'var(--positive)' : 'var(--negative)' }}>
+            {totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(2)}% · Depot €{totalValue.toLocaleString('de-DE', { maximumFractionDigits: 0 })}
+          </p>
+        </div>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid var(--border)' }}>
+              {['Ticker', 'Stück', 'Ø Kauf', 'Kurs', 'Wert', 'P&L', '+/-%'].map(h => (
+                <th key={h} style={{ textAlign: 'left', padding: '.35rem .5rem', fontSize: '.65rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {items.map(it => (
+              <tr key={it.ticker} style={{ borderBottom: '1px solid var(--border)' }}>
+                <td style={{ padding: '.45rem .5rem', fontWeight: 700, color: 'var(--teal)' }}>{it.ticker}</td>
+                <td style={{ padding: '.45rem .5rem', color: 'var(--text-2)' }}>{it.shares}</td>
+                <td style={{ padding: '.45rem .5rem', color: 'var(--text-2)' }}>€{it.avg_buy.toFixed(2)}</td>
+                <td style={{ padding: '.45rem .5rem', fontWeight: 600 }}>{it.curr > 0 ? `$${it.curr.toFixed(2)}` : <span style={{ color: 'var(--text-3)' }}>···</span>}</td>
+                <td style={{ padding: '.45rem .5rem' }}>{it.curr > 0 ? `€${it.value.toLocaleString('de-DE', { maximumFractionDigits: 0 })}` : '—'}</td>
+                <td style={{ padding: '.45rem .5rem', fontWeight: 700, color: it.pnl >= 0 ? 'var(--positive)' : 'var(--negative)' }}>{it.curr > 0 ? `${it.pnl >= 0 ? '+' : ''}€${it.pnl.toFixed(0)}` : '—'}</td>
+                <td style={{ padding: '.45rem .5rem', fontSize: '.8rem', fontWeight: 700, color: it.pnlPct >= 0 ? 'var(--positive)' : 'var(--negative)' }}>{it.curr > 0 ? `${it.pnlPct >= 0 ? '+' : ''}${it.pnlPct.toFixed(1)}%` : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 const UNIVERSE = [
   "AAPL","MSFT","NVDA","GOOG","META","AVGO","AMD","ORCL","CRM","ADBE",
   "INTC","QCOM","TXN","IBM","NOW","SNOW","PLTR","MU","AMAT","LRCX",
@@ -89,7 +168,7 @@ function TickerInput({ value, onChange }: { value: string; onChange: (v: string)
         style={inputStyle}
       />
       {suggestions.length > 0 && (
-        <ul style={{
+        <ul className="dropdown-list" style={{
           position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
           background: 'var(--surface)', border: '1px solid var(--border)',
           borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow)',
@@ -254,6 +333,10 @@ export default function Portfolio() {
   // ── Detail modal ──
   const [detailTicker, setDetailTicker] = useState<string | null>(null)
 
+  // ── Live holding prices (for P&L) ──
+  const [holdingPrices, setHoldingPrices] = useState<Record<string, { price: number; change_pct: number }>>({})
+  const csvInputRef = useRef<HTMLInputElement>(null)
+
   // ── Toast ──
   const [toast, setToast] = useState('')
   function showToast(msg: string, ms = 3000) { setToast(msg); setTimeout(() => setToast(''), ms) }
@@ -261,6 +344,13 @@ export default function Portfolio() {
   // Persist + load positions
   useEffect(() => {
     if (positions.length > 0) localStorage.setItem(POSITIONS_KEY, JSON.stringify(positions))
+  }, [positions])
+
+  // Load live prices for holdings
+  useEffect(() => {
+    const tickers = positions.filter(p => p.ticker).map(p => p.ticker)
+    if (!tickers.length) return
+    getMarketPrices(tickers.join(',')).then(setHoldingPrices).catch(() => {})
   }, [positions])
 
   useEffect(() => {
@@ -306,6 +396,22 @@ export default function Portfolio() {
   function removeRow(i: number)                     { setPositions(p => p.filter((_, j) => j !== i)) }
   function updateTicker(i: number, v: string)       { setPositions(p => p.map((r, j) => j === i ? { ...r, ticker: v } : r)) }
   function updateInvestment(i: number, v: number)   { setPositions(p => p.map((r, j) => j === i ? { ...r, investment: v } : r)) }
+
+  function handleCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = ev => {
+      const text = ev.target?.result as string
+      const parsed = parseTRCsv(text)
+      if (!parsed.length) { showToast('CSV nicht erkannt — prüfe das Format'); return }
+      localStorage.setItem(SEED_KEY, '1')
+      setPositions(parsed)
+      showToast(`${parsed.length} Positionen importiert`)
+    }
+    reader.readAsText(file, 'UTF-8')
+    if (csvInputRef.current) csvInputRef.current.value = ''
+  }
 
   function acceptSeed() {
     localStorage.setItem(SEED_KEY, '1')
@@ -441,11 +547,20 @@ export default function Portfolio() {
               <button onClick={handleSave} disabled={saving} className="btn btn-outline" style={{ fontSize: '.8rem' }}>
                 {saving ? 'Saving…' : '↑ Save'}
               </button>
+              <button onClick={() => csvInputRef.current?.click()} className="btn btn-outline" style={{ fontSize: '.8rem' }} title="CSV aus Trade Republic importieren">
+                ↑ CSV Import (TR)
+              </button>
               <button onClick={handleAnalyze} disabled={analyzing} className="btn btn-primary" style={{ fontSize: '.8rem' }}>
                 {analyzing ? 'Analyzing…' : 'Analyze'}
               </button>
+              <input ref={csvInputRef} type="file" accept=".csv,.txt" style={{ display: 'none' }} onChange={handleCsvImport} />
             </div>
+            <p style={{ fontSize: '.72rem', color: 'var(--text-3)', marginTop: '.5rem' }}>
+              TR CSV Export: Depot → Exportieren → CSV. Spalten: Ticker, Menge, Einstandspreis werden erkannt.
+            </p>
           </div>
+
+          <LivePnlCard positions={positions} prices={holdingPrices} />
 
           {analyzing && (
             <div className="card" style={{ marginBottom: '1.5rem', padding: '2rem', textAlign: 'center' }}>
@@ -477,7 +592,7 @@ export default function Portfolio() {
                   const matches = UNIVERSE.filter(t => t.startsWith(watchInput)).slice(0, 6)
                   if (!matches.length) return null
                   return (
-                    <ul style={{
+                    <ul className="dropdown-list" style={{
                       position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
                       background: 'var(--surface)', border: '1px solid var(--border)',
                       borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow)',
