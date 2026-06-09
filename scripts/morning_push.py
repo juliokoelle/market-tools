@@ -51,31 +51,48 @@ def _extract_open(text: str, section: str) -> list[str]:
     return [l.strip()[6:] for l in lines[start:end] if l.strip().startswith("- [ ]")]
 
 
-def _extract_priority_backlog(text: str, limit: int = 5) -> list[str]:
-    """Extract top open items from OPEN_TASKS.md: 🔴 urgent first, then 🎯 active."""
+def _extract_priority_backlog(text: str, limit: int = 8) -> list[str]:
+    """Extract top open items from OPEN_TASKS.md with section context prefix."""
     lines = text.splitlines()
-    urgent: list[str] = []
-    active: list[str] = []
-    bucket = "other"
+
+    PRIORITY = {"🔴": 0, "💼": 1, "🎯": 2, "🟡": 3, "🔵": 4, "🟢": 5}
+
+    buckets: dict[str, list[str]] = {}
+    section_priority: dict[str, int] = {}
+    current_section = ""
+    current_subsection = ""
+    current_priority = 99
 
     for line in lines:
         stripped = line.strip()
-        if stripped.startswith("## ") or stripped.startswith("### "):
-            if "🔴" in line:
-                bucket = "urgent"
-            elif "🎯" in line:
-                bucket = "active"
-            else:
-                bucket = "other"
-        if stripped.startswith("- [ ]"):
-            item = stripped[6:]
-            if bucket == "urgent":
-                urgent.append(item)
-            elif bucket == "active":
-                active.append(item)
+        if stripped.startswith("## "):
+            header = stripped[3:].strip()
+            current_priority = next(
+                (v for k, v in PRIORITY.items() if k in header), 99
+            )
+            current_section = header
+            current_subsection = ""
+        elif stripped.startswith("### "):
+            current_subsection = stripped[4:].strip()
+        elif stripped.startswith("- [ ]") and current_section:
+            label = current_subsection or current_section
+            item = stripped[6:].strip()
+            if "←" in item:
+                item = item[:item.index("←")].strip()
+            tagged = f"[{label}] {item}"
+            if label not in buckets:
+                buckets[label] = []
+                section_priority[label] = current_priority
+            buckets[label].append(tagged)
 
-    combined = urgent + active
-    return combined[:limit]
+    result: list[str] = []
+    seen_sections = sorted(buckets.keys(), key=lambda s: section_priority.get(s, 99))
+    for section in seen_sections:
+        result.extend(buckets[section][:2])
+        if len(result) >= limit:
+            break
+
+    return result[:limit]
 
 
 def _extract_qa(text: str, limit: int = 3) -> list[tuple[str, str]]:
@@ -246,7 +263,7 @@ def _build_message(
         lines.append("Nichts offen ✅")
 
     if backlog:
-        lines += ["", "🎯 *Prioritäten (Backlog)*"]
+        lines += ["", "🎯 *Offene Prioritäten*"]
         for b in backlog:
             lines.append(f"• {b}")
 
