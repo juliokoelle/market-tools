@@ -154,6 +154,25 @@ async def _dispatch(item: CapturedItem) -> str | None:
             return f"⚠️ Noch keine Daily Note für heute — kein Task markiert."
         if matched:
             return f"✅ Erledigt: _{matched[0]}_"
+
+        # Fallback: search OPEN_TASKS.md
+        backlog_matched: list[str] = []
+
+        def backlog_mutate(current: str) -> str:
+            if not current:
+                return current
+            updated, found = mark_tasks_done([task_ref], current)
+            backlog_matched.extend(found)
+            return updated
+
+        await asyncio.to_thread(
+            github_read_modify_write,
+            "00_Inbox/OPEN_TASKS.md",
+            backlog_mutate,
+            f"capture: task done in backlog ({run_date})",
+        )
+        if backlog_matched:
+            return f"✅ Erledigt (Backlog): _{backlog_matched[0]}_"
         return f"⚠️ Kein passender Task gefunden für: _{task_ref}_"
 
     elif item.type == "task":
