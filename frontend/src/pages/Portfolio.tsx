@@ -19,25 +19,75 @@ function parseTRCsv(text: string): { rows: Position[]; hasIsins: boolean; debugH
 
   const col = (names: string[]) => names.map(n => headers.indexOf(n)).find(i => i >= 0) ?? -1
   const colPartial = (frags: string[]) => { for (const f of frags) { const i = headers.findIndex(h => h.includes(f)); if (i >= 0) return i } return -1 }
+  const parseNum = (s: string) => parseFloat(s.replace(/\./g, '').replace(',', '.'))
 
-  const isinCol   = col(['isin'])
-  const nameCol   = col(['name', 'titel', 'wertpapier', 'bezeichnung', 'security', 'title'])
-  const sharesCol = col(['menge', 'shares', 'anzahl', 'quantity', 'stucke', 'stuck', 'stueck', 'stk'])
-  const priceCol  = colPartial(['einstandspreis', 'kaufkurs', 'kaufpreis', 'avg price', 'average price'])
+  // TR transaction export: has category + type + symbol columns
+  const categoryCol = col(['category'])
+  const typeCol     = col(['type'])
+  const symbolCol   = col(['symbol'])
+  const nameCol     = col(['name', 'titel', 'wertpapier', 'bezeichnung', 'security', 'title'])
+  const sharesCol   = col(['shares', 'menge', 'anzahl', 'quantity', 'stucke', 'stuck', 'stueck', 'stk'])
+  const priceCol    = col(['price', 'kurs']) >= 0
+    ? col(['price', 'kurs'])
+    : colPartial(['einstandspreis', 'kaufkurs', 'kaufpreis', 'avg price'])
+
+  const isTrTransactionFormat = categoryCol >= 0 && typeCol >= 0 && symbolCol >= 0
+
+  if (isTrTransactionFormat) {
+    type AggEntry = { name: string; totalShares: number; totalCost: number; buyShares: number }
+    const agg: Record<string, AggEntry> = {}
+
+    for (const line of lines.slice(1)) {
+      if (!line.trim()) continue
+      const cells    = line.split(sep).map(c => c.replace(/^"|"$/g, '').trim())
+      const category = cells[categoryCol]?.toUpperCase() ?? ''
+      const txType   = cells[typeCol]?.toUpperCase() ?? ''
+      const isin     = cells[symbolCol]?.toUpperCase().replace(/\s/g, '') ?? ''
+
+      if (!isin || !isIsin(isin)) continue // skip cash rows, BTC, etc.
+
+      const isTrading            = category === 'TRADING' && (txType === 'BUY' || txType === 'SELL')
+      const isShareCorpAction    = category === 'CORPORATE_ACTION' && cells[sharesCol]?.trim() !== ''
+      if (!isTrading && !isShareCorpAction) continue
+
+      const shares = parseNum(cells[sharesCol] ?? '')
+      const price  = priceCol >= 0 ? parseNum(cells[priceCol] ?? '') : NaN
+      if (isNaN(shares) || shares === 0) continue
+
+      if (!agg[isin]) agg[isin] = { name: cells[nameCol] ?? isin, totalShares: 0, totalCost: 0, buyShares: 0 }
+      agg[isin].totalShares += shares
+      if (txType === 'BUY' && !isNaN(price) && shares > 0) {
+        agg[isin].totalCost += shares * price
+        agg[isin].buyShares += shares
+      }
+    }
+
+    const rows: Position[] = Object.entries(agg)
+      .filter(([, e]) => e.totalShares > 0.0001)
+      .map(([isin, e]) => ({
+        ticker:     isin,
+        investment: parseFloat(e.totalCost.toFixed(2)),
+        shares:     parseFloat(e.totalShares.toFixed(6)),
+        avg_buy:    e.buyShares > 0 ? parseFloat((e.totalCost / e.buyShares).toFixed(4)) : undefined,
+      }))
+
+    return { rows, hasIsins: true, debugHeaders: rawHeaders }
+  }
+
+  // Fallback: snapshot format (one row = one position)
+  const isinCol   = col(['isin', 'isin_code', 'wertpapier_id'])
   const investCol = col(['einstandswert', 'invested', 'investment', 'investiert', 'einstand'])
   const idCol     = isinCol >= 0 ? isinCol : (nameCol >= 0 ? nameCol : col(['ticker', 'symbol', 'wkn']))
   if (idCol < 0) return { rows: [], hasIsins: false, debugHeaders: rawHeaders }
 
-  const parseNum = (s: string) => parseFloat(s.replace(/\./g, '').replace(',', '.'))
-
   const rows = lines.slice(1).flatMap(line => {
     if (!line.trim()) return []
-    const cells = line.split(sep).map(c => c.replace(/^"|"$/g, '').trim())
-    const ticker = cells[idCol]?.toUpperCase().replace(/\s/g, '') ?? ''
+    const cells   = line.split(sep).map(c => c.replace(/^"|"$/g, '').trim())
+    const ticker  = cells[idCol]?.toUpperCase().replace(/\s/g, '') ?? ''
     if (!ticker) return []
-    const shares  = sharesCol >= 0 ? parseNum(cells[sharesCol]  ?? '') : NaN
-    const avg_buy = priceCol  >= 0 ? parseNum(cells[priceCol]   ?? '') : NaN
-    const invest  = investCol >= 0 ? parseNum(cells[investCol]  ?? '') : NaN
+    const shares  = sharesCol >= 0 ? parseNum(cells[sharesCol] ?? '') : NaN
+    const avg_buy = priceCol  >= 0 ? parseNum(cells[priceCol]  ?? '') : NaN
+    const invest  = investCol >= 0 ? parseNum(cells[investCol] ?? '') : NaN
     const investment = !isNaN(invest) ? invest : (!isNaN(shares) && !isNaN(avg_buy) ? shares * avg_buy : 0)
     return [{ ticker, investment, shares: isNaN(shares) ? undefined : shares, avg_buy: isNaN(avg_buy) ? undefined : avg_buy }] as Position[]
   })
