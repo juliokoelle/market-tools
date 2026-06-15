@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { getPortfolio, savePortfolio, analyzePortfolio, getMarketPrices, getMarketNames, getStockDetail, searchTickers, getStockWatchlist, addStockToWatchlist, removeStockFromWatchlist, getAllocation, type Position, type PortfolioAnalysis, type StockDetail, type AllocationData, type AllocSlice } from '../services/api'
 import { DonutSvg } from '../components/DonutSvg'
+import { parseNum } from '../lib/parseNum'
+import { normalizeTicker } from '../lib/ticker'
 
 function isIsin(s: string) { return /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(s) }
 
@@ -20,7 +22,6 @@ function parseTRCsv(text: string): { rows: Position[]; hasIsins: boolean; debugH
 
   const col = (names: string[]) => names.map(n => headers.indexOf(n)).find(i => i >= 0) ?? -1
   const colPartial = (frags: string[]) => { for (const f of frags) { const i = headers.findIndex(h => h.includes(f)); if (i >= 0) return i } return -1 }
-  const parseNum = (s: string) => parseFloat(s.replace(/\./g, '').replace(',', '.'))
 
   // TR transaction export: has category + type + symbol columns
   const categoryCol = col(['category'])
@@ -481,6 +482,26 @@ export default function Portfolio() {
   function removeRow(i: number)                     { setPositions(p => p.filter((_, j) => j !== i)) }
   function updateTicker(i: number, v: string)       { setPositions(p => p.map((r, j) => j === i ? { ...r, ticker: v } : r)) }
   function updateInvestment(i: number, v: number)   { setPositions(p => p.map((r, j) => j === i ? { ...r, investment: v } : r)) }
+  function updateShares(i: number, raw: string) {
+    const v = parseNum(raw)
+    setPositions(p => p.map((r, j) => {
+      if (j !== i) return r
+      const shares = Number.isNaN(v) ? undefined : v
+      const investment = shares != null && r.avg_buy != null
+        ? parseFloat((shares * r.avg_buy).toFixed(2)) : r.investment
+      return { ...r, shares, investment }
+    }))
+  }
+  function updateAvgBuy(i: number, raw: string) {
+    const v = parseNum(raw)
+    setPositions(p => p.map((r, j) => {
+      if (j !== i) return r
+      const avg_buy = Number.isNaN(v) ? undefined : v
+      const investment = avg_buy != null && r.shares != null
+        ? parseFloat((avg_buy * r.shares).toFixed(2)) : r.investment
+      return { ...r, avg_buy, investment }
+    }))
+  }
 
   function handleCsvImport(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -534,7 +555,14 @@ export default function Portfolio() {
 
   async function handleSave() {
     setSaving(true)
-    try { await savePortfolio(positions.filter(p => p.ticker)); showToast('Portfolio saved') }
+    const cleaned = positions
+      .filter(p => p.ticker)
+      .map(p => ({ ...p, ticker: normalizeTicker(p.ticker) }))
+    try {
+      await savePortfolio(cleaned)
+      setPositions(prev => prev.map(p => p.ticker ? { ...p, ticker: normalizeTicker(p.ticker) } : p))
+      showToast('Portfolio saved')
+    }
     catch { showToast('Save failed') }
     finally { setSaving(false) }
   }
@@ -619,13 +647,33 @@ export default function Portfolio() {
             <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>Holdings</h2>
 
             <div style={{ overflowX: 'auto', marginBottom: '.75rem', WebkitOverflowScrolling: 'touch' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px 28px 28px', gap: '.5rem .5rem', minWidth: 360 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 110px 130px 28px 28px', gap: '.5rem .5rem', minWidth: 480 }}>
               <p style={labelStyle}>Ticker</p>
+              <p style={labelStyle}>Stück</p>
+              <p style={labelStyle}>Ø Kauf (€)</p>
               <p style={labelStyle}>Investment (€)</p>
               <span /><span />
               {positions.map((p, i) => (
                 <>
                   <TickerInput key={`t${i}`} value={p.ticker} onChange={v => updateTicker(i, v)} />
+                  <input
+                    key={`s${i}`}
+                    type="text"
+                    inputMode="decimal"
+                    defaultValue={p.shares ?? ''}
+                    onBlur={e => updateShares(i, e.target.value)}
+                    placeholder="z.B. 2,91"
+                    style={inputStyle}
+                  />
+                  <input
+                    key={`a${i}`}
+                    type="text"
+                    inputMode="decimal"
+                    defaultValue={p.avg_buy ?? ''}
+                    onBlur={e => updateAvgBuy(i, e.target.value)}
+                    placeholder="z.B. 162,66"
+                    style={inputStyle}
+                  />
                   <input
                     key={`v${i}`}
                     type="number"
