@@ -621,6 +621,136 @@ def portfolio_holdings_save(request: PortfolioHoldingsRequest):
 
 
 # ---------------------------------------------------------------------------
+# Portfolio allocation (by holding / sector / continent / market)
+# ---------------------------------------------------------------------------
+
+class AllocHolding(BaseModel):
+    ticker: str
+    value: float  # weight basis (e.g. invested EUR or current market value)
+
+
+class AllocRequest(BaseModel):
+    holdings: list[AllocHolding]
+
+
+# Yahoo `info["country"]` (full name) -> (continent, market classification)
+_COUNTRY_META: dict[str, tuple[str, str]] = {
+    "United States": ("North America", "Developed"),
+    "Canada": ("North America", "Developed"),
+    "Mexico": ("North America", "Emerging"),
+    "Germany": ("Europe", "Developed"),
+    "Netherlands": ("Europe", "Developed"),
+    "United Kingdom": ("Europe", "Developed"),
+    "Ireland": ("Europe", "Developed"),
+    "France": ("Europe", "Developed"),
+    "Switzerland": ("Europe", "Developed"),
+    "Italy": ("Europe", "Developed"),
+    "Spain": ("Europe", "Developed"),
+    "Sweden": ("Europe", "Developed"),
+    "Denmark": ("Europe", "Developed"),
+    "Finland": ("Europe", "Developed"),
+    "Norway": ("Europe", "Developed"),
+    "Belgium": ("Europe", "Developed"),
+    "Austria": ("Europe", "Developed"),
+    "Luxembourg": ("Europe", "Developed"),
+    "Japan": ("Asia", "Developed"),
+    "Hong Kong": ("Asia", "Developed"),
+    "Singapore": ("Asia", "Developed"),
+    "South Korea": ("Asia", "Developed"),
+    "China": ("Asia", "Emerging"),
+    "Taiwan": ("Asia", "Emerging"),
+    "India": ("Asia", "Emerging"),
+    "Indonesia": ("Asia", "Emerging"),
+    "Israel": ("Asia", "Developed"),
+    "Cayman Islands": ("Asia", "Emerging"),  # most KY-domiciled issuers operate in Asia (e.g. Razer)
+    "Brazil": ("South America", "Emerging"),
+    "Argentina": ("South America", "Emerging"),
+    "South Africa": ("Africa", "Emerging"),
+    "Australia": ("Oceania", "Developed"),
+    "New Zealand": ("Oceania", "Developed"),
+}
+
+
+def _alloc_meta(ticker: str) -> dict:
+    """Cached sector + country for a ticker (ETFs flagged as 'ETF'/'Global')."""
+    key = f"allocmeta:{ticker}"
+    cached = _cache_get(key, _TTL_NAME)
+    if cached is not None:
+        return cached  # type: ignore[return-value]
+    import yfinance as yf
+    sector, country = "Unknown", "Unknown"
+    try:
+        info = yf.Ticker(ticker).info or {}
+        quote_type = info.get("quoteType", "")
+        is_etf = (
+            quote_type in ("ETF", "MUTUALFUND")
+            or bool(info.get("fundFamily"))
+            or bool(info.get("categoryName"))
+        )
+        if is_etf:
+            sector, country = "ETF", "Global"
+        else:
+            sector = info.get("sector") or "Unknown"
+            country = info.get("country") or "Unknown"
+    except Exception:
+        pass
+    meta = {"sector": sector, "country": country}
+    _cache_set(key, meta)
+    return meta
+
+
+@app.post("/portfolio/allocation")
+def portfolio_allocation(request: AllocRequest):
+    from concurrent.futures import ThreadPoolExecutor
+
+    holds = [h for h in request.holdings if h.ticker and h.value > 0]
+    if not holds:
+        return {"total": 0, "byHolding": [], "bySector": [],
+                "byContinent": [], "byMarket": [], "byCountry": []}
+
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        metas = list(ex.map(lambda h: (h, _alloc_meta(h.ticker.upper())), holds))
+
+    total = sum(h.value for h in holds) or 1.0
+
+    def _continent(meta: dict) -> str:
+        if meta["country"] == "Global":
+            return "Global (ETF)"
+        return _COUNTRY_META.get(meta["country"], ("Other", "Other"))[0]
+
+    def _market(meta: dict) -> str:
+        if meta["country"] == "Global":
+            return "Diversified (ETF)"
+        return _COUNTRY_META.get(meta["country"], ("Other", "Other"))[1]
+
+    def _group(key_fn) -> list[dict]:
+        agg: dict[str, float] = {}
+        for h, meta in metas:
+            k = key_fn(h, meta)
+            agg[k] = agg.get(k, 0.0) + h.value
+        return sorted(
+            [{"label": k, "value": round(v, 2), "pct": round(v / total * 100, 2)}
+             for k, v in agg.items()],
+            key=lambda x: -x["value"],
+        )
+
+    by_holding = sorted(
+        [{"label": h.ticker.upper(), "value": round(h.value, 2),
+          "pct": round(h.value / total * 100, 2)} for h in holds],
+        key=lambda x: -x["value"],
+    )
+
+    return {
+        "total": round(total, 2),
+        "byHolding": by_holding,
+        "bySector": _group(lambda h, m: m["sector"]),
+        "byContinent": _group(lambda h, m: _continent(m)),
+        "byMarket": _group(lambda h, m: _market(m)),
+        "byCountry": _group(lambda h, m: m["country"]),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Portfolio persistence (GitHub-backed)
 # ---------------------------------------------------------------------------
 

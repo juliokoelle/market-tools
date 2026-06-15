@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { getPortfolio, savePortfolio, analyzePortfolio, getMarketPrices, getMarketNames, getStockDetail, searchTickers, getStockWatchlist, addStockToWatchlist, removeStockFromWatchlist, type Position, type PortfolioAnalysis, type StockDetail } from '../services/api'
+import { getPortfolio, savePortfolio, analyzePortfolio, getMarketPrices, getMarketNames, getStockDetail, searchTickers, getStockWatchlist, addStockToWatchlist, removeStockFromWatchlist, getAllocation, type Position, type PortfolioAnalysis, type StockDetail, type AllocationData, type AllocSlice } from '../services/api'
+import { DonutSvg } from '../components/DonutSvg'
 
 function isIsin(s: string) { return /^[A-Z]{2}[A-Z0-9]{9}[0-9]$/.test(s) }
 
@@ -405,6 +406,9 @@ export default function Portfolio() {
   // ── Detail modal ──
   const [detailTicker, setDetailTicker] = useState<string | null>(null)
 
+  // ── Allocation (by holding / sector / continent / market) ──
+  const [alloc, setAlloc] = useState<AllocationData | null>(null)
+
   // ── Live holding prices (for P&L) ──
   const [holdingPrices, setHoldingPrices] = useState<Record<string, { price: number; change_pct: number }>>({})
   const csvInputRef = useRef<HTMLInputElement>(null)
@@ -423,6 +427,15 @@ export default function Portfolio() {
     const tickers = positions.filter(p => p.ticker).map(p => p.ticker)
     if (!tickers.length) return
     getMarketPrices(tickers.join(',')).then(setHoldingPrices).catch(() => {})
+  }, [positions])
+
+  // Load allocation breakdown (weighted by invested €, consistent currency)
+  useEffect(() => {
+    const holdings = positions
+      .filter(p => p.ticker && p.investment > 0)
+      .map(p => ({ ticker: p.ticker, value: p.investment }))
+    if (!holdings.length) { setAlloc(null); return }
+    getAllocation(holdings).then(setAlloc).catch(() => setAlloc(null))
   }, [positions])
 
   useEffect(() => {
@@ -657,6 +670,30 @@ export default function Portfolio() {
 
           <LivePnlCard positions={positions} prices={holdingPrices} />
 
+          {alloc && alloc.byHolding.length > 0 && (
+            <div className="card" style={{ marginBottom: '1.5rem' }}>
+              <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem' }}>Allocation</h2>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem 2rem' }}>
+                <AllocBlock title="By Holding"   slices={alloc.byHolding} />
+                <AllocBlock title="By Sector"    slices={alloc.bySector} />
+                <AllocBlock title="By Continent" slices={alloc.byContinent} />
+                <AllocBlock title="By Market"    slices={alloc.byMarket} />
+              </div>
+
+              {/* Regions strip — Developed / Emerging / Diversified / Other */}
+              <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', marginTop: '1.5rem', borderTop: '1px solid var(--border)', paddingTop: '1.25rem' }}>
+                {alloc.byMarket.map(m => (
+                  <div key={m.label}>
+                    <p style={{ fontSize: '1.4rem', fontWeight: 800, lineHeight: 1 }}>
+                      {m.pct.toFixed(2)}<span style={{ fontSize: '.8rem', fontWeight: 600, color: 'var(--text-3)' }}> %</span>
+                    </p>
+                    <p style={{ fontSize: '.7rem', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', marginTop: '.2rem' }}>{m.label}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {analyzing && (
             <div className="card" style={{ marginBottom: '1.5rem', padding: '2rem', textAlign: 'center' }}>
               <p style={{ color: 'var(--text-3)', fontSize: '.875rem' }}>Running portfolio analysis…</p>
@@ -797,6 +834,15 @@ export default function Portfolio() {
         </div>
       )}
     </main>
+  )
+}
+
+function AllocBlock({ title, slices }: { title: string; slices: AllocSlice[] }) {
+  return (
+    <div>
+      <p style={{ ...labelStyle, marginBottom: '.75rem' }}>{title}</p>
+      <DonutSvg slices={slices} />
+    </div>
   )
 }
 

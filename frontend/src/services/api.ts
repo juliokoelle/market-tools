@@ -87,6 +87,19 @@ export const savePortfolio = (positions: Position[]) =>
 export const analyzePortfolio = (holdings: Holding[]) =>
   post<PortfolioAnalysis>('/portfolio/analyze', { holdings })
 
+// Allocation (by holding / sector / continent / market)
+export interface AllocSlice { label: string; value: number; pct: number }
+export interface AllocationData {
+  total: number
+  byHolding: AllocSlice[]
+  bySector: AllocSlice[]
+  byContinent: AllocSlice[]
+  byMarket: AllocSlice[]
+  byCountry: AllocSlice[]
+}
+export const getAllocation = (holdings: { ticker: string; value: number }[]) =>
+  post<AllocationData>('/portfolio/allocation', { holdings })
+
 // Stocks
 export const getWatchlist = () =>
   get<any>('/watchlist').then((data: any): WatchlistCategory[] =>

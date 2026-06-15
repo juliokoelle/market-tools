@@ -58,7 +58,7 @@ export default function HotStocks() {
       {loading ? (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="card" style={{ height: 110, opacity: .4, background: 'var(--surface-alt)' }} />
+            <div key={i} className="card" style={{ height: 110, background: 'var(--surface-alt)', animation: `pulse 1.4s ease-in-out ${i * 120}ms infinite` }} />
           ))}
         </div>
       ) : rows.length === 0 ? (
@@ -67,10 +67,8 @@ export default function HotStocks() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
           {rows.map((s, i) => (
             <a key={s.ticker} href={`https://finance.yahoo.com/quote/${s.ticker}`} target="_blank" rel="noopener noreferrer"
-              className="card"
-              style={{ display: 'flex', flexDirection: 'column', gap: '.5rem', padding: '1rem', textDecoration: 'none', transition: 'box-shadow .15s, transform .15s' }}
-              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.boxShadow = '0 8px 24px -4px rgba(0,0,0,.12)'; (e.currentTarget as HTMLElement).style.transform = 'translateY(-2px)' }}
-              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.boxShadow = ''; (e.currentTarget as HTMLElement).style.transform = '' }}
+              className="card stock-card"
+              style={{ display: 'flex', flexDirection: 'column', gap: '.5rem', padding: '1rem', textDecoration: 'none', animationDelay: `${i * 40}ms` }}
             >
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: '.68rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em' }}>#{i + 1}</span>

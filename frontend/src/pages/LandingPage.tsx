@@ -41,6 +41,14 @@ const projects = [
     tags: ['TanStack', 'React', 'WM 2026'],
     status: 'Live',
   },
+  {
+    title: 'Finlytic',
+    description: 'Automated monthly financial reporting for €2M–€50M companies — board packs, P&L vs budget, AI variance commentary, and streamlined month-end close.',
+    link: 'https://id-preview--da003f2b-1440-4fff-a5e1-6631eeb8f226.lovable.app',
+    external: true,
+    tags: ['B2B', 'Finance', 'Automation'],
+    status: 'Live',
+  },
 ]
 
 export default function LandingPage() {
