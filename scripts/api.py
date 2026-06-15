@@ -672,30 +672,40 @@ _COUNTRY_META: dict[str, tuple[str, str]] = {
 
 
 def _alloc_meta(ticker: str) -> dict:
-    """Cached sector + country for a ticker (ETFs flagged as 'ETF'/'Global')."""
+    """Cached sector + country for a ticker (ETFs flagged as 'ETF'/'Global').
+
+    Retries against Yahoo throttling; caches only successful fetches so a
+    throttled failure does not poison the cache as 'Unknown'.
+    """
     key = f"allocmeta:{ticker}"
     cached = _cache_get(key, _TTL_NAME)
     if cached is not None:
         return cached  # type: ignore[return-value]
+    import time
     import yfinance as yf
     sector, country = "Unknown", "Unknown"
-    try:
-        info = yf.Ticker(ticker).info or {}
-        quote_type = info.get("quoteType", "")
-        is_etf = (
-            quote_type in ("ETF", "MUTUALFUND")
-            or bool(info.get("fundFamily"))
-            or bool(info.get("categoryName"))
-        )
-        if is_etf:
-            sector, country = "ETF", "Global"
-        else:
-            sector = info.get("sector") or "Unknown"
-            country = info.get("country") or "Unknown"
-    except Exception:
-        pass
+    fetched = False
+    for attempt in range(3):
+        try:
+            info = yf.Ticker(ticker).info or {}
+            quote_type = info.get("quoteType", "")
+            is_etf = (
+                quote_type in ("ETF", "MUTUALFUND")
+                or bool(info.get("fundFamily"))
+                or bool(info.get("categoryName"))
+            )
+            if is_etf:
+                sector, country = "ETF", "Global"
+            else:
+                sector = info.get("sector") or "Unknown"
+                country = info.get("country") or "Unknown"
+            fetched = True
+            break
+        except Exception:
+            time.sleep(0.5 * (attempt + 1))
     meta = {"sector": sector, "country": country}
-    _cache_set(key, meta)
+    if fetched:
+        _cache_set(key, meta)
     return meta
 
 
@@ -708,7 +718,7 @@ def portfolio_allocation(request: AllocRequest):
         return {"total": 0, "byHolding": [], "bySector": [],
                 "byContinent": [], "byMarket": [], "byCountry": []}
 
-    with ThreadPoolExecutor(max_workers=8) as ex:
+    with ThreadPoolExecutor(max_workers=3) as ex:
         metas = list(ex.map(lambda h: (h, _alloc_meta(h.ticker.upper())), holds))
 
     total = sum(h.value for h in holds) or 1.0
