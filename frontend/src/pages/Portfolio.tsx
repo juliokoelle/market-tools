@@ -439,13 +439,17 @@ export default function Portfolio() {
     getAllocation(holdings).then(setAlloc).catch(() => setAlloc(null))
   }, [positions])
 
+  // The GitHub-backed server store is the cross-device source of truth (written
+  // on every Save). localStorage is only an offline cache / first-paint buffer —
+  // it must NOT win over the server, otherwise updates from another device never
+  // surface (was the "Daten nicht aktualisiert" bug).
   useEffect(() => {
     getPortfolio()
       .then(d => {
-        const hasLocal = !!localStorage.getItem(POSITIONS_KEY)
-        if (d.positions?.length && !hasLocal) {
+        if (d.positions?.length) {
           setPositions(d.positions)
-        } else if (!hasLocal && !localStorage.getItem(SEED_KEY)) {
+          localStorage.setItem(POSITIONS_KEY, JSON.stringify(d.positions))
+        } else if (!localStorage.getItem(POSITIONS_KEY) && !localStorage.getItem(SEED_KEY)) {
           setShowSeed(true)
         }
       })

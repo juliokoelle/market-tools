@@ -199,6 +199,8 @@ class PortfolioPosition(BaseModel):
     amount_eur: float
     category: str  # "stock" | "etf" | "commodity"
     note: str = ""
+    shares: float | None = None    # manual quantity (for P&L)
+    avg_buy: float | None = None   # average buy price in EUR (for P&L)
 
 
 class GHPortfolioWrite(BaseModel):

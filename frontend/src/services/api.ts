@@ -70,8 +70,11 @@ export const getPortfolio = () =>
     positions: (d.positions ?? []).map((p: any): Position => ({
       ticker: p.ticker,
       investment: p.investment ?? p.amount_eur ?? 0,
+      shares: p.shares ?? undefined,
+      avg_buy: p.avg_buy ?? undefined,
     })),
     total_value: d.total_eur ?? d.total_value ?? 0,
+    last_updated: d.last_updated ?? null,
   }))
 
 export const savePortfolio = (positions: Position[]) =>
@@ -81,6 +84,8 @@ export const savePortfolio = (positions: Position[]) =>
       amount_eur: p.investment,
       category: 'stock',
       note: '',
+      shares: p.shares ?? null,
+      avg_buy: p.avg_buy ?? null,
     })),
   })
 
