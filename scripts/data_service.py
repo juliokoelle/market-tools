@@ -70,6 +70,11 @@ def get_historical_data(ticker: str, period: str = "6mo") -> pd.DataFrame | None
         df = yf.download(ticker, period=period, auto_adjust=True, progress=False)
         if df.empty:
             return None
+        # Newer yfinance returns MultiIndex columns even for a single ticker
+        # (e.g. ("Close", "VWCE.DE")). Flatten to the field name so downstream
+        # df["Close"] access keeps working.
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
         return df
     except Exception:
         return None
