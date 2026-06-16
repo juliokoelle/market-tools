@@ -34,6 +34,24 @@
   --font: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --ease-out:    cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+
+  /* ── Market semantic tokens (Lovable-Struktur, unser Look) ──
+     Aliasen auf bestehende Farben → adaptieren automatisch an Light/Dark. */
+  --gain:      var(--positive);
+  --loss:      var(--negative);
+  --brand:     var(--teal);
+  --brand-mid: var(--teal-mid);
+  --brand-soft:var(--teal-light);
+  --surface-1: var(--surface);
+  --surface-2: var(--surface-alt);
+  --surface-3: var(--border-soft);
+  --hairline:  var(--border-soft);
+  /* Chart-Palette (theme-unabhängig, lesbar auf hell + dunkel) */
+  --chart-1:   var(--teal);
+  --chart-2:   #16a34a;
+  --chart-3:   #d97706;
+  --chart-4:   #2563eb;
+  --chart-5:   #7c3aed;
 }
 
 [data-theme="dark"] {
@@ -441,6 +459,16 @@ a .card, button .card, [style*="cursor: pointer"] .card {
   background: var(--teal);
   border-radius: 999px;
   transition: width .4s ease;
+}
+
+/* ── Market utils ── */
+.tabular { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+.eyebrow {
+  font-size: .62rem;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--text-3);
 }
 
 /* ── Misc utils ── */

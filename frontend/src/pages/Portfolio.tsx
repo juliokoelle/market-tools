@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { getPortfolio, savePortfolio, analyzePortfolio, getMarketPrices, getMarketNames, getStockDetail, searchTickers, getStockWatchlist, addStockToWatchlist, removeStockFromWatchlist, getAllocation, type Position, type PortfolioAnalysis, type StockDetail, type AllocationData, type AllocSlice } from '../services/api'
-import { DonutSvg } from '../components/DonutSvg'
+import { getPortfolio, savePortfolio, analyzePortfolio, getMarketPrices, getMarketNames, getStockDetail, searchTickers, getStockWatchlist, addStockToWatchlist, removeStockFromWatchlist, getAllocation, getPortfolioPerformance, type Position, type PortfolioAnalysis, type StockDetail, type AllocationData, type PerfData } from '../services/api'
+import { computePnl, MetricStrip, PerformancePanel, AllocationDonut, RiskPanel, HoldingsTable } from '../components/market/portfolio-panels'
 import { parseNum } from '../lib/parseNum'
 import { normalizeTicker } from '../lib/ticker'
 
@@ -95,62 +95,6 @@ function parseTRCsv(text: string): { rows: Position[]; hasIsins: boolean; debugH
   })
 
   return { rows, hasIsins: rows.some(r => isIsin(r.ticker)), debugHeaders: rawHeaders }
-}
-
-function LivePnlCard({ positions, prices }: { positions: Position[]; prices: Record<string, { price: number; change_pct: number }> }) {
-  const rows = positions.filter(p => p.ticker && p.shares && p.avg_buy)
-  if (!rows.length) return null
-  let totalCost = 0, totalValue = 0
-  const items = rows.map(p => {
-    const cost = (p.shares ?? 0) * (p.avg_buy ?? 0)
-    const curr = prices[p.ticker]?.price ?? 0
-    const value = curr > 0 ? curr * (p.shares ?? 0) : cost
-    totalCost += cost; totalValue += value
-    const pnl = curr > 0 ? value - cost : 0
-    const pnlPct = cost > 0 && curr > 0 ? (pnl / cost) * 100 : 0
-    return { ticker: p.ticker, shares: p.shares ?? 0, avg_buy: p.avg_buy ?? 0, curr, value, pnl, pnlPct }
-  })
-  const totalPnl = totalValue - totalCost
-  const totalPnlPct = totalCost > 0 ? (totalPnl / totalCost) * 100 : 0
-  return (
-    <div className="card" style={{ marginBottom: '1.5rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-        <h2 style={{ fontSize: '1rem', fontWeight: 700 }}>Live P&L</h2>
-        <div style={{ textAlign: 'right' }}>
-          <p style={{ fontSize: '1.3rem', fontWeight: 800, color: totalPnl >= 0 ? 'var(--positive)' : 'var(--negative)' }}>
-            {totalPnl >= 0 ? '+' : ''}€{totalPnl.toLocaleString('de-DE', { maximumFractionDigits: 0 })}
-          </p>
-          <p style={{ fontSize: '.75rem', fontWeight: 600, color: totalPnlPct >= 0 ? 'var(--positive)' : 'var(--negative)' }}>
-            {totalPnlPct >= 0 ? '+' : ''}{totalPnlPct.toFixed(2)}% · Depot €{totalValue.toLocaleString('de-DE', { maximumFractionDigits: 0 })}
-          </p>
-        </div>
-      </div>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '.875rem' }}>
-          <thead>
-            <tr style={{ borderBottom: '2px solid var(--border)' }}>
-              {['Ticker', 'Stück', 'Ø Kauf', 'Kurs', 'Wert', 'P&L', '+/-%'].map(h => (
-                <th key={h} style={{ textAlign: 'left', padding: '.35rem .5rem', fontSize: '.65rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {items.map(it => (
-              <tr key={it.ticker} style={{ borderBottom: '1px solid var(--border)' }}>
-                <td style={{ padding: '.45rem .5rem', fontWeight: 700, color: 'var(--teal)' }}>{it.ticker}</td>
-                <td style={{ padding: '.45rem .5rem', color: 'var(--text-2)' }}>{it.shares}</td>
-                <td style={{ padding: '.45rem .5rem', color: 'var(--text-2)' }}>€{it.avg_buy.toFixed(2)}</td>
-                <td style={{ padding: '.45rem .5rem', fontWeight: 600 }}>{it.curr > 0 ? `$${it.curr.toFixed(2)}` : <span style={{ color: 'var(--text-3)' }}>···</span>}</td>
-                <td style={{ padding: '.45rem .5rem' }}>{it.curr > 0 ? `€${it.value.toLocaleString('de-DE', { maximumFractionDigits: 0 })}` : '—'}</td>
-                <td style={{ padding: '.45rem .5rem', fontWeight: 700, color: it.pnl >= 0 ? 'var(--positive)' : 'var(--negative)' }}>{it.curr > 0 ? `${it.pnl >= 0 ? '+' : ''}€${it.pnl.toFixed(0)}` : '—'}</td>
-                <td style={{ padding: '.45rem .5rem', fontSize: '.8rem', fontWeight: 700, color: it.pnlPct >= 0 ? 'var(--positive)' : 'var(--negative)' }}>{it.curr > 0 ? `${it.pnlPct >= 0 ? '+' : ''}${it.pnlPct.toFixed(1)}%` : '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  )
 }
 
 const UNIVERSE = [
@@ -410,6 +354,11 @@ export default function Portfolio() {
   // ── Allocation (by holding / sector / continent / market) ──
   const [alloc, setAlloc] = useState<AllocationData | null>(null)
 
+  // ── Performance (vs S&P 500) ──
+  const [perf, setPerf] = useState<PerfData | null>(null)
+  const [perfPeriod, setPerfPeriod] = useState('6M')
+  const [perfLoading, setPerfLoading] = useState(false)
+
   // ── Live holding prices (for P&L) ──
   const [holdingPrices, setHoldingPrices] = useState<Record<string, { price: number; change_pct: number }>>({})
   const csvInputRef = useRef<HTMLInputElement>(null)
@@ -438,6 +387,19 @@ export default function Portfolio() {
     if (!holdings.length) { setAlloc(null); return }
     getAllocation(holdings).then(setAlloc).catch(() => setAlloc(null))
   }, [positions])
+
+  // Load performance series (weighted current allocation vs S&P 500)
+  useEffect(() => {
+    const holdings = positions
+      .filter(p => p.ticker && p.investment > 0)
+      .map(p => ({ ticker: p.ticker, value: p.investment }))
+    if (!holdings.length) { setPerf(null); return }
+    setPerfLoading(true)
+    getPortfolioPerformance(holdings, perfPeriod)
+      .then(setPerf)
+      .catch(() => setPerf(null))
+      .finally(() => setPerfLoading(false))
+  }, [positions, perfPeriod])
 
   // The GitHub-backed server store is the cross-device source of truth (written
   // on every Save). localStorage is only an offline cache / first-paint buffer —
@@ -622,6 +584,7 @@ export default function Portfolio() {
   }
 
   const portfolioTickers = new Set(positions.map(p => p.ticker))
+  const pnl = computePnl(positions, holdingPrices)
 
   return (
     <main className="page page-enter">
@@ -647,8 +610,23 @@ export default function Portfolio() {
       {/* ── Holdings tab ── */}
       {tab === 'holdings' && (
         <>
+          {pnl.items.length > 0 && <MetricStrip stats={pnl} analysis={analysis} />}
+
+          {pnl.items.length > 0 && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <PerformancePanel data={perf} period={perfPeriod} onPeriod={setPerfPeriod} loading={perfLoading} />
+            </div>
+          )}
+
+          {(alloc?.byHolding.length || analysis) && (
+            <div className="grid-2" style={{ marginBottom: '1.5rem', alignItems: 'start' }}>
+              {alloc && alloc.byHolding.length > 0 && <AllocationDonut alloc={alloc} />}
+              <RiskPanel analysis={analysis} stats={pnl} />
+            </div>
+          )}
+
           <div className="card" style={{ marginBottom: '1.5rem' }}>
-            <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>Holdings</h2>
+            <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1rem' }}>Positionen bearbeiten</h2>
 
             <div style={{ overflowX: 'auto', marginBottom: '.75rem', WebkitOverflowScrolling: 'touch' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 110px 130px 28px 28px', gap: '.5rem .5rem', minWidth: 480 }}>
@@ -720,31 +698,7 @@ export default function Portfolio() {
             </p>
           </div>
 
-          <LivePnlCard positions={positions} prices={holdingPrices} />
-
-          {alloc && alloc.byHolding.length > 0 && (
-            <div className="card" style={{ marginBottom: '1.5rem' }}>
-              <h2 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '1.25rem' }}>Allocation</h2>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem 2rem' }}>
-                <AllocBlock title="By Holding"   slices={alloc.byHolding} />
-                <AllocBlock title="By Sector"    slices={alloc.bySector} />
-                <AllocBlock title="By Continent" slices={alloc.byContinent} />
-                <AllocBlock title="By Market"    slices={alloc.byMarket} />
-              </div>
-
-              {/* Regions strip — Developed / Emerging / Diversified / Other */}
-              <div style={{ display: 'flex', gap: '2rem', flexWrap: 'wrap', marginTop: '1.5rem', borderTop: '1px solid var(--border)', paddingTop: '1.25rem' }}>
-                {alloc.byMarket.map(m => (
-                  <div key={m.label}>
-                    <p style={{ fontSize: '1.4rem', fontWeight: 800, lineHeight: 1 }}>
-                      {m.pct.toFixed(2)}<span style={{ fontSize: '.8rem', fontWeight: 600, color: 'var(--text-3)' }}> %</span>
-                    </p>
-                    <p style={{ fontSize: '.7rem', color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em', marginTop: '.2rem' }}>{m.label}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <HoldingsTable stats={pnl} />
 
           {analyzing && (
             <div className="card" style={{ marginBottom: '1.5rem', padding: '2rem', textAlign: 'center' }}>
@@ -886,15 +840,6 @@ export default function Portfolio() {
         </div>
       )}
     </main>
-  )
-}
-
-function AllocBlock({ title, slices }: { title: string; slices: AllocSlice[] }) {
-  return (
-    <div>
-      <p style={{ ...labelStyle, marginBottom: '.75rem' }}>{title}</p>
-      <DonutSvg slices={slices} />
-    </div>
   )
 }
 

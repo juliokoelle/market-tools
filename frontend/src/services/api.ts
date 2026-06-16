@@ -105,6 +105,12 @@ export interface AllocationData {
 export const getAllocation = (holdings: { ticker: string; value: number }[]) =>
   post<AllocationData>('/portfolio/allocation', { holdings })
 
+// Performance — weighted equity curve vs S&P 500
+export interface PerfPoint { date: string; value: number; benchmark?: number }
+export interface PerfData { period: string; total: number; series: PerfPoint[] }
+export const getPortfolioPerformance = (holdings: { ticker: string; value: number }[], period = '6mo') =>
+  post<PerfData>('/portfolio/performance', { holdings, period })
+
 // Stocks
 export const getWatchlist = () =>
   get<any>('/watchlist').then((data: any): WatchlistCategory[] =>
