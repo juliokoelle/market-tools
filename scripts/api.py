@@ -635,6 +635,11 @@ class AllocRequest(BaseModel):
     holdings: list[AllocHolding]
 
 
+class PerfRequest(BaseModel):
+    holdings: list[AllocHolding]
+    period: str = "6mo"
+
+
 # Yahoo `info["country"]` (full name) -> (continent, market classification)
 _COUNTRY_META: dict[str, tuple[str, str]] = {
     "United States": ("North America", "Developed"),
@@ -760,6 +765,80 @@ def portfolio_allocation(request: AllocRequest):
         "byMarket": _group(lambda h, m: _market(m)),
         "byCountry": _group(lambda h, m: m["country"]),
     }
+
+
+_TTL_PERF = 600.0  # performance series (10 min)
+_PERIOD_ALIASES = {"1M": "1mo", "3M": "3mo", "6M": "6mo", "1Y": "1y", "2Y": "2y", "5Y": "5y", "ALL": "5y"}
+
+
+@app.post("/portfolio/performance")
+def portfolio_performance(request: PerfRequest):
+    """Weighted equity curve of the *current* allocation vs. S&P 500.
+
+    Each holding's historical close is normalized to its first value, scaled by
+    the holding's weight (invested EUR), and summed. Both the portfolio and the
+    S&P 500 benchmark start at the current total, so the lines are directly
+    comparable. Currency-agnostic (uses return ratios, not absolute prices).
+    """
+    import pandas as pd
+    from concurrent.futures import ThreadPoolExecutor
+
+    period = _PERIOD_ALIASES.get(request.period.upper(), request.period)
+    if period not in ("1mo", "3mo", "6mo", "1y", "2y", "5y"):
+        period = "6mo"
+
+    holds = [h for h in request.holdings if h.ticker and h.value > 0]
+    if not holds:
+        return {"period": period, "total": 0, "series": []}
+
+    total = sum(h.value for h in holds) or 1.0
+    weights = {h.ticker.upper(): h.value for h in holds}
+
+    key = f"perf:{period}:" + ",".join(sorted(f"{k}={round(v, 2)}" for k, v in weights.items()))
+    cached = _cache_get(key, _TTL_PERF)
+    if cached is not None:
+        return cached
+
+    def _close_map(ticker: str) -> tuple[str, dict | None]:
+        try:
+            df = get_historical_data(ticker, period=period)
+            if df is None or df.empty:
+                return ticker, None
+            s = df["Close"].dropna()
+            return ticker, {str(pd.Timestamp(d).date()): float(v) for d, v in s.items()}
+        except Exception:
+            return ticker, None
+
+    tickers = list(weights.keys())
+    with ThreadPoolExecutor(max_workers=4) as ex:
+        pairs = list(ex.map(_close_map, tickers + ["^GSPC"]))
+
+    maps = {t: m for t, m in pairs if m}
+    bench_map = maps.pop("^GSPC", None)
+    if not maps:
+        return {"period": period, "total": round(total, 2), "series": []}
+
+    # ISO date strings sort chronologically; ffill/bfill across the union of dates.
+    frame = pd.DataFrame({t: maps[t] for t in maps}).sort_index().ffill().bfill()
+    norm = frame.div(frame.iloc[0])
+    port = sum(norm[t] * weights.get(t, 0.0) for t in frame.columns)
+
+    bench_series = None
+    if bench_map:
+        b = pd.Series(bench_map).sort_index()
+        b = b.reindex(frame.index).ffill().bfill()
+        bench_series = (b / b.iloc[0]) * total
+
+    series = []
+    for d in frame.index:
+        row = {"date": d, "value": round(float(port[d]), 2)}
+        if bench_series is not None and pd.notna(bench_series.get(d)):
+            row["benchmark"] = round(float(bench_series[d]), 2)
+        series.append(row)
+
+    result = {"period": period, "total": round(total, 2), "series": series}
+    _cache_set(key, result)
+    return result
 
 
 # ---------------------------------------------------------------------------
