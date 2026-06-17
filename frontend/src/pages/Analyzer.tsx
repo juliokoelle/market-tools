@@ -94,7 +94,7 @@ function SearchBar({ onSearch }: { onSearch: (ticker: string) => void }) {
           {suggestions.map(s => (
             <li
               key={s.ticker}
-              onClick={() => pick(s.ticker)}
+              onMouseDown={e => { e.preventDefault(); pick(s.ticker) }}
               style={{
                 padding: '.45rem .75rem',
                 cursor: 'pointer',
@@ -189,7 +189,7 @@ export default function Analyzer() {
                   )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '.4rem' }}>
                     <span className="tabular" style={{ fontWeight: 700, fontSize: '.85rem' }}>
-                      {s.price ? fmtCurrencyExact(s.price) : '—'}
+                      {s.price != null ? fmtCurrencyExact(s.price) : '—'}
                     </span>
                     <Delta value={s.change_pct} />
                   </div>
