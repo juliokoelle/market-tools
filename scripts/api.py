@@ -107,6 +107,7 @@ _TTL_CHART      = 900.0   # OHLC chart data (15 min)
 _TTL_AI_SUMMARY = 21600.0 # Sonnet summary (6 h)
 _TTL_PORTFOLIO  = 30.0    # portfolio positions (30 s)
 _TTL_NAME       = 1800.0  # company names (30 min)
+_TTL_FX         = 3600.0  # native->EUR FX rate (1 h)
 
 _PORTFOLIO_GH_PATH  = "20_Career/investments/portfolio-current.json"
 _WATCHLIST_GH_PATH  = "20_Career/investments/stock-watchlist.json"
@@ -125,6 +126,34 @@ def _cache_set(key: str, value: object) -> None:
 
 def _cache_del(key: str) -> None:
     _cache.pop(key, None)
+
+
+def _eur_rate(currency: str | None) -> tuple[float, bool]:
+    """Multiplikator native -> EUR. Rückgabe (rate, fx_ok). Gecacht (1h).
+
+    EUR -> 1.0. Sonst yfinance-Paar EUR{CUR}=X (z.B. EURUSD=X gibt EUR->USD),
+    Kehrwert ist native->EUR. Fehler/0 -> (1.0, False), damit nicht still falsch
+    gerechnet wird (Aufrufer kann fx_ok ins Payload spiegeln).
+    """
+    cur = (currency or "EUR").upper()
+    if cur == "EUR":
+        return 1.0, True
+    cache_key = f"fx:{cur}"
+    cached = _cache_get(cache_key, _TTL_FX)
+    if cached is not None:
+        return cached  # type: ignore[return-value]
+    import yfinance as yf
+    try:
+        fi = yf.Ticker(f"EUR{cur}=X").fast_info
+        eur_to_native = getattr(fi, "last_price", None)
+        if eur_to_native and eur_to_native > 0:
+            result = (1.0 / float(eur_to_native), True)
+        else:
+            result = (1.0, False)
+    except Exception:
+        result = (1.0, False)
+    _cache_set(cache_key, result)
+    return result
 
 
 # ---------------------------------------------------------------------------
