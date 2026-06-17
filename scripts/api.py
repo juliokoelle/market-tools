@@ -1450,22 +1450,30 @@ def stock_chart(
     if hasattr(df.columns, "levels"):
         df.columns = df.columns.get_level_values(0)
 
+    native_currency = None
+    try:
+        native_currency = getattr(yf.Ticker(ticker).fast_info, "currency", None)
+    except Exception:
+        pass
+    rate, fx_ok = _eur_rate(native_currency)
+
     rows = []
     for dt, row in df.iterrows():
         try:
             vol = row.get("Volume", 0)
             rows.append({
                 "date":   str(dt.date()),
-                "open":   round(float(row["Open"]), 2),
-                "high":   round(float(row["High"]), 2),
-                "low":    round(float(row["Low"]), 2),
-                "close":  round(float(row["Close"]), 2),
+                "open":   round(float(row["Open"])  * rate, 2),
+                "high":   round(float(row["High"])  * rate, 2),
+                "low":    round(float(row["Low"])   * rate, 2),
+                "close":  round(float(row["Close"]) * rate, 2),
                 "volume": int(vol) if vol == vol else 0,
             })
         except (ValueError, TypeError):
             continue  # skip rows with NaN OHLC values
 
-    result = {"ticker": ticker, "period": period, "ohlcv": rows}
+    result = {"ticker": ticker, "period": period, "currency": "EUR",
+              "fx_ok": fx_ok, "ohlcv": rows}
     _cache_set(cache_key, result)
     return result
 
