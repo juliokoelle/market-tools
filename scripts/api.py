@@ -1442,7 +1442,10 @@ def stock_detail(ticker: str):
         rate, fx_ok = _eur_rate(native_currency)
 
         def _eur(v):
-            return round(float(v) * rate, 2) if v is not None else None
+            try:
+                return round(float(v) * rate, 2) if v is not None else None
+            except (TypeError, ValueError):
+                return None
 
         detail = {
             **score_data,
@@ -1464,7 +1467,8 @@ def stock_detail(ticker: str):
     except Exception:
         detail = {**score_data, "name": ticker, "company_name": ticker,
                   "price": 0, "change_pct": 0, "pe_ratio": None,
-                  "week_52_high": None, "week_52_low": None}
+                  "week_52_high": None, "week_52_low": None,
+                  "currency": "EUR", "fx_ok": False}
 
     _cache_set(cache_key, detail)
     return detail
@@ -1585,7 +1589,7 @@ def stock_peers(ticker: str):
 
     with ThreadPoolExecutor(max_workers=12) as ex:
         sectors = {t: ex.submit(_ticker_sector, t) for t in universe}
-        same = [t for t in universe if sectors[t].result() == target_sector][:6]
+        same = [t for t in universe if sectors[t].result() == target_sector]
 
     if not same:
         result = {"ticker": ticker, "sector": target_sector, "peers": []}
@@ -1611,7 +1615,8 @@ def stock_peers(ticker: str):
             })
 
     peers.sort(key=lambda p: p["bull_score"], reverse=True)
-    result = {"ticker": ticker, "sector": target_sector, "peers": peers}
+    peers = peers[:6]
+    result = {"ticker": ticker, "sector": target_sector, "peers": peers, "currency": "EUR"}
     _cache_set(cache_key, result)
     return result
 
