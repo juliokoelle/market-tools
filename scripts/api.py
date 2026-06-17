@@ -1371,6 +1371,9 @@ def stock_detail(ticker: str):
         week_52_high = getattr(fast, "year_high", None)
         week_52_low  = getattr(fast, "year_low", None)
         market_cap   = getattr(fast, "market_cap", None)
+        native_currency = getattr(fast, "currency", None)
+        beta            = None
+        rel_volume      = None
         name         = ticker
         sector       = None
         pe_ratio     = None
@@ -1379,25 +1382,42 @@ def stock_detail(ticker: str):
             name         = info.get("longName") or info.get("shortName") or ticker
             sector       = info.get("sector")
             pe_ratio     = info.get("trailingPE")
+            beta         = info.get("beta")
+            native_currency = native_currency or info.get("currency")
             if not market_cap:
                 market_cap = info.get("marketCap")
             if not week_52_high:
                 week_52_high = info.get("fiftyTwoWeekHigh")
             if not week_52_low:
                 week_52_low = info.get("fiftyTwoWeekLow")
+            vol = info.get("volume") or info.get("regularMarketVolume")
+            avg = info.get("averageDailyVolume10Day") or info.get("averageVolume")
+            if vol and avg:
+                rel_volume = round(float(vol) / float(avg), 2)
         except Exception:
             pass
+
+        rate, fx_ok = _eur_rate(native_currency)
+
+        def _eur(v):
+            return round(float(v) * rate, 2) if v is not None else None
+
         detail = {
             **score_data,
-            "name":         name,
-            "company_name": name,
-            "price":        round(float(price), 2),
-            "change_pct":   round(float(chg), 2),
-            "pe_ratio":     pe_ratio,
-            "week_52_high": week_52_high,
-            "week_52_low":  week_52_low,
-            "sector":       sector,
-            "market_cap":   market_cap,
+            "name":            name,
+            "company_name":    name,
+            "price":           _eur(price) or 0,
+            "change_pct":      round(float(chg), 2),
+            "pe_ratio":        pe_ratio,
+            "week_52_high":    _eur(week_52_high),
+            "week_52_low":     _eur(week_52_low),
+            "sector":          sector,
+            "market_cap":      _eur(market_cap),
+            "native_currency": native_currency,
+            "currency":        "EUR",
+            "beta":            beta,
+            "rel_volume":      rel_volume,
+            "fx_ok":           fx_ok,
         }
     except Exception:
         detail = {**score_data, "name": ticker, "company_name": ticker,
