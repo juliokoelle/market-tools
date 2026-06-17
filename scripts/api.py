@@ -1315,6 +1315,37 @@ def _fetch_name(ticker: str) -> str:
     return name
 
 
+def _fetch_meta(ticker: str) -> dict:
+    """Name + currency aus einem info-Call. 30-min Cache."""
+    cache_key = f"meta:{ticker}"
+    cached = _cache_get(cache_key, _TTL_NAME)
+    if cached is not None:
+        return cached  # type: ignore[return-value]
+    import yfinance as yf
+    try:
+        info = yf.Ticker(ticker).info
+        meta = {"name": info.get("longName") or info.get("shortName") or ticker,
+                "currency": info.get("currency")}
+    except Exception:
+        meta = {"name": ticker, "currency": None}
+    _cache_set(cache_key, meta)
+    return meta
+
+
+def _ticker_sector(ticker: str) -> str | None:
+    cache_key = f"sector:{ticker}"
+    cached = _cache_get(cache_key, _TTL_NAME)
+    if cached is not None:
+        return cached or None
+    import yfinance as yf
+    try:
+        sector = yf.Ticker(ticker).info.get("sector")
+    except Exception:
+        sector = None
+    _cache_set(cache_key, sector or "")
+    return sector
+
+
 @app.get("/watchlist")
 def get_watchlist():
     from concurrent.futures import ThreadPoolExecutor
@@ -1334,16 +1365,27 @@ def get_watchlist():
 
     with ThreadPoolExecutor(max_workers=12) as executor:
         score_futures = {t: executor.submit(_score_one_ticker, t) for t in all_tickers}
-        name_futures  = {t: executor.submit(_fetch_name, t)        for t in all_tickers}
+        meta_futures  = {t: executor.submit(_fetch_meta, t)       for t in all_tickers}
         scores = {t: f.result() for t, f in score_futures.items()}
-        names  = {t: f.result() for t, f in name_futures.items()}
+        metas  = {t: f.result() for t, f in meta_futures.items()}
 
     result = []
     for cat in categories:
         items = []
         for t in cat["tickers"]:
             entry = scores.get(t, {"ticker": t, "bull_score": 50, "components": {}, "is_crypto": False})
-            items.append({**entry, "name": names.get(t, t)})
+            meta  = metas.get(t, {"name": t, "currency": None})
+            md    = (entry.get("components", {}).get("momentum", {}) or {}).get("details", {}) or {}
+            rate, _ = _eur_rate(meta.get("currency"))
+            price = md.get("price")
+            items.append({
+                **entry,
+                "name":       meta.get("name", t),
+                "price":      round(float(price) * rate, 2) if price else None,
+                "change_pct": md.get("change_pct"),
+                "spark":      md.get("spark", []),
+                "currency":   "EUR",
+            })
         result.append({"name": cat["name"], "tickers": items})
 
     return {"categories": result}
@@ -1519,6 +1561,57 @@ def stock_financials(ticker: str):
         rows = []
 
     result = {"ticker": ticker, "currency": "EUR", "fx_ok": fx_ok, "rows": rows}
+    _cache_set(cache_key, result)
+    return result
+
+
+@app.get("/stock/{ticker}/peers")
+def stock_peers(ticker: str):
+    from concurrent.futures import ThreadPoolExecutor
+    ticker = ticker.upper()
+    cache_key = f"peers:{ticker}"
+    cached = _cache_get(cache_key, _TTL_BULL_SCORE)
+    if cached is not None:
+        return cached
+
+    target_sector = _ticker_sector(ticker)
+    universe = sorted({t.upper() for cat in _load_watchlist_categories() for t in cat["tickers"]})
+    universe = [t for t in universe if t != ticker]
+
+    if not target_sector:
+        result = {"ticker": ticker, "sector": None, "peers": []}
+        _cache_set(cache_key, result)
+        return result
+
+    with ThreadPoolExecutor(max_workers=12) as ex:
+        sectors = {t: ex.submit(_ticker_sector, t) for t in universe}
+        same = [t for t in universe if sectors[t].result() == target_sector][:6]
+
+    if not same:
+        result = {"ticker": ticker, "sector": target_sector, "peers": []}
+        _cache_set(cache_key, result)
+        return result
+
+    with ThreadPoolExecutor(max_workers=12) as ex:
+        score_f = {t: ex.submit(_score_one_ticker, t) for t in same}
+        meta_f  = {t: ex.submit(_fetch_meta, t)        for t in same}
+        peers = []
+        for t in same:
+            sd = score_f[t].result()
+            md = (sd.get("components", {}).get("momentum", {}) or {}).get("details", {}) or {}
+            meta = meta_f[t].result()
+            rate, _ = _eur_rate(meta.get("currency"))
+            price = md.get("price")
+            peers.append({
+                "ticker":     t,
+                "name":       meta.get("name", t),
+                "bull_score": sd.get("bull_score", 50),
+                "price":      round(float(price) * rate, 2) if price else None,
+                "change_pct": md.get("change_pct"),
+            })
+
+    peers.sort(key=lambda p: p["bull_score"], reverse=True)
+    result = {"ticker": ticker, "sector": target_sector, "peers": peers}
     _cache_set(cache_key, result)
     return result
 
