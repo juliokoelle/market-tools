@@ -1478,6 +1478,51 @@ def stock_chart(
     return result
 
 
+@app.get("/stock/{ticker}/financials")
+def stock_financials(ticker: str):
+    ticker = ticker.upper()
+    cache_key = f"financials:{ticker}"
+    cached = _cache_get(cache_key, _TTL_CHART)
+    if cached is not None:
+        return cached
+
+    import yfinance as yf
+    yf_ticker = yf.Ticker(ticker)
+    native_currency = None
+    try:
+        native_currency = getattr(yf_ticker.fast_info, "currency", None)
+    except Exception:
+        pass
+    rate, fx_ok = _eur_rate(native_currency)
+
+    def _row_val(stmt, keys, col):
+        for k in keys:
+            if k in stmt.index:
+                v = stmt.loc[k, col]
+                if v == v and v is not None:  # not NaN
+                    return round(float(v) * rate, 0)
+        return None
+
+    rows = []
+    try:
+        stmt = yf_ticker.income_stmt
+        if stmt is not None and not stmt.empty:
+            for col in stmt.columns:
+                rows.append({
+                    "year":       int(getattr(col, "year", 0)) or str(col)[:4],
+                    "revenue":    _row_val(stmt, ["Total Revenue"], col),
+                    "ebitda":     _row_val(stmt, ["EBITDA", "Normalized EBITDA"], col),
+                    "net_income": _row_val(stmt, ["Net Income", "Net Income Common Stockholders"], col),
+                })
+            rows = sorted(rows, key=lambda r: str(r["year"]))
+    except Exception:
+        rows = []
+
+    result = {"ticker": ticker, "currency": "EUR", "fx_ok": fx_ok, "rows": rows}
+    _cache_set(cache_key, result)
+    return result
+
+
 @app.get("/stock/{ticker}/ai-summary")
 def stock_ai_summary(ticker: str):
     ticker = ticker.upper()
