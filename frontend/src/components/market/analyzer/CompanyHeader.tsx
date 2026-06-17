@@ -14,7 +14,7 @@ export function CompanyHeader({ detail, onWatch, onAddPortfolio }: {
   onAddPortfolio?: () => void
 }) {
   const navigate = useNavigate()
-  const pos = detail.week_52_low && detail.week_52_high
+  const pos = detail.week_52_low > 0 && detail.week_52_high > 0
     ? range52Position(detail.week_52_low, detail.week_52_high, detail.price) : 0
   return (
     <Panel>
@@ -41,7 +41,7 @@ export function CompanyHeader({ detail, onWatch, onAddPortfolio }: {
         <Stat label="P/E" value={detail.pe_ratio != null ? fmtNumber(detail.pe_ratio, 1) : '—'} />
       </div>
 
-      {detail.week_52_low && detail.week_52_high ? (
+      {detail.week_52_low > 0 && detail.week_52_high > 0 ? (
         <div style={{ marginTop: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.7rem', color: 'var(--text-3)' }}>
             <span>{fmtCurrencyExact(detail.week_52_low)}</span>

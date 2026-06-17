@@ -52,7 +52,7 @@ export function PriceChart({ ticker }: { ticker: string }) {
               </defs>
               <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-3)' }} minTickGap={40} />
               <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} width={50} domain={['auto', 'auto']}
-                tickFormatter={(v: number) => fmtCurrencyExact(v)} />
+                tickFormatter={(v) => typeof v === 'number' ? fmtCurrencyExact(v) : String(v)} />
               <Tooltip formatter={(v) => typeof v === 'number' ? fmtCurrencyExact(v) : String(v)} />
               <Area type="monotone" dataKey="close" stroke="var(--brand)" strokeWidth={2} fill="url(#priceFill)" />
             </AreaChart>
