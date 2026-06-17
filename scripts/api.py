@@ -1323,9 +1323,19 @@ def _fetch_meta(ticker: str) -> dict:
         return cached  # type: ignore[return-value]
     import yfinance as yf
     try:
-        info = yf.Ticker(ticker).info
-        meta = {"name": info.get("longName") or info.get("shortName") or ticker,
-                "currency": info.get("currency")}
+        yt = yf.Ticker(ticker)
+        currency = None
+        try:
+            currency = getattr(yt.fast_info, "currency", None)  # reliable on cloud
+        except Exception:
+            pass
+        try:
+            info = yt.info
+            name = info.get("longName") or info.get("shortName") or ticker
+            currency = currency or info.get("currency")
+        except Exception:
+            name = ticker
+        meta = {"name": name, "currency": currency}
     except Exception:
         meta = {"name": ticker, "currency": None}
     _cache_set(cache_key, meta)
@@ -1376,12 +1386,14 @@ def get_watchlist():
             entry = scores.get(t, {"ticker": t, "bull_score": 50, "components": {}, "is_crypto": False})
             meta  = metas.get(t, {"name": t, "currency": None})
             md    = (entry.get("components", {}).get("momentum", {}) or {}).get("details", {}) or {}
-            rate, _ = _eur_rate(meta.get("currency"))
+            cur = meta.get("currency")
+            rate, _ = _eur_rate(cur)
             price = md.get("price")
+            price_eur = round(float(price) * rate, 2) if (price and cur) else None
             items.append({
                 **entry,
                 "name":       meta.get("name", t),
-                "price":      round(float(price) * rate, 2) if price else None,
+                "price":      price_eur,
                 "change_pct": md.get("change_pct"),
                 "spark":      md.get("spark", []),
                 "currency":   "EUR",
@@ -1560,6 +1572,7 @@ def stock_financials(ticker: str):
                     "ebitda":     _row_val(stmt, ["EBITDA", "Normalized EBITDA"], col),
                     "net_income": _row_val(stmt, ["Net Income", "Net Income Common Stockholders"], col),
                 })
+            rows = [r for r in rows if any(r[k] is not None for k in ("revenue", "ebitda", "net_income"))]
             rows = sorted(rows, key=lambda r: str(r["year"]))
     except Exception:
         rows = []
@@ -1604,13 +1617,14 @@ def stock_peers(ticker: str):
             sd = score_f[t].result()
             md = (sd.get("components", {}).get("momentum", {}) or {}).get("details", {}) or {}
             meta = meta_f[t].result()
-            rate, _ = _eur_rate(meta.get("currency"))
+            cur = meta.get("currency")
+            rate, _ = _eur_rate(cur)
             price = md.get("price")
             peers.append({
                 "ticker":     t,
                 "name":       meta.get("name", t),
                 "bull_score": sd.get("bull_score", 50),
-                "price":      round(float(price) * rate, 2) if price else None,
+                "price":      round(float(price) * rate, 2) if (price and cur) else None,
                 "change_pct": md.get("change_pct"),
             })
 
