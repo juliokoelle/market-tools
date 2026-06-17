@@ -88,12 +88,18 @@ def _momentum_score(ticker: str) -> tuple[float, dict]:
         s90 = _return_to_score(ret_90d, scale=0.25)
         score = s30 * 0.40 + s90 * 0.30 + ma_score * 0.30
 
+        day_change = None
+        if len(close) >= 2 and float(close.iloc[-2]):
+            day_change = round((price / float(close.iloc[-2]) - 1.0) * 100, 2)
+        spark = [round(float(c), 2) for c in close.iloc[-30:].tolist()]
         return round(score, 1), {
             "return_30d":  round(ret_30d * 100, 1) if ret_30d is not None else None,
             "return_90d":  round(ret_90d * 100, 1) if ret_90d is not None else None,
             "above_ma50":  above_50,
             "above_ma200": above_200,
             "price":       round(price, 2),
+            "change_pct":  day_change,
+            "spark":       spark,
         }
     except Exception as exc:
         return 50.0, {"error": str(exc)}
