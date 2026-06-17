@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { getPortfolio, savePortfolio, analyzePortfolio, getMarketPrices, getMarketNames, getStockDetail, searchTickers, getStockWatchlist, addStockToWatchlist, removeStockFromWatchlist, getAllocation, getPortfolioPerformance, type Position, type PortfolioAnalysis, type StockDetail, type AllocationData, type PerfData } from '../services/api'
+import { getPortfolio, savePortfolio, analyzePortfolio, getMarketPrices, getStockDetail, searchTickers, getStockWatchlist, addStockToWatchlist, removeStockFromWatchlist, getAllocation, getPortfolioPerformance, type Position, type PortfolioAnalysis, type StockDetail, type AllocationData, type PerfData } from '../services/api'
+import WatchlistPanel from '../components/market/portfolio/WatchlistPanel'
 import { computePnl, MetricStrip, PerformancePanel, AllocationDonut, RiskPanel, HoldingsTable } from '../components/market/portfolio-panels'
 import { parseNum } from '../lib/parseNum'
 import { normalizeTicker } from '../lib/ticker'
@@ -342,10 +343,6 @@ export default function Portfolio() {
   // ── Watchlist (backed by /stock-watchlist API) ──
   const [watchlist, setWatchlist] = useState<string[]>([])
   const [watchLoading, setWatchLoading] = useState(true)
-  const [watchPrices, setWatchPrices] = useState<Record<string, { price: number; change_pct: number }>>({})
-  const [watchNames, setWatchNames]   = useState<Record<string, string>>({})
-  const [watchInput, setWatchInput]   = useState('')
-  const watchInputRef = useRef<HTMLDivElement>(null)
   const [transferTicker, setTransferTicker] = useState<{ ticker: string; price: number } | null>(null)
 
   // ── Detail modal ──
@@ -429,19 +426,6 @@ export default function Portfolio() {
       .catch(() => setWatchlist([]))
       .finally(() => setWatchLoading(false))
   }, [])
-
-  useEffect(() => {
-    if (!watchlist.length) return
-    getMarketNames(watchlist).then(setWatchNames).catch(() => {})
-  }, [watchlist])
-
-  useEffect(() => {
-    if (!watchlist.length) return
-    const load = () => getMarketPrices(watchlist.join(',')).then(setWatchPrices).catch(() => {})
-    load()
-    const id = setInterval(load, 60_000)
-    return () => clearInterval(id)
-  }, [watchlist])
 
   // Holdings helpers
   function addRow()                                 { setPositions(p => [...p, { ticker: '', investment: 0 }]) }
@@ -554,12 +538,11 @@ export default function Portfolio() {
   // Watchlist helpers (API-backed)
   async function addToWatchlist(ticker: string) {
     const t = ticker.trim().toUpperCase()
-    if (!t || watchlist.includes(t)) { setWatchInput(''); return }
+    if (!t || watchlist.includes(t)) return
     try {
       await addStockToWatchlist(t)
       setWatchlist(w => [...w, t])
     } catch { showToast('Failed to add ticker') }
-    setWatchInput('')
   }
 
   async function removeFromWatchlist(ticker: string) {
@@ -712,113 +695,16 @@ export default function Portfolio() {
 
       {/* ── Watchlist tab ── */}
       {tab === 'watchlist' && (
-        <div>
-          {/* Add ticker row */}
-          <div className="card" style={{ marginBottom: '1rem', padding: '1rem 1.25rem' }}>
-            <div style={{ display: 'flex', gap: '.75rem', alignItems: 'center' }}>
-              <div ref={watchInputRef} style={{ position: 'relative', flex: 1 }}>
-                <input
-                  value={watchInput}
-                  onChange={e => setWatchInput(e.target.value.toUpperCase().replace(/\s/g, ''))}
-                  onKeyDown={e => { if (e.key === 'Enter') addToWatchlist(watchInput) }}
-                  placeholder="Search ticker (e.g. AAPL)"
-                  autoComplete="off"
-                  spellCheck={false}
-                  style={inputStyle}
-                />
-                {watchInput.length >= 1 && (() => {
-                  const matches = UNIVERSE.filter(t => t.startsWith(watchInput)).slice(0, 6)
-                  if (!matches.length) return null
-                  return (
-                    <ul className="dropdown-list" style={{
-                      position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 50,
-                      background: 'var(--surface)', border: '1px solid var(--border)',
-                      borderRadius: 'var(--radius-sm)', boxShadow: 'var(--shadow)',
-                      listStyle: 'none', margin: 0, padding: '.25rem 0',
-                    }}>
-                      {matches.map(s => (
-                        <li key={s}
-                          onMouseDown={e => { e.preventDefault(); addToWatchlist(s) }}
-                          style={{ padding: '.4rem .75rem', fontSize: '.875rem', cursor: 'pointer', color: 'var(--text)' }}
-                        >{s}</li>
-                      ))}
-                    </ul>
-                  )
-                })()}
-              </div>
-              <button onClick={() => addToWatchlist(watchInput)} className="btn btn-outline" style={{ fontSize: '.8rem', flexShrink: 0 }}>
-                + Add
-              </button>
-            </div>
-          </div>
-
-          {/* Watchlist rows */}
-          <div className="card table-scroll" style={{ padding: 0 }}>
-            {watchLoading ? (
-              <p style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-3)', fontSize: '.875rem' }}>Loading…</p>
-            ) : watchlist.length === 0 ? (
-              <p style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-3)', fontSize: '.875rem' }}>
-                Your watchlist is empty. Search for a ticker above to add.
-              </p>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
-                    {['Stock', 'Price', 'Change', ''].map(h => (
-                      <th key={h} style={{ padding: '.75rem 1.25rem', textAlign: 'left', fontSize: '.65rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.06em' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {watchlist.map((ticker, i) => {
-                    const d = watchPrices[ticker]
-                    const inPortfolio = portfolioTickers.has(ticker)
-                    return (
-                      <tr key={ticker} style={{ borderBottom: i < watchlist.length - 1 ? '1px solid var(--border)' : 'none' }}>
-                        <td style={{ padding: '.85rem 1.25rem', fontWeight: 600, fontSize: '.875rem' }}>
-                          <a href={`https://finance.yahoo.com/quote/${encodeURIComponent(ticker)}`} target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'none' }}>
-                            {watchNames[ticker] && watchNames[ticker] !== ticker
-                              ? `${watchNames[ticker]} — ${ticker}`
-                              : ticker}
-                          </a>
-                        </td>
-                        <td style={{ padding: '.85rem 1.25rem', fontSize: '.9rem', color: 'var(--text-2)' }}>
-                          {d ? `$${d.price.toFixed(2)}` : <span style={{ color: 'var(--text-3)' }}>···</span>}
-                        </td>
-                        <td style={{ padding: '.85rem 1.25rem' }}>
-                          {d ? (
-                            <span style={{ fontSize: '.8rem', fontWeight: 700, color: d.change_pct >= 0 ? 'var(--positive)' : 'var(--negative)' }}>
-                              {d.change_pct >= 0 ? '+' : ''}{d.change_pct.toFixed(2)}%
-                            </span>
-                          ) : <span style={{ color: 'var(--text-3)', fontSize: '.8rem' }}>···</span>}
-                        </td>
-                        <td style={{ padding: '.85rem 1.25rem' }}>
-                          <div style={{ display: 'flex', gap: '.5rem', justifyContent: 'flex-end' }}>
-                            {inPortfolio ? (
-                              <span className="badge badge-teal" style={{ fontSize: '.65rem' }}>In Portfolio</span>
-                            ) : (
-                              <button
-                                onClick={() => setTransferTicker({ ticker, price: d?.price ?? 0 })}
-                                className="btn btn-outline"
-                                style={{ fontSize: '.75rem', padding: '.3rem .65rem' }}
-                              >
-                                → Portfolio
-                              </button>
-                            )}
-                            <button
-                              onClick={() => removeFromWatchlist(ticker)}
-                              style={{ background: 'none', border: 'none', color: 'var(--text-3)', fontSize: '1rem', cursor: 'pointer', padding: '.2rem .4rem', borderRadius: 4 }}
-                            >×</button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
+        <WatchlistPanel
+          tickers={watchlist}
+          portfolioTickers={portfolioTickers}
+          loading={watchLoading}
+          universe={UNIVERSE}
+          inputStyle={inputStyle}
+          onAdd={addToWatchlist}
+          onRemove={removeFromWatchlist}
+          onTransfer={setTransferTicker}
+        />
       )}
 
       {detailTicker && <HoldingDetailModal ticker={detailTicker} onClose={() => setDetailTicker(null)} />}
