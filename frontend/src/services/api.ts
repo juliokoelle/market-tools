@@ -119,14 +119,15 @@ export const getWatchlist = () =>
       stocks: (cat.tickers ?? []).map((t: any): StockDetail => ({
         ticker: t.ticker,
         name: t.name ?? t.ticker,
-        price: t.components?.momentum?.details?.price ?? 0,
-        change_pct: 0,
+        price: t.price ?? 0,
+        change_pct: t.change_pct ?? 0,
         bull_score: t.bull_score ?? 50,
         sector: '',
         market_cap: 0,
         pe_ratio: null,
         week_52_high: 0,
         week_52_low: 0,
+        spark: t.spark ?? [],
         components: {
           momentum:  t.components?.momentum?.score  ?? 50,
           sentiment: t.components?.sentiment?.score ?? 50,
@@ -149,6 +150,10 @@ export const getStockDetail = (ticker: string) =>
     pe_ratio: d.pe_ratio ?? null,
     week_52_high: d.week_52_high ?? 0,
     week_52_low: d.week_52_low ?? 0,
+    native_currency: d.native_currency ?? null,
+    currency: d.currency ?? 'EUR',
+    beta: d.beta ?? null,
+    rel_volume: d.rel_volume ?? null,
     components: {
       momentum:  d.components?.momentum?.score  ?? 50,
       sentiment: d.components?.sentiment?.score ?? 50,
@@ -165,6 +170,12 @@ export const getStockChart = (ticker: string, period: string) =>
 
 export const getStockAiSummary = (ticker: string) =>
   get<{ summary: string }>(`/stock/${ticker}/ai-summary`)
+
+export const getStockFinancials = (ticker: string) =>
+  get<StockFinancials>(`/stock/${ticker}/financials`)
+
+export const getStockPeers = (ticker: string) =>
+  get<PeersResponse>(`/stock/${ticker}/peers`).then(d => d.peers ?? [])
 
 export const getTickerProfile = (ticker: string) =>
   get<TickerProfile>(`/ticker/${ticker}/profile`)
@@ -206,6 +217,9 @@ export interface StockDetail {
   ticker: string; name: string; price: number; change_pct: number
   bull_score: number; sector: string; market_cap: number
   pe_ratio: number | null; week_52_high: number; week_52_low: number
+  native_currency?: string | null; currency?: string
+  beta?: number | null; rel_volume?: number | null
+  spark?: number[]
   components: { momentum: number; sentiment: number; valuation: number; analyst: number }
 }
 export interface ChartPoint { date: string; open: number; high: number; low: number; close: number; volume: number }
@@ -214,3 +228,7 @@ export interface TickerProfile {
   market_cap: number; description: string; website: string
   employees: number; country: string
 }
+export interface FinancialsRow { year: number | string; revenue: number | null; ebitda: number | null; net_income: number | null }
+export interface StockFinancials { ticker: string; currency: string; fx_ok: boolean; rows: FinancialsRow[] }
+export interface PeerRow { ticker: string; name: string; bull_score: number; price: number | null; change_pct: number | null }
+export interface PeersResponse { ticker: string; sector: string | null; peers: PeerRow[] }
