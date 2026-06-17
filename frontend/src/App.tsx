@@ -10,6 +10,7 @@ import Briefing from './pages/Briefing'
 import Portfolio from './pages/Portfolio'
 import HotStocks from './pages/HotStocks'
 import Analyzer from './pages/Analyzer'
+import AnalyzerDetail from './pages/AnalyzerDetail'
 import Ideas from './pages/Ideas'
 import Training from './pages/Training'
 import Podcasts from './pages/Podcasts'
@@ -38,6 +39,7 @@ export default function App() {
               <Route path="/market/portfolio" element={<Portfolio />} />
               <Route path="/market/hot-stocks" element={<HotStocks />} />
               <Route path="/market/analyzer" element={<Analyzer />} />
+              <Route path="/market/analyzer/:symbol" element={<AnalyzerDetail />} />
               <Route path="/ideas" element={<Ideas />} />
               <Route path="/life/training" element={<Training />} />
               <Route path="/life/podcasts" element={<Podcasts />} />
