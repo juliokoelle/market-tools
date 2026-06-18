@@ -254,17 +254,17 @@ function TransferModal({ ticker, price, onConfirm, onCancel }: {
         <label style={labelStyle}>Investment amount (€)</label>
         <input
           autoFocus
-          type="number"
-          min="1"
+          type="text"
+          inputMode="decimal"
           value={amount}
           onChange={e => setAmount(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') { const n = parseFloat(amount); if (n > 0) onConfirm(n) } }}
+          onKeyDown={e => { if (e.key === 'Enter') { const n = parseNum(amount); if (n > 0) onConfirm(n) } }}
           placeholder="e.g. 500"
           style={{ ...inputStyle, marginTop: '.35rem', marginBottom: '1rem' }}
         />
         <div style={{ display: 'flex', gap: '.75rem' }}>
           <button
-            onClick={() => { const n = parseFloat(amount); if (n > 0) onConfirm(n) }}
+            onClick={() => { const n = parseNum(amount); if (n > 0) onConfirm(n) }}
             className="btn btn-primary" style={{ flex: 1, justifyContent: 'center' }}
           >Add to Portfolio</button>
           <button onClick={onCancel} className="btn btn-outline" style={{ flex: 1, justifyContent: 'center' }}>Cancel</button>
@@ -640,10 +640,11 @@ export default function Portfolio() {
                     style={inputStyle}
                   />
                   <input
-                    key={`v${i}`}
-                    type="number"
-                    value={p.investment || ''}
-                    onChange={e => updateInvestment(i, parseFloat(e.target.value) || 0)}
+                    key={`v${i}-${p.investment}`}
+                    type="text"
+                    inputMode="decimal"
+                    defaultValue={p.investment || ''}
+                    onBlur={e => updateInvestment(i, parseNum(e.target.value) || 0)}
                     placeholder="5000"
                     style={inputStyle}
                   />
