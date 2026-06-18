@@ -1,0 +1,18 @@
+# Coolify-Deployment: FastAPI-Backend + Telegram-Bot aus EINEM Image.
+# Beide Services teilen sich das via Dockerfile gebaute Image (build: .),
+# nur das Start-Kommando unterscheidet sich.
+# Env-Vars werden in der Coolify-UI gesetzt (NICHT hier committen).
+services:
+  backend:
+    build: .
+    command: uvicorn scripts.api:app --host 0.0.0.0 --port 8000
+    restart: unless-stopped
+    # Coolify mappt die öffentliche Domain auf diesen Port.
+    expose:
+      - "8000"
+
+  telegram-bot:
+    build: .
+    command: python -m scripts.telegram_bot
+    restart: unless-stopped
+    # Kein Port: Polling-Bot, braucht keinen eingehenden Verkehr.
