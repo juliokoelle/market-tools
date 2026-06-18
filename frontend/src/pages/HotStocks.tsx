@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { getHotStocks, type StockRow } from '../services/api'
-
-type Tab = 'gainers' | 'losers' | 'bull_high' | 'bull_low'
+import { getHotStocks } from '../services/api'
+import type { Tab, HotStockRow } from '../components/market/hot-stocks/hot-data'
+import HotStockList from '../components/market/hot-stocks/HotStockList'
 
 const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'gainers',   label: 'Top Gainers',       icon: '📈' },
@@ -10,25 +10,22 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
   { id: 'bull_low',  label: 'Lowest Bull Score',  icon: '🐻' },
 ]
 
-let _cache: { data: Record<Tab, StockRow[]>; ts: number } | null = null
+type TabData = Record<Tab, HotStockRow[]>
+const EMPTY: TabData = { gainers: [], losers: [], bull_high: [], bull_low: [] }
+
+let _cache: { data: TabData; ts: number } | null = null
 const CACHE_TTL = 5 * 60 * 1000
 
 export default function HotStocks() {
-  const [data, setData] = useState<Record<Tab, StockRow[]>>(
-    () => _cache ? _cache.data : { gainers: [], losers: [], bull_high: [], bull_low: [] }
-  )
-  const [tab, setTab]     = useState<Tab>('gainers')
+  const [data, setData] = useState<TabData>(() => (_cache ? _cache.data : EMPTY))
+  const [tab, setTab] = useState<Tab>('gainers')
   const [loading, setLoading] = useState(!_cache)
 
   function load(force = false) {
     if (!force && _cache && Date.now() - _cache.ts < CACHE_TTL) return
     setLoading(true)
     getHotStocks()
-      .then(d => {
-        const typed = d as Record<Tab, StockRow[]>
-        _cache = { data: typed, ts: Date.now() }
-        setData(typed)
-      })
+      .then(d => { _cache = { data: d, ts: Date.now() }; setData(d) })
       .catch(() => {})
       .finally(() => setLoading(false))
   }
@@ -56,44 +53,14 @@ export default function HotStocks() {
       </div>
 
       {loading ? (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
+        <div className="card" style={{ padding: 0 }}>
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="card" style={{ height: 110, background: 'var(--surface-alt)', animation: `pulse 1.4s ease-in-out ${i * 120}ms infinite` }} />
+            <div key={i} style={{ height: 58, borderBottom: i < 4 ? '1px solid var(--border)' : 'none', background: 'var(--surface-alt)', animation: `pulse 1.4s ease-in-out ${i * 120}ms infinite` }} />
           ))}
         </div>
-      ) : rows.length === 0 ? (
-        <p style={{ color: 'var(--text-3)', fontSize: '.875rem', padding: '2rem 0' }}>No data available.</p>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '1rem' }}>
-          {rows.map((s, i) => (
-            <a key={s.ticker} href={`https://finance.yahoo.com/quote/${s.ticker}`} target="_blank" rel="noopener noreferrer"
-              className="card stock-card"
-              style={{ display: 'flex', flexDirection: 'column', gap: '.5rem', padding: '1rem', textDecoration: 'none', animationDelay: `${i * 40}ms` }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: '.68rem', fontWeight: 700, color: 'var(--text-3)', textTransform: 'uppercase', letterSpacing: '.04em' }}>#{i + 1}</span>
-                <span style={{ color: s.change_pct >= 0 ? '#059669' : '#dc2626', fontWeight: 700, fontSize: '.85rem' }}>
-                  {s.change_pct >= 0 ? '+' : ''}{s.change_pct.toFixed(2)}%
-                </span>
-              </div>
-              <div>
-                <p style={{ fontWeight: 700, fontSize: '.9rem', color: 'var(--teal)' }}>{s.ticker}</p>
-                {s.name !== s.ticker && (
-                  <p style={{ fontSize: '.78rem', color: 'var(--text-3)', marginTop: '.1rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</p>
-                )}
-              </div>
-              <p style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--text)' }}>${s.price.toFixed(2)}</p>
-              {tab.startsWith('bull') && s.bull_score !== undefined && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '.5rem', marginTop: '.25rem' }}>
-                  <div style={{ flex: 1, height: 5, background: 'var(--border)', borderRadius: 3, overflow: 'hidden' }}>
-                    <div style={{ width: `${s.bull_score}%`, height: '100%', borderRadius: 3,
-                      background: s.bull_score > 60 ? '#059669' : s.bull_score > 40 ? '#d97706' : '#dc2626' }} />
-                  </div>
-                  <span style={{ fontSize: '.75rem', fontWeight: 600, minWidth: 24 }}>{s.bull_score}</span>
-                </div>
-              )}
-            </a>
-          ))}
+        <div className="table-scroll">
+          <HotStockList rows={rows} />
         </div>
       )}
     </main>
