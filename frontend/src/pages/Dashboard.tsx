@@ -1,153 +1,94 @@
+// Market-Dashboard (Phase 6) — zentrale Übersicht aller Market-Tabs.
+// Hero-Metric-Strip + 2-Spalten-Grid mit Kurzüberblicken, die in die Detail-Tabs verlinken.
+// Nur echte Daten aus vorhandenen Endpoints; jede Quelle lädt unabhängig (graceful degradation).
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getMarketPrices, getBriefingPreview } from '../services/api'
-import { LoadingOverlay } from '../components/LoadingOverlay'
+import {
+  getPortfolio, getMarketPrices, getHotStocks, getWatchlist, getBriefingPreview,
+  type WatchlistCategory, type StockDetail, type Position,
+} from '../services/api'
+import { computePnl, type PnlStats } from '../components/market/portfolio-panels'
+import type { Tab, HotStockRow } from '../components/market/hot-stocks/hot-data'
+import { topPositions, topMovers } from '../components/market/dashboard/dashboard-data'
+import { HeroStrip } from '../components/market/dashboard/HeroStrip'
+import { PortfolioSnapshot } from '../components/market/dashboard/PortfolioSnapshot'
+import { HotStocksRadar } from '../components/market/dashboard/HotStocksRadar'
+import { WatchlistMovers } from '../components/market/dashboard/WatchlistMovers'
 
-const MARKET_TICKERS = '^GSPC,GC=F,EURUSD=X,CL=F,^VIX'
-const TICKER_META: Record<string, { label: string; unit: string; prefix: string }> = {
-  '^GSPC':   { label: 'S&P 500',  unit: 'pts',    prefix: '' },
-  'GC=F':    { label: 'Gold',     unit: 'USD/oz', prefix: '$' },
-  'EURUSD=X':{ label: 'EUR/USD',  unit: '',       prefix: '' },
-  'CL=F':    { label: 'Brent',    unit: 'USD/bbl',prefix: '$' },
-  '^VIX':    { label: 'VIX',      unit: '',       prefix: '' },
-}
-
-function formatPrice(ticker: string, price: number) {
-  const m = TICKER_META[ticker]
-  if (!m) return price.toFixed(2)
-  if (ticker === 'EURUSD=X') return price.toFixed(4)
-  if (ticker === '^GSPC') return m.prefix + price.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
-  return m.prefix + price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-}
-
-function ChangePill({ v }: { v: number }) {
-  const pos = v >= 0
-  return (
-    <span className={`badge ${pos ? 'badge-teal' : 'badge-red'}`} style={pos ? {} : { background: '#fee2e2', color: '#991b1b' }}>
-      {pos ? '▲' : '▼'} {Math.abs(v).toFixed(2)}%
-    </span>
-  )
-}
-
-function MarketStatCard({ ticker, data }: { ticker: string; data?: { price: number; change_pct: number } }) {
-  const meta = TICKER_META[ticker]
-  return (
-    <div className="card card-sm">
-      <p className="stat-label">{meta?.label ?? ticker}</p>
-      {data ? (
-        <>
-          <p className="stat-num" style={{ fontSize: '1.6rem', marginTop: '.4rem' }}>
-            {formatPrice(ticker, data.price)}
-          </p>
-          <div style={{ marginTop: '.6rem' }}>
-            <ChangePill v={data.change_pct} />
-          </div>
-          {meta?.unit && (
-            <p style={{ fontSize: '.65rem', color: 'var(--text-3)', marginTop: '.35rem' }}>{meta.unit}</p>
-          )}
-        </>
-      ) : (
-        <div style={{ height: 52, marginTop: '.4rem', background: 'var(--border-soft)', borderRadius: 8, animation: 'pulse 1.4s infinite' }} />
-      )}
-    </div>
-  )
-}
-
-const QUICK_LINKS = [
-  { to: '/market/portfolio',  label: 'Portfolio',      desc: 'Analyze your holdings'      },
-  { to: '/market/hot-stocks', label: 'Hot Stocks',     desc: 'Top movers & gainers'       },
-  { to: '/market/analyzer',   label: 'Stock Analyzer', desc: 'Watchlist & bull scores'    },
-  { to: '/market/briefing',   label: 'Full Briefing',  desc: "Today's economic analysis"  },
-]
+type Quote = { price: number; change_pct: number }
 
 export default function Dashboard() {
-  const [prices, setPrices] = useState<Record<string, { price: number; change_pct: number }>>({})
+  const [pnl, setPnl] = useState<PnlStats | null>(null)
+  const [market, setMarket] = useState<Record<string, Quote>>({})
+  const [tabs, setTabs] = useState<Record<Tab, HotStockRow[]> | null>(null)
+  const [movers, setMovers] = useState<StockDetail[]>([])
   const [preview, setPreview] = useState<{ preview: string; date: string } | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([
-      getMarketPrices(MARKET_TICKERS).then(setPrices).catch(() => {}),
-      getBriefingPreview().then(setPreview).catch(() => {}),
-    ]).finally(() => setLoading(false))
+    // Portfolio + Kurse (inkl. Indizes) in einem Marktdaten-Call.
+    const portfolioFlow = getPortfolio()
+      .then(async pf => {
+        const tickers = pf.positions.map((p: Position) => p.ticker).filter(Boolean)
+        const all = Array.from(new Set([...tickers, '^GSPC', '^VIX'])).join(',')
+        const prices = await getMarketPrices(all).catch(() => ({} as Record<string, Quote>))
+        setMarket(prices)
+        setPnl(computePnl(pf.positions, prices))
+      })
+      .catch(() => {})
+
+    const hotFlow = getHotStocks().then(setTabs).catch(() => {})
+    const watchFlow = getWatchlist()
+      .then((cats: WatchlistCategory[]) => setMovers(topMovers(cats)))
+      .catch(() => {})
+    const briefingFlow = getBriefingPreview().then(setPreview).catch(() => {})
+
+    Promise.allSettled([portfolioFlow, hotFlow, watchFlow, briefingFlow]).finally(() => setLoading(false))
   }, [])
 
-  const tickers = MARKET_TICKERS.split(',')
-  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  const snapshot = pnl ? topPositions(pnl) : []
 
   return (
     <main className="page page-enter">
-      {/* Header */}
-      <div className="page-header" style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-        <div>
-          <h1 className="page-title">Dashboard</h1>
-          <p className="page-subtitle">{today}</p>
-        </div>
-      </div>
+      <HeroStrip
+        totalValue={pnl?.totalValue ?? 0}
+        totalPnl={pnl?.totalPnl ?? 0}
+        totalPnlPct={pnl?.totalPnlPct ?? 0}
+        anyPnl={pnl?.anyPnl ?? false}
+        sp={market['^GSPC']}
+        vix={market['^VIX']}
+      />
 
-      {/* Market snapshot */}
-      <div style={{ position: 'relative', marginBottom: '1.5rem', borderRadius: 'var(--radius)' }}>
-        <LoadingOverlay visible={loading} />
-        <div className="grid-5">
-          {tickers.map(t => (
-            <MarketStatCard key={t} ticker={t} data={prices[t]} />
-          ))}
-        </div>
-      </div>
-
-      {/* Briefing + Quick links */}
-      <div className="grid-main-sidebar" style={{ marginBottom: '1.5rem' }}>
-        {/* Briefing preview */}
-        <div className="card">
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <div>
-              <p className="stat-label">Today's Briefing</p>
-              {preview && <p style={{ fontSize: '.75rem', color: 'var(--text-3)', marginTop: '.2rem' }}>{preview.date}</p>}
-            </div>
-            <Link to="/market/briefing" className="btn btn-outline">Read full →</Link>
-          </div>
-          <div className="stat-divider" />
-          {preview ? (
-            <p style={{ fontSize: '.875rem', color: 'var(--text-2)', lineHeight: 1.75, whiteSpace: 'pre-line', marginTop: '1rem' }}>
-              {preview.preview}
-            </p>
-          ) : (
-            <p style={{ fontSize: '.85rem', color: 'var(--text-3)', marginTop: '1rem' }}>
-              {loading ? 'Loading briefing…' : 'No briefing available today.'}
-            </p>
-          )}
+      <div className="grid-main-sidebar">
+        {/* Hauptspalte: Snapshot + Hot-Stocks-Radar */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <PortfolioSnapshot rows={snapshot} loading={loading} />
+          <HotStocksRadar tabs={tabs} loading={loading} />
         </div>
 
-        {/* Quick links */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '.75rem' }}>
-          {QUICK_LINKS.map(l => (
-            <Link key={l.to} to={l.to} style={{ display: 'block' }}>
-              <div
-                className="card card-sm"
-                style={{
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '.9rem',
-                  transition: 'box-shadow .15s, border-color .15s',
-                }}
-                onMouseEnter={e => {
-                  (e.currentTarget as HTMLDivElement).style.borderColor = 'var(--teal-muted)'
-                  ;(e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow)'
-                }}
-                onMouseLeave={e => {
-                  (e.currentTarget as HTMLDivElement).style.borderColor = ''
-                  ;(e.currentTarget as HTMLDivElement).style.boxShadow = ''
-                }}
-              >
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--teal)', flexShrink: 0 }} />
-                <div>
-                  <p style={{ fontSize: '.875rem', fontWeight: 600, color: 'var(--text)' }}>{l.label}</p>
-                  <p style={{ fontSize: '.75rem', color: 'var(--text-3)', marginTop: '.1rem' }}>{l.desc}</p>
-                </div>
+        {/* Sidebar: Briefing-Preview + Watchlist-Movers */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div className="card">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div>
+                <p className="stat-label">Today's Briefing</p>
+                {preview && <p style={{ fontSize: '.75rem', color: 'var(--text-3)', marginTop: '.2rem' }}>{preview.date}</p>}
               </div>
-            </Link>
-          ))}
+              <Link to="/market/briefing" className="btn btn-outline">Read full →</Link>
+            </div>
+            <div className="stat-divider" />
+            {preview ? (
+              <p style={{ fontSize: '.875rem', color: 'var(--text-2)', lineHeight: 1.75, whiteSpace: 'pre-line', marginTop: '1rem' }}>
+                {preview.preview}
+              </p>
+            ) : (
+              <p style={{ fontSize: '.85rem', color: 'var(--text-3)', marginTop: '1rem' }}>
+                {loading ? 'Loading briefing…' : 'No briefing available today.'}
+              </p>
+            )}
+          </div>
+
+          <WatchlistMovers rows={movers} loading={loading} />
         </div>
       </div>
     </main>
