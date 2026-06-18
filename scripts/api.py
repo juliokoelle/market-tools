@@ -1099,48 +1099,57 @@ def market_hot_stocks():
     import yfinance as yf
     from concurrent.futures import ThreadPoolExecutor
 
-    stocks = get_hot_stocks(top_n=50)
+    stocks = get_hot_stocks(top_n=30)
     if not stocks:
         raise HTTPException(status_code=503, detail="Could not fetch market data. Try again shortly.")
 
     def _enrich(s: dict) -> dict:
         ticker = s["ticker"]
         try:
-            yf_ticker = yf.Ticker(ticker)
-            fast  = yf_ticker.fast_info
-            price = getattr(fast, "last_price", None) or 0
-            prev  = getattr(fast, "previous_close", None) or getattr(fast, "regular_market_previous_close", None) or 0
-            chg   = (price - prev) / prev * 100 if prev else s.get("return", 0) * 100
-            name  = ticker
+            score = _score_one_ticker(ticker)            # bull_score + components (5-min cache)
+            meta  = _fetch_meta(ticker)                  # name + currency (30-min cache)
+            cur   = meta.get("currency")
+            rate, _ = _eur_rate(cur)
+            md    = (score.get("components", {}).get("momentum", {}) or {}).get("details", {}) or {}
+            price = md.get("price")
+            price_eur = round(float(price) * rate, 2) if (price is not None and cur) else None
+
+            market_cap = None
+            rel_volume = None
             try:
-                info = yf_ticker.info
-                name = info.get("shortName") or info.get("longName") or ticker
+                fast = yf.Ticker(ticker).fast_info
+                mc = getattr(fast, "market_cap", None)
+                market_cap = round(float(mc) * rate) if (mc and cur) else None
+                last_vol = getattr(fast, "last_volume", None)
+                avg_vol = s.get("volume_avg")
+                if last_vol and avg_vol:
+                    rel_volume = round(float(last_vol) / float(avg_vol), 2)
             except Exception:
                 pass
+
             return {
-                **s,
-                "name":           name,
-                "price":          round(float(price), 2) if price else None,
-                "change_pct":     round(float(chg), 2),
-                "pe_ratio":       None,
-                "week_52_high":   None,
-                "week_52_low":    None,
-                "analyst_rating": None,
-                "sparkline":      _sparkline(ticker, period="1mo", interval="1d"),
+                **score,
+                "name":        meta.get("name", ticker),
+                "sector":      _ticker_sector(ticker),
+                "price":       price_eur,
+                "change_pct":  md.get("change_pct"),
+                "spark":       md.get("spark", []),
+                "market_cap":  market_cap,
+                "rel_volume":  rel_volume,
+                "currency":    "EUR",
             }
         except Exception:
             return {
-                **s,
-                "name": ticker, "price": None,
-                "change_pct": round(s.get("return", 0) * 100, 2),
-                "pe_ratio": None, "week_52_high": None,
-                "week_52_low": None, "analyst_rating": None, "sparkline": [],
+                "ticker": ticker, "name": ticker, "sector": None,
+                "price": None, "change_pct": round(s.get("return", 0) * 100, 2),
+                "spark": [], "bull_score": 50, "components": {},
+                "market_cap": None, "rel_volume": None, "currency": "EUR",
             }
 
     with ThreadPoolExecutor(max_workers=10) as ex:
         enriched = list(ex.map(_enrich, stocks))
 
-    enriched.sort(key=lambda x: x.get("change_pct", 0), reverse=True)
+    enriched.sort(key=lambda x: x.get("change_pct") or 0, reverse=True)
     result = {"stocks": enriched, "total": len(enriched)}
     _cache_set("hot_stocks_enriched", result)
     return result
