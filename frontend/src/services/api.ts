@@ -1,3 +1,5 @@
+import { mapHotStock, rankTabs, type RawHotStock } from '../components/market/hot-stocks/hot-data'
+
 const BASE = import.meta.env.VITE_API_URL
   ?? (window.location.hostname === 'localhost'
     ? '/api'
@@ -24,25 +26,9 @@ export const getMarketPrices = (tickers: string) =>
   get<Record<string, { price: number; change: number; change_pct: number }>>(`/market/prices?tickers=${tickers}`)
 
 export const getHotStocks = () =>
-  get<any>('/market/hot-stocks').then((d: any) => {
-    const stocks: StockRow[] = (d.stocks ?? [])
-      .filter((s: any) => s.price != null)
-      .map((s: any): StockRow => ({
-        ticker: s.ticker,
-        name: s.name ?? s.ticker,
-        price: s.price ?? 0,
-        change_pct: s.change_pct ?? 0,
-        bull_score: s.bull_score ?? 50,
-      }))
-    const byChange = [...stocks].sort((a, b) => b.change_pct - a.change_pct)
-    const byBull   = [...stocks].sort((a, b) => (b.bull_score ?? 50) - (a.bull_score ?? 50))
-    return {
-      gainers:  byChange.slice(0, 5),
-      losers:   byChange.slice(-5).reverse(),
-      bull_high: byBull.slice(0, 5),
-      bull_low:  byBull.slice(-5).reverse(),
-    }
-  })
+  get<{ stocks?: RawHotStock[] }>('/market/hot-stocks').then(d =>
+    rankTabs((d.stocks ?? []).filter(s => s.price != null).map(mapHotStock))
+  )
 
 // Briefing
 export const getBriefingPreview = () =>
