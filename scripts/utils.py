@@ -1,10 +1,17 @@
 """Shared utilities for the Daily Global Economic Briefing."""
 
-from datetime import date
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+# All "today" logic is anchored to Europe/Berlin so the daily-note date matches
+# the Berlin-local timestamps written by vault_utils.note_entry. Using the
+# server's local date (often UTC) put captures into the wrong daily note around
+# midnight Berlin time.
+_BERLIN = ZoneInfo("Europe/Berlin")
 
 
 def today() -> str:
-    return date.today().isoformat()
+    return datetime.now(_BERLIN).date().isoformat()
 
 
 def oz_to_gram(price_per_oz: float) -> float:

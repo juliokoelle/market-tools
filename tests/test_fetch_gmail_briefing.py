@@ -192,7 +192,7 @@ def test_fetch_today_briefing_combines_all_sections():
         "papaya":  "<h2>Tech Roundup</h2><p>AI funding surge.</p>",
     }
 
-    def fake_fetch(conn, sender):
+    def fake_fetch(conn, sender, target_date=None):
         for key, html in html_by_sender.items():
             if key in sender:
                 return html
@@ -216,7 +216,7 @@ def test_fetch_today_briefing_partial_returns_content():
     from scripts.fetch_gmail_briefing import fetch_today_briefing
     mock_conn = MagicMock()
 
-    def fake_fetch(conn, sender):
+    def fake_fetch(conn, sender, target_date=None):
         return "<p>Markets content</p>" if "markets" in sender else None
 
     with patch("scripts.fetch_gmail_briefing._connect_imap", return_value=mock_conn), \

@@ -14,10 +14,10 @@ import os
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
-import httpx
 import requests
 
 from scripts.sync_to_brain import _gh_config, github_read
+from scripts.telegram_utils import send_message
 from scripts.utils import today
 
 logging.basicConfig(
@@ -29,8 +29,6 @@ log = logging.getLogger(__name__)
 _TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN", "")
 _OWNER_ID = os.getenv("TELEGRAM_CHAT_ID") or os.getenv("TELEGRAM_OWNER_ID", "")
 _BERLIN   = ZoneInfo("Europe/Berlin")
-
-_SEND_URL = f"https://api.telegram.org/bot{_TOKEN}/sendMessage"
 
 SECTIONS_TO_SHOW = ["Tasks", "Follow-ups"]
 TASK_LIMIT = 10
@@ -339,12 +337,7 @@ def send_morning_push() -> None:
             backlog=backlog, qa=yesterday_qa,
         )
 
-    resp = httpx.post(_SEND_URL, json={
-        "chat_id": _OWNER_ID,
-        "text": message,
-        "parse_mode": "Markdown",
-    }, timeout=10)
-    resp.raise_for_status()
+    send_message(_TOKEN, _OWNER_ID, message)
     log.info("Morning push sent OK")
 
 

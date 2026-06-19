@@ -16,13 +16,18 @@ import argparse
 import logging
 import time
 
+from scripts.redis_state import heartbeat, install_redis_log_handler
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s warmer: %(message)s")
 log = logging.getLogger("warmer")
+
+_SERVICE = "cache-warmer"
 
 
 def warm_once() -> None:
     from scripts import api
 
+    heartbeat(_SERVICE)  # liveness signal for /health
     t0 = time.time()
     ok = 0
 
@@ -62,6 +67,8 @@ def main() -> None:
     parser.add_argument("--loop", type=int, default=0,
                         help="seconds between passes; 0 = single pass then exit")
     args = parser.parse_args()
+
+    install_redis_log_handler(_SERVICE)  # surface warnings/errors in /health
 
     if args.loop <= 0:
         warm_once()

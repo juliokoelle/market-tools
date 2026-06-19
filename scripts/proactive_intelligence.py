@@ -34,6 +34,9 @@ from zoneinfo import ZoneInfo
 import anthropic
 import requests
 
+from scripts.telegram_utils import send_message
+from scripts.utils import today
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s %(message)s",
@@ -239,7 +242,7 @@ def _ask_claude(today_str: str, context: str) -> str:
     if not api_key:
         raise RuntimeError("ANTHROPIC_API_KEY not set")
 
-    client = anthropic.Anthropic(api_key=api_key)
+    client = anthropic.Anthropic(api_key=api_key, timeout=30.0)
 
     user_message = f"Today is {today_str}. Here is Julio's context:\n\n{context}"
 
@@ -268,15 +271,8 @@ def _send_telegram(text: str) -> None:
     if not bot_token or not owner_id:
         raise RuntimeError("TELEGRAM_BOT_TOKEN and TELEGRAM_OWNER_ID must be set")
 
-    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-    payload = {
-        "chat_id": owner_id,
-        "text": text,
-        "parse_mode": "Markdown",
-    }
     try:
-        resp = requests.post(url, json=payload, timeout=15)
-        resp.raise_for_status()
+        send_message(bot_token, owner_id, text)
         log.info("[pi] Telegram message sent OK")
     except requests.RequestException as exc:
         log.error("[pi] Telegram send failed: %s", exc)
@@ -300,7 +296,7 @@ def _is_empty_response(text: str) -> bool:
 
 
 def run_proactive_intelligence() -> None:
-    today_str = date.today().isoformat()
+    today_str = today()
     log.info("[pi] Starting proactive intelligence for %s", today_str)
 
     context = _build_context(today_str)

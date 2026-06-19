@@ -437,3 +437,23 @@ def test_redis_state_degrades_without_redis(monkeypatch):
     assert rs.last_heartbeat("telegram-bot") is None
     rs.heartbeat("telegram-bot")  # must not raise
     rs._reset_for_tests()
+
+
+# ---------------------------------------------------------------------------
+# _authorized — None-chat guard and owner matching (R4)
+# ---------------------------------------------------------------------------
+
+def test_authorized_handles_none_chat():
+    from types import SimpleNamespace
+    from scripts.telegram_bot import _authorized
+
+    assert _authorized(SimpleNamespace(effective_chat=None)) is False
+
+
+def test_authorized_matches_owner_only(monkeypatch):
+    from types import SimpleNamespace
+    import scripts.telegram_bot as tb
+
+    monkeypatch.setattr(tb, "_OWNER_ID", 999)
+    assert tb._authorized(SimpleNamespace(effective_chat=SimpleNamespace(id=999))) is True
+    assert tb._authorized(SimpleNamespace(effective_chat=SimpleNamespace(id=42))) is False
