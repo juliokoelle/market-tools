@@ -25,12 +25,14 @@ import os
 import re
 import time as _time_mod
 from datetime import datetime, time, timedelta
+from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import openai
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.constants import ParseMode
+from telegram.error import BadRequest
 from telegram.ext import (
     Application,
     CallbackQueryHandler,
@@ -45,9 +47,19 @@ from scripts.utils import today
 from scripts.vault_utils import insert_into_section, make_daily_note as _make_daily_note, note_entry as _note_entry
 from scripts.classifier import classify_text, CapturedItem, VALID_TYPES
 from scripts.capture_router import route_item
+from scripts.redis_state import (
+    get_redis,
+    heartbeat,
+    install_redis_log_handler,
+    last_heartbeat,
+    read_recent_logs,
+)
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
+
+# Identifies this process in the shared Redis log sink / heartbeat (see /health).
+_SERVICE = "telegram-bot"
 
 _TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN", "")
 _OWNER_ID = int(os.getenv("TELEGRAM_CHAT_ID", "0"))
@@ -100,20 +112,182 @@ def _type_picker_keyboard(key: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(rows)
 
 
+# ---------------------------------------------------------------------------
+# Pending-state store (Redis-backed, survives redeploys; in-memory fallback)
+#
+# Confirmation cards reference a pending item by key. Storing this only in
+# bot_data meant every Coolify redeploy silently orphaned in-flight cards.
+# We now persist in the shared Redis; if Redis is unavailable we transparently
+# fall back to ctx.application.bot_data so nothing breaks locally.
+# ---------------------------------------------------------------------------
+
+_PENDING_HKEY = "tg:pending"
+_RECAP_KEY = "tg:recap_msg_id"
+_PENDING_TTL = 2 * 86400  # safety expiry; flush_pending handles the logical 24h
+
+
+def _ser_item(item: CapturedItem) -> dict:
+    return {"type": item.type, "text": item.text, "metadata": item.metadata}
+
+
+def _deser_item(d: dict) -> CapturedItem:
+    return CapturedItem(
+        type=d.get("type", "note"),
+        text=d.get("text", ""),
+        metadata=d.get("metadata") or {},
+    )
+
+
+def _pending_put(bot_data: dict, key: str, item: CapturedItem) -> None:
+    ts = _time_mod.time()
+    r = get_redis()
+    if r is not None:
+        try:
+            r.hset(_PENDING_HKEY, key, json.dumps({"item": _ser_item(item), "ts": ts}))
+            r.expire(_PENDING_HKEY, _PENDING_TTL)
+            return
+        except Exception as e:  # noqa: BLE001
+            log.warning("pending put via Redis failed (%s) — using memory", e)
+    bot_data.setdefault("pending", {})[key] = {"item": item, "ts": ts}
+
+
+def _pending_get(bot_data: dict, key: str) -> tuple[CapturedItem, float] | None:
+    r = get_redis()
+    if r is not None:
+        try:
+            raw = r.hget(_PENDING_HKEY, key)
+            if raw is None:
+                return None
+            d = json.loads(raw)
+            return _deser_item(d["item"]), d.get("ts", 0.0)
+        except Exception as e:  # noqa: BLE001
+            log.warning("pending get via Redis failed (%s)", e)
+    entry = bot_data.get("pending", {}).get(key)
+    return (entry["item"], entry.get("ts", 0.0)) if entry else None
+
+
+def _pending_pop(bot_data: dict, key: str) -> tuple[CapturedItem, float] | None:
+    r = get_redis()
+    if r is not None:
+        try:
+            raw = r.hget(_PENDING_HKEY, key)
+            if raw is None:
+                return None
+            r.hdel(_PENDING_HKEY, key)
+            d = json.loads(raw)
+            return _deser_item(d["item"]), d.get("ts", 0.0)
+        except Exception as e:  # noqa: BLE001
+            log.warning("pending pop via Redis failed (%s)", e)
+    entry = bot_data.get("pending", {}).pop(key, None)
+    return (entry["item"], entry.get("ts", 0.0)) if entry else None
+
+
+def _pending_remove(bot_data: dict, key: str) -> None:
+    r = get_redis()
+    if r is not None:
+        try:
+            r.hdel(_PENDING_HKEY, key)
+            return
+        except Exception:  # noqa: BLE001
+            pass
+    bot_data.get("pending", {}).pop(key, None)
+
+
+def _pending_set_type(bot_data: dict, key: str, new_type: str) -> CapturedItem | None:
+    r = get_redis()
+    if r is not None:
+        try:
+            raw = r.hget(_PENDING_HKEY, key)
+            if raw is None:
+                return None
+            d = json.loads(raw)
+            d["item"]["type"] = new_type
+            r.hset(_PENDING_HKEY, key, json.dumps(d))
+            return _deser_item(d["item"])
+        except Exception as e:  # noqa: BLE001
+            log.warning("pending set_type via Redis failed (%s)", e)
+    entry = bot_data.get("pending", {}).get(key)
+    if entry is None:
+        return None
+    entry["item"].type = new_type
+    return entry["item"]
+
+
+def _pending_all(bot_data: dict) -> dict[str, tuple[CapturedItem, float]]:
+    r = get_redis()
+    if r is not None:
+        try:
+            out: dict[str, tuple[CapturedItem, float]] = {}
+            for k, raw in (r.hgetall(_PENDING_HKEY) or {}).items():
+                d = json.loads(raw)
+                out[k] = (_deser_item(d["item"]), d.get("ts", 0.0))
+            return out
+        except Exception as e:  # noqa: BLE001
+            log.warning("pending all via Redis failed (%s)", e)
+    return {k: (v["item"], v.get("ts", 0.0)) for k, v in bot_data.get("pending", {}).items()}
+
+
+def _recap_set(bot_data: dict, msg_id: int) -> None:
+    r = get_redis()
+    if r is not None:
+        try:
+            r.set(_RECAP_KEY, msg_id, ex=_PENDING_TTL)
+            return
+        except Exception:  # noqa: BLE001
+            pass
+    bot_data["recap_msg_id"] = msg_id
+
+
+def _recap_get(bot_data: dict) -> int | None:
+    r = get_redis()
+    if r is not None:
+        try:
+            v = r.get(_RECAP_KEY)
+            return int(v) if v is not None else None
+        except Exception:  # noqa: BLE001
+            pass
+    return bot_data.get("recap_msg_id")
+
+
+def _card_text(emoji: str, label: str, text: str, suffix: str | None = None) -> str:
+    """Build a MarkdownV2 confirmation card with all dynamic text safely escaped.
+
+    Card text previously used legacy Markdown with raw item text, so any '_', '*',
+    '[' or backtick (common in transcripts, tickers, URLs) made Telegram reject
+    the message and the card never appeared.
+    """
+    out = f"{emoji} *{label} erkannt*\n{_esc(text)}"
+    if suffix:
+        out += f"\n\n{_esc(suffix)}"
+    return out
+
+
+async def _safe_reply(message, text: str, parse_mode: str = ParseMode.MARKDOWN) -> None:
+    """Reply with Markdown, falling back to plain text if entity parsing fails.
+
+    Follow-up messages (stock snapshots, question answers) carry LLM/free text
+    that can contain unbalanced Markdown; this guarantees the message arrives.
+    """
+    try:
+        await message.reply_text(text, parse_mode=parse_mode)
+    except BadRequest as e:
+        log.warning("Markdown reply failed (%s) — sending plain", e)
+        await message.reply_text(text)
+
+
 async def _send_confirmations(
     update: Update, ctx: ContextTypes.DEFAULT_TYPE, items: list[CapturedItem]
 ) -> None:
     """Send one confirmation message per item and store each in pending state."""
-    pending: dict = ctx.application.bot_data.setdefault("pending", {})
+    bot_data = ctx.application.bot_data
     for item in items:
         key = str(_time_mod.monotonic_ns())
-        pending[key] = {"item": item, "ts": _time_mod.time()}
+        _pending_put(bot_data, key, item)
         emoji = _TYPE_EMOJI.get(item.type, "📝")
         label = _TYPE_LABEL.get(item.type, "Note")
-        text = f"{emoji} *{label} erkannt*\n{item.text}"
         await update.message.reply_text(
-            text,
-            parse_mode="Markdown",
+            _card_text(emoji, label, item.text),
+            parse_mode=ParseMode.MARKDOWN_V2,
             reply_markup=_confirmation_keyboard(key),
         )
 
@@ -123,37 +297,38 @@ async def handle_confirmation(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
     query = update.callback_query
     await query.answer()
     data: str = query.data or ""
-    pending: dict = ctx.application.bot_data.get("pending", {})
+    bot_data = ctx.application.bot_data
 
     if data.startswith("save:"):
         key = data[5:]
-        entry = pending.pop(key, None)
-        if entry is None:
+        got = _pending_pop(bot_data, key)
+        if got is None:
             await query.edit_message_reply_markup(reply_markup=None)
             return
-        item: CapturedItem = entry["item"]
+        item, _ = got
         label = _TYPE_LABEL.get(item.type, "Note")
         await query.edit_message_text(f"✅ Gespeichert als {label}: {item.text}")
         follow_up = await route_item(item)
         if follow_up:
-            await query.message.reply_text(follow_up)
+            await _safe_reply(query.message, follow_up)
 
     elif data.startswith("discard:"):
         key = data[8:]
-        pending.pop(key, None)
+        _pending_remove(bot_data, key)
         await query.edit_message_text("❌ Verworfen")
 
     elif data.startswith("retype:"):
         key = data[7:]
-        if key not in pending:
+        got = _pending_get(bot_data, key)
+        if got is None:
             await query.edit_message_reply_markup(reply_markup=None)
             return
-        item = pending[key]["item"]
+        item, _ = got
         emoji = _TYPE_EMOJI.get(item.type, "📝")
         label = _TYPE_LABEL.get(item.type, "Note")
         await query.edit_message_text(
-            f"{emoji} *{label} erkannt*\n{item.text}\n\nWelcher Typ?",
-            parse_mode="Markdown",
+            _card_text(emoji, label, item.text, "Welcher Typ?"),
+            parse_mode=ParseMode.MARKDOWN_V2,
             reply_markup=_type_picker_keyboard(key),
         )
 
@@ -164,16 +339,15 @@ async def handle_confirmation(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
         _, new_type, key = parts
         if new_type not in VALID_TYPES:
             return
-        if key not in pending:
+        item = _pending_set_type(bot_data, key, new_type)
+        if item is None:
             await query.edit_message_reply_markup(reply_markup=None)
             return
-        pending[key]["item"].type = new_type
-        item = pending[key]["item"]
         emoji = _TYPE_EMOJI.get(new_type, "📝")
         label = _TYPE_LABEL.get(new_type, "Note")
         await query.edit_message_text(
-            f"{emoji} *{label} erkannt*\n{item.text}",
-            parse_mode="Markdown",
+            _card_text(emoji, label, item.text),
+            parse_mode=ParseMode.MARKDOWN_V2,
             reply_markup=_confirmation_keyboard(key),
         )
 
@@ -359,37 +533,64 @@ async def cmd_tasks(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         await update.message.reply_text(f"Fehler: {e}")
 
 
+def _read_log_file(service: str, hours: int) -> tuple[list[str], list[str]]:
+    """Fallback log source: parse logs/<service>.log when Redis has nothing.
+
+    Only sees files in this container's filesystem (i.e. telegram-bot's own log).
+    """
+    path = Path(__file__).parent.parent / "logs" / f"{service}.log"
+    errors: list[str] = []
+    warnings: list[str] = []
+    if not path.exists():
+        return errors, warnings
+    cutoff = datetime.now() - timedelta(hours=hours)
+    for line in path.read_text(errors="replace").splitlines():
+        # Lines look like: 2026-05-31 08:15:42 ERROR scripts.foo: message
+        try:
+            ts = datetime.strptime(line[:19], "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            continue
+        if ts < cutoff:
+            continue
+        upper = line.upper()
+        if " ERROR " in upper:
+            errors.append(line[upper.find(" ERROR ") + 7:][:160])
+        elif " WARNING " in upper:
+            warnings.append(line[upper.find(" WARNING ") + 9:][:160])
+    return errors, warnings
+
+
 async def cmd_health(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if not _authorized(update):
         return
-    log_dir = Path(__file__).parent.parent / "logs"
-    cutoff = datetime.now() - timedelta(hours=24)
-    files = {
-        "telegram-bot": log_dir / "telegram-bot.log",
-        "gmail-briefing": log_dir / "gmail-briefing.log",
+    # Pulled from the shared Redis log sink so we see other containers too.
+    services = {
+        "telegram-bot": "Telegram Bot",
+        "gmail-briefing": "Gmail Briefing",
+        "cache-warmer": "Cache Warmer",
     }
     parts: list[str] = ["🩺 *System Health — letzte 24h*\n"]
     total_errors = 0
-    for name, path in files.items():
-        errors: list[str] = []
-        warnings: list[str] = []
-        if path.exists():
-            for line in path.read_text(errors="replace").splitlines():
-                # Lines look like: 2026-05-31 08:15:42,123 ERROR ...
-                try:
-                    ts_str = line[:19]
-                    ts = datetime.strptime(ts_str, "%Y-%m-%d %H:%M:%S")
-                except ValueError:
-                    continue
-                if ts < cutoff:
-                    continue
-                upper = line.upper()
-                if " ERROR " in upper:
-                    errors.append(line[line.upper().find(" ERROR ") + 7:][:120])
-                elif " WARNING " in upper:
-                    warnings.append(line[line.upper().find(" WARNING ") + 9:][:120])
-        status = "✅" if not errors else "🔴"
-        parts.append(f"{status} *{name}*")
+    for svc, label in services.items():
+        errors, warnings = read_recent_logs(svc, 24)
+        if not errors and not warnings:  # Redis empty → try local file
+            ferr, fwarn = _read_log_file(svc, 24)
+            errors, warnings = ferr, fwarn
+        hb = last_heartbeat(svc)
+
+        if errors:
+            status = "🔴"
+        elif hb is not None:
+            status = "✅"
+        else:
+            status = "⚪"  # no errors AND no liveness signal — unknown, not "OK"
+
+        live = ""
+        if hb is not None:
+            mins = int((_time_mod.time() - hb) / 60)
+            live = " · aktiv" if mins <= 0 else f" · aktiv vor {mins}m"
+        parts.append(f"{status} *{label}*{live}")
+
         if errors:
             total_errors += len(errors)
             for e in errors[-3:]:
@@ -400,10 +601,14 @@ async def cmd_health(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
             for w in warnings[-2:]:
                 parts.append(f"  ⚠️ {w}")
         if not errors and not warnings:
-            parts.append("  Keine Probleme")
+            parts.append("  Keine Fehler" if hb is not None else "  Keine Daten")
         parts.append("")
-    parts.append("_Alles OK_ ✅" if total_errors == 0 else f"_⚠️ {total_errors} Fehler gefunden_")
-    await update.message.reply_text("\n".join(parts), parse_mode="Markdown")
+
+    parts.append(
+        "_Keine Fehler in den letzten 24h_ ✅" if total_errors == 0
+        else f"_⚠️ {total_errors} Fehler gefunden_"
+    )
+    await _safe_reply(update.message, "\n".join(parts), parse_mode=ParseMode.MARKDOWN)
 
 
 async def cmd_frage(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
@@ -433,7 +638,7 @@ async def plain_text(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     if (
         update.message.reply_to_message is not None
         and update.message.reply_to_message.message_id
-            == ctx.application.bot_data.get("recap_msg_id")
+            == _recap_get(ctx.application.bot_data)
     ):
         run_date = today()
         entry = _note_entry(text)
@@ -601,25 +806,25 @@ async def send_evening_recap_prompt(ctx: ContextTypes.DEFAULT_TYPE) -> None:
             text="📔 *Tages-Recap* — Wie war dein Tag? Antworte auf diese Nachricht mit deiner Zusammenfassung.",
             parse_mode=ParseMode.MARKDOWN,
         )
-        ctx.application.bot_data["recap_msg_id"] = sent.message_id
+        _recap_set(ctx.application.bot_data, sent.message_id)
     except Exception as e:
         log.error("send_evening_recap_prompt failed: %s", e)
 
 
 async def flush_pending(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     """Flush unconfirmed items older than 24 h as notes. Runs daily at 23:55."""
-    pending: dict = ctx.application.bot_data.get("pending", {})
+    bot_data = ctx.application.bot_data
     cutoff = _time_mod.time() - 86400
-    to_flush = [k for k, v in list(pending.items()) if v.get("ts", 0) < cutoff]
-    for key in to_flush:
-        entry = pending.pop(key, None)
-        if entry:
-            item: CapturedItem = entry["item"]
-            item.type = "note"
-            try:
-                await route_item(item)
-            except Exception as e:
-                log.error("flush_pending: failed to save item %r: %s", item.text, e)
+    expired = [(k, item) for k, (item, ts) in _pending_all(bot_data).items() if ts < cutoff]
+    to_flush: list[str] = []
+    for key, item in expired:
+        item.type = "note"
+        try:
+            await route_item(item)
+            _pending_remove(bot_data, key)  # only drop after a successful save
+            to_flush.append(key)
+        except Exception as e:
+            log.error("flush_pending: failed to save item %r: %s", item.text, e)
     if to_flush:
         log.info("flush_pending: flushed %d expired items as notes", len(to_flush))
         try:
@@ -635,9 +840,35 @@ async def flush_pending(ctx: ContextTypes.DEFAULT_TYPE) -> None:
 # Entry point
 # ---------------------------------------------------------------------------
 
+async def _heartbeat_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Record liveness so /health can tell 'silent-healthy' from 'dead'."""
+    heartbeat(_SERVICE)
+
+
+def _configure_logging() -> None:
+    """Write rotating file logs (so /health's file fallback works) and push
+    WARNING+ records to the shared Redis sink (so /health sees other services)."""
+    log_dir = Path(__file__).parent.parent / "logs"
+    try:
+        log_dir.mkdir(exist_ok=True)
+        fh = RotatingFileHandler(
+            log_dir / f"{_SERVICE}.log", maxBytes=1_000_000, backupCount=2
+        )
+        fh.setFormatter(logging.Formatter(
+            "%(asctime)s %(levelname)s %(name)s: %(message)s",
+            datefmt="%Y-%m-%d %H:%M:%S",
+        ))
+        logging.getLogger().addHandler(fh)
+    except Exception as e:  # noqa: BLE001 — file logging is best-effort
+        log.warning("file logging unavailable (%s)", e)
+    install_redis_log_handler(_SERVICE)
+
+
 def main() -> None:
     if not _TOKEN or not _OWNER_ID:
         raise RuntimeError("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set.")
+
+    _configure_logging()
 
     app = Application.builder().token(_TOKEN).build()
     app.add_handler(CommandHandler("task",   cmd_task))
@@ -662,6 +893,8 @@ def main() -> None:
         flush_pending,
         time=time(23, 55, tzinfo=_BERLIN),
     )
+    # Liveness heartbeat for /health (first beat immediately, then every 5 min).
+    app.job_queue.run_repeating(_heartbeat_job, interval=300, first=0)
 
     log.info("Telegram bot starting — polling.")
     app.run_polling()

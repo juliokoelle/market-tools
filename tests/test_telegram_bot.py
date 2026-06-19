@@ -346,3 +346,94 @@ def test_daily_mutator_entries_shopping_section():
     assert "## Shopping List" in result
     assert "- [ ] Milk" in result
     assert "- [ ] Eggs" in result
+
+
+# ---------------------------------------------------------------------------
+# _card_text — MarkdownV2 escaping (regression for broken confirmation cards)
+# ---------------------------------------------------------------------------
+
+def test_card_text_escapes_markdown_special_chars():
+    from scripts.telegram_bot import _card_text
+
+    out = _card_text("📈", "Stock Pick", "buy $MNDY_X now *cheap* (link)")
+    # The dynamic text must have every MarkdownV2 special char backslash-escaped.
+    assert r"\_" in out
+    assert r"\*" in out
+    assert r"\(" in out and r"\)" in out
+    # The static label header stays bold (its surrounding asterisks unescaped).
+    assert "*Stock Pick erkannt*" in out
+
+
+def test_card_text_with_suffix_escapes_suffix():
+    from scripts.telegram_bot import _card_text
+
+    out = _card_text("📋", "Task", "do it", "Pick a type!")
+    assert r"Pick a type\!" in out
+
+
+# ---------------------------------------------------------------------------
+# Pending store — in-memory fallback path (no REDIS_URL in test env)
+# ---------------------------------------------------------------------------
+
+def test_pending_item_serialization_roundtrip():
+    from scripts.telegram_bot import _ser_item, _deser_item
+    from scripts.classifier import CapturedItem
+
+    item = CapturedItem(type="stock_pick", text="MNDY", metadata={"ticker": "MNDY"})
+    back = _deser_item(_ser_item(item))
+    assert back.type == "stock_pick"
+    assert back.text == "MNDY"
+    assert back.metadata == {"ticker": "MNDY"}
+
+
+def test_pending_put_get_pop_in_memory():
+    from scripts.telegram_bot import _pending_put, _pending_get, _pending_pop
+    from scripts.classifier import CapturedItem
+
+    bot_data: dict = {}
+    item = CapturedItem(type="task", text="call bank", metadata={})
+    _pending_put(bot_data, "k1", item)
+
+    got = _pending_get(bot_data, "k1")
+    assert got is not None and got[0].text == "call bank"
+
+    popped = _pending_pop(bot_data, "k1")
+    assert popped is not None and popped[0].type == "task"
+    # Gone after pop.
+    assert _pending_get(bot_data, "k1") is None
+
+
+def test_pending_set_type_in_memory():
+    from scripts.telegram_bot import _pending_put, _pending_set_type
+    from scripts.classifier import CapturedItem
+
+    bot_data: dict = {}
+    _pending_put(bot_data, "k2", CapturedItem(type="note", text="x", metadata={}))
+    item = _pending_set_type(bot_data, "k2", "question")
+    assert item is not None and item.type == "question"
+    assert _pending_set_type(bot_data, "missing", "task") is None
+
+
+def test_recap_set_get_in_memory():
+    from scripts.telegram_bot import _recap_set, _recap_get
+
+    bot_data: dict = {}
+    assert _recap_get(bot_data) is None
+    _recap_set(bot_data, 4242)
+    assert _recap_get(bot_data) == 4242
+
+
+# ---------------------------------------------------------------------------
+# redis_state — graceful degradation when Redis is unavailable
+# ---------------------------------------------------------------------------
+
+def test_redis_state_degrades_without_redis(monkeypatch):
+    import scripts.redis_state as rs
+
+    monkeypatch.delenv("REDIS_URL", raising=False)
+    rs._reset_for_tests()
+    assert rs.get_redis() is None
+    assert rs.read_recent_logs("telegram-bot", 24) == ([], [])
+    assert rs.last_heartbeat("telegram-bot") is None
+    rs.heartbeat("telegram-bot")  # must not raise
+    rs._reset_for_tests()
