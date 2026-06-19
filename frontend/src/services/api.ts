@@ -152,7 +152,10 @@ export const getMarketNames = (tickers: string[]) =>
   get<Record<string, string>>(`/market/names?tickers=${tickers.join(',')}`)
 
 export const getStockChart = (ticker: string, period: string) =>
-  get<any>(`/stock/${ticker}/chart?period=${period}`).then((d: any): ChartPoint[] => d.ohlcv ?? [])
+  get<any>(`/stock/${ticker}/chart?period=${period}`).then((d: any): ChartData => ({
+    currency: d.currency ?? 'EUR',
+    points: (d.ohlcv ?? []) as ChartPoint[],
+  }))
 
 export const getStockAiSummary = (ticker: string) =>
   get<{ summary: string }>(`/stock/${ticker}/ai-summary`)
@@ -209,6 +212,7 @@ export interface StockDetail {
   components: { momentum: number; sentiment: number; valuation: number; analyst: number }
 }
 export interface ChartPoint { date: string; open: number; high: number; low: number; close: number; volume: number }
+export interface ChartData { currency: string; points: ChartPoint[] }
 export interface TickerProfile {
   ticker: string; name: string; sector: string; industry: string
   market_cap: number; description: string; website: string

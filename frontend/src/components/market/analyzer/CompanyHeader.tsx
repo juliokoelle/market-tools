@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { Panel, Delta } from '../primitives'
-import { fmtCurrencyExact, fmtCompact, fmtNumber } from '../../../lib/format'
+import { fmtMoneyExact, fmtCompact, fmtNumber, currencyLabel } from '../../../lib/format'
 import { range52Position, fmtRelVolume } from '../../../lib/analyzer'
 import type { StockDetail } from '../../../services/api'
 
@@ -14,6 +14,7 @@ export function CompanyHeader({ detail, onWatch, onAddPortfolio }: {
   onAddPortfolio?: () => void
 }) {
   const navigate = useNavigate()
+  const cur = detail.currency ?? 'EUR'
   const pos = detail.week_52_low > 0 && detail.week_52_high > 0
     ? range52Position(detail.week_52_low, detail.week_52_high, detail.price) : 0
   return (
@@ -29,13 +30,13 @@ export function CompanyHeader({ detail, onWatch, onAddPortfolio }: {
           </p>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <p className="tabular" style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>{fmtCurrencyExact(detail.price)}</p>
+          <p className="tabular" style={{ fontSize: '1.5rem', fontWeight: 800, margin: 0 }}>{fmtMoneyExact(detail.price, cur)}</p>
           <Delta value={detail.change_pct} style={{ justifyContent: 'flex-end' }} />
         </div>
       </div>
 
       <div style={{ marginTop: '1rem', display: 'flex', gap: '1.25rem', flexWrap: 'wrap', fontSize: '.8rem' }}>
-        <Stat label="Market Cap" value={detail.market_cap ? `${fmtCompact(detail.market_cap)} €` : '—'} />
+        <Stat label="Market Cap" value={detail.market_cap ? `${fmtCompact(detail.market_cap)} ${currencyLabel(cur)}` : '—'} />
         <Stat label="Rel. Volumen" value={fmtRelVolume(detail.rel_volume)} />
         <Stat label="Beta" value={detail.beta != null ? fmtNumber(detail.beta, 2) : '—'} />
         <Stat label="P/E" value={detail.pe_ratio != null ? fmtNumber(detail.pe_ratio, 1) : '—'} />
@@ -44,9 +45,9 @@ export function CompanyHeader({ detail, onWatch, onAddPortfolio }: {
       {detail.week_52_low > 0 && detail.week_52_high > 0 ? (
         <div style={{ marginTop: '1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '.7rem', color: 'var(--text-3)' }}>
-            <span>{fmtCurrencyExact(detail.week_52_low)}</span>
+            <span>{fmtMoneyExact(detail.week_52_low, cur)}</span>
             <span>52-Wochen-Spanne</span>
-            <span>{fmtCurrencyExact(detail.week_52_high)}</span>
+            <span>{fmtMoneyExact(detail.week_52_high, cur)}</span>
           </div>
           <div style={{ marginTop: '.35rem', height: 6, borderRadius: 999, background: 'var(--surface-3)', position: 'relative' }}>
             <div style={{ position: 'absolute', left: `${pos}%`, top: -2, width: 10, height: 10, borderRadius: '50%', background: 'var(--brand)', transform: 'translateX(-50%)' }} />

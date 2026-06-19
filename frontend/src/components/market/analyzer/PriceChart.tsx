@@ -3,20 +3,21 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import { BarChart2 } from 'lucide-react'
 import { Panel, SectionHeader, EmptyState } from '../primitives'
 import { getStockChart, type ChartPoint } from '../../../services/api'
-import { fmtCurrencyExact } from '../../../lib/format'
+import { fmtMoneyExact, currencyLabel } from '../../../lib/format'
 
 const PERIODS = ['1mo', '3mo', '6mo', '1y'] as const
 
 export function PriceChart({ ticker }: { ticker: string }) {
   const [period, setPeriod] = useState<typeof PERIODS[number]>('3mo')
   const [data, setData] = useState<ChartPoint[]>([])
+  const [currency, setCurrency] = useState('EUR')
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     let active = true
     setLoading(true)
     getStockChart(ticker, period)
-      .then(d => { if (active) setData(d) })
+      .then(d => { if (active) { setData(d.points); setCurrency(d.currency) } })
       .catch(() => { if (active) setData([]) })
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
@@ -25,8 +26,8 @@ export function PriceChart({ ticker }: { ticker: string }) {
   return (
     <Panel>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '.5rem', flexWrap: 'wrap' }}>
-        {/* SectionHeader has no `sub` prop — use description for EUR label */}
-        <SectionHeader title="Kursverlauf" description="EUR" />
+        {/* Währung kommt vom Backend (Heimatwährung), nicht hart EUR */}
+        <SectionHeader title="Kursverlauf" description={currencyLabel(currency)} />
         <div style={{ display: 'flex', gap: '.3rem' }}>
           {PERIODS.map(p => (
             <button key={p} className="btn btn-outline" onClick={() => setPeriod(p)}
@@ -52,8 +53,8 @@ export function PriceChart({ ticker }: { ticker: string }) {
               </defs>
               <XAxis dataKey="date" tick={{ fontSize: 10, fill: 'var(--text-3)' }} minTickGap={40} />
               <YAxis tick={{ fontSize: 10, fill: 'var(--text-3)' }} width={50} domain={['auto', 'auto']}
-                tickFormatter={(v) => typeof v === 'number' ? fmtCurrencyExact(v) : String(v)} />
-              <Tooltip formatter={(v) => typeof v === 'number' ? fmtCurrencyExact(v) : String(v)} />
+                tickFormatter={(v) => typeof v === 'number' ? fmtMoneyExact(v, currency) : String(v)} />
+              <Tooltip formatter={(v) => typeof v === 'number' ? fmtMoneyExact(v, currency) : String(v)} />
               <Area type="monotone" dataKey="close" stroke="var(--brand)" strokeWidth={2} fill="url(#priceFill)" />
             </AreaChart>
           </ResponsiveContainer>

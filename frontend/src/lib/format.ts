@@ -18,6 +18,38 @@ export const fmtCurrencyExact = (n: number) =>
     maximumFractionDigits: 2,
   }).format(n)
 
+/**
+ * Geldbetrag in beliebiger Währung (Backend liefert Analyzer-Werte in
+ * Heimatwährung — USD bei US-Titeln). Ungültige/Nicht-ISO-Codes (z.B. "GBp")
+ * fallen sauber auf "<Zahl> <Code>" zurück statt zu werfen.
+ */
+export const fmtMoney = (n: number, code = 'EUR') => {
+  try {
+    return new Intl.NumberFormat('de-DE', {
+      style: 'currency', currency: code,
+      maximumFractionDigits: Math.abs(n) >= 1000 ? 0 : 2,
+    }).format(n)
+  } catch {
+    return `${fmtNumber(n, Math.abs(n) >= 1000 ? 0 : 2)} ${code}`
+  }
+}
+
+/** Geldbetrag in beliebiger Währung, immer 2 Nachkommastellen. */
+export const fmtMoneyExact = (n: number, code = 'EUR') => {
+  try {
+    return new Intl.NumberFormat('de-DE', {
+      style: 'currency', currency: code,
+      minimumFractionDigits: 2, maximumFractionDigits: 2,
+    }).format(n)
+  } catch {
+    return `${fmtPrice(n)} ${code}`
+  }
+}
+
+/** Währungssymbol/-code für Labels (z.B. Achsen). */
+export const currencyLabel = (code = 'EUR') =>
+  ({ USD: '$', EUR: '€', GBP: '£', GBp: 'p', CHF: 'CHF', JPY: '¥', CAD: 'C$', AUD: 'A$', HKD: 'HK$' } as Record<string, string>)[code] ?? code
+
 /** Reine Zahl mit 2 Nachkommastellen (z.B. Kurse). */
 export const fmtPrice = (n: number) =>
   new Intl.NumberFormat('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)

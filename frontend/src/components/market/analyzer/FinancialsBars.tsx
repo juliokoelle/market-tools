@@ -3,14 +3,16 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } fro
 import { Panel, SectionHeader } from '../primitives'
 import { getStockFinancials, type FinancialsRow } from '../../../services/api'
 import { financialsToBars } from '../../../lib/analyzer'
+import { currencyLabel } from '../../../lib/format'
 
 export function FinancialsBars({ ticker }: { ticker: string }) {
   const [rows, setRows] = useState<FinancialsRow[] | null>(null)
+  const [currency, setCurrency] = useState('EUR')
 
   useEffect(() => {
     let active = true
     getStockFinancials(ticker)
-      .then(d => { if (active) setRows(d.rows) })
+      .then(d => { if (active) { setRows(d.rows); setCurrency(d.currency ?? 'EUR') } })
       .catch(() => { if (active) setRows([]) })
     return () => { active = false }
   }, [ticker])
@@ -21,8 +23,8 @@ export function FinancialsBars({ ticker }: { ticker: string }) {
   const data = financialsToBars(rows)
   return (
     <Panel>
-      {/* SectionHeader has no `sub` prop — use description for "Mio. €" label */}
-      <SectionHeader title="Financials" description="Mio. €" />
+      {/* Währung kommt vom Backend (Heimatwährung des Unternehmens) */}
+      <SectionHeader title="Financials" description={`Mio. ${currencyLabel(currency)}`} />
       <div style={{ height: 240, marginTop: '.75rem' }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>

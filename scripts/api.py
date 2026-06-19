@@ -156,6 +156,39 @@ def _eur_rate(currency: str | None) -> tuple[float, bool]:
     return result
 
 
+def _native_currency(ticker: str) -> str:
+    """Best-effort native currency of a security.
+
+    fast_info.currency is frequently empty under yfinance throttling, so fall
+    back to exchange-suffix heuristics and finally USD. The Analyzer endpoints
+    report values in this native currency instead of forcing a (often
+    unavailable) EUR conversion that silently mislabels USD figures as EUR.
+    """
+    try:
+        import yfinance as yf
+        cur = getattr(yf.Ticker(ticker).fast_info, "currency", None)
+        if cur:
+            return str(cur).upper()
+    except Exception:
+        pass
+    t = ticker.upper()
+    if t.endswith((".DE", ".PA", ".AS", ".MI", ".MC", ".F", ".VI", ".BR", ".LS", ".HE", ".IR")):
+        return "EUR"
+    if t.endswith(".L"):
+        return "GBP"
+    if t.endswith(".SW"):
+        return "CHF"
+    if t.endswith((".TO", ".V", ".NE")):
+        return "CAD"
+    if t.endswith(".HK"):
+        return "HKD"
+    if t.endswith((".T", ".JP")):
+        return "JPY"
+    if t.endswith(".AX"):
+        return "AUD"
+    return "USD"
+
+
 # ---------------------------------------------------------------------------
 # GitHub helpers
 # ---------------------------------------------------------------------------
@@ -1460,36 +1493,39 @@ def stock_detail(ticker: str):
         except Exception:
             pass
 
-        rate, fx_ok = _eur_rate(native_currency)
+        native_currency = native_currency or _native_currency(ticker)
 
-        def _eur(v):
+        def _round(v):
             try:
-                return round(float(v) * rate, 2) if v is not None else None
+                return round(float(v), 2) if v is not None else None
             except (TypeError, ValueError):
                 return None
 
+        # Values are reported in their native currency (no EUR conversion) so
+        # USD figures are never silently mislabeled as EUR under FX throttling.
         detail = {
             **score_data,
             "name":            name,
             "company_name":    name,
-            "price":           _eur(price) or 0,
+            "price":           _round(price) or 0,
             "change_pct":      round(float(chg), 2),
             "pe_ratio":        pe_ratio,
-            "week_52_high":    _eur(week_52_high),
-            "week_52_low":     _eur(week_52_low),
+            "week_52_high":    _round(week_52_high),
+            "week_52_low":     _round(week_52_low),
             "sector":          sector,
-            "market_cap":      _eur(market_cap),
+            "market_cap":      _round(market_cap),
             "native_currency": native_currency,
-            "currency":        "EUR",
+            "currency":        native_currency,
             "beta":            beta,
             "rel_volume":      rel_volume,
-            "fx_ok":           fx_ok,
+            "fx_ok":           True,
         }
     except Exception:
+        nc = _native_currency(ticker)
         detail = {**score_data, "name": ticker, "company_name": ticker,
                   "price": 0, "change_pct": 0, "pe_ratio": None,
                   "week_52_high": None, "week_52_low": None,
-                  "currency": "EUR", "fx_ok": False}
+                  "native_currency": nc, "currency": nc, "fx_ok": True}
 
     _cache_set(cache_key, detail)
     return detail
@@ -1517,30 +1553,35 @@ def stock_chart(
     if hasattr(df.columns, "levels"):
         df.columns = df.columns.get_level_values(0)
 
-    native_currency = None
-    try:
-        native_currency = getattr(yf.Ticker(ticker).fast_info, "currency", None)
-    except Exception:
-        pass
-    rate, fx_ok = _eur_rate(native_currency)
+    # Drop rows with NaN OHLC up front. round(float(nan)*rate) silently yields
+    # NaN (no exception), which then crashes json.dumps with
+    # "Out of range float values are not JSON compliant" -> 500. Same fix as
+    # /market/history, which dropna()s before serialising.
+    df = df.dropna(subset=["Open", "High", "Low", "Close"])
+    if df.empty:
+        raise HTTPException(status_code=404, detail=f"No chart data for {ticker}")
 
+    native_currency = _native_currency(ticker)
+
+    # OHLC reported in native currency (no EUR conversion) — consistent with
+    # /stock/{ticker}/detail and avoids mislabeling under FX throttling.
     rows = []
     for dt, row in df.iterrows():
         try:
             vol = row.get("Volume", 0)
             rows.append({
                 "date":   str(dt.date()),
-                "open":   round(float(row["Open"])  * rate, 2),
-                "high":   round(float(row["High"])  * rate, 2),
-                "low":    round(float(row["Low"])   * rate, 2),
-                "close":  round(float(row["Close"]) * rate, 2),
+                "open":   round(float(row["Open"]),  2),
+                "high":   round(float(row["High"]),  2),
+                "low":    round(float(row["Low"]),   2),
+                "close":  round(float(row["Close"]), 2),
                 "volume": int(vol) if vol == vol else 0,
             })
         except (ValueError, TypeError):
             continue  # skip rows with NaN OHLC values
 
-    result = {"ticker": ticker, "period": period, "currency": "EUR",
-              "fx_ok": fx_ok, "ohlcv": rows}
+    result = {"ticker": ticker, "period": period, "currency": native_currency,
+              "ohlcv": rows}
     _cache_set(cache_key, result)
     return result
 
@@ -1555,19 +1596,16 @@ def stock_financials(ticker: str):
 
     import yfinance as yf
     yf_ticker = yf.Ticker(ticker)
-    native_currency = None
-    try:
-        native_currency = getattr(yf_ticker.fast_info, "currency", None)
-    except Exception:
-        pass
-    rate, fx_ok = _eur_rate(native_currency)
+    native_currency = _native_currency(ticker)
 
+    # income_stmt is reported in the company's native currency — keep it there
+    # rather than forcing an unreliable EUR conversion that mislabels the figures.
     def _row_val(stmt, keys, col):
         for k in keys:
             if k in stmt.index:
                 v = stmt.loc[k, col]
                 if v == v and v is not None:  # not NaN
-                    return round(float(v) * rate, 0)
+                    return round(float(v), 0)
         return None
 
     rows = []
@@ -1586,7 +1624,7 @@ def stock_financials(ticker: str):
     except Exception:
         rows = []
 
-    result = {"ticker": ticker, "currency": "EUR", "fx_ok": fx_ok, "rows": rows}
+    result = {"ticker": ticker, "currency": native_currency, "fx_ok": True, "rows": rows}
     _cache_set(cache_key, result)
     return result
 
