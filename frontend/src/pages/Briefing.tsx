@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { getBriefingList, getBriefing, type BriefingMeta } from '../services/api'
 import { LoadingOverlay } from '../components/LoadingOverlay'
 
-const BACKEND = window.location.hostname === 'localhost'
-  ? '/api'
-  : 'https://market-tools-backend-my0v.onrender.com'
+const BACKEND = import.meta.env.VITE_API_URL
+  ?? (window.location.hostname === 'localhost'
+    ? '/api'
+    : 'https://api.178-104-138-156.sslip.io')
 const GH_RAW = 'https://raw.githubusercontent.com/juliokoelle/julio-brain/main/10_Daily'
 
 function renderMarkdown(md: string): string {

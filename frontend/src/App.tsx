@@ -15,7 +15,7 @@ import Ideas from './pages/Ideas'
 import Training from './pages/Training'
 import Podcasts from './pages/Podcasts'
 
-const BACKEND = 'https://market-tools-backend-my0v.onrender.com'
+const BACKEND = import.meta.env.VITE_API_URL ?? 'https://api.178-104-138-156.sslip.io'
 
 export default function App() {
   useEffect(() => {
