@@ -1,12 +1,24 @@
-# Coolify-Deployment: FastAPI-Backend + Telegram-Bot aus EINEM Image.
-# Beide Services teilen sich das via Dockerfile gebaute Image (build: .),
-# nur das Start-Kommando unterscheidet sich.
-# Env-Vars werden in der Coolify-UI gesetzt (NICHT hier committen).
+# Coolify-Deployment: FastAPI-Backend + Telegram-Bot + Cache-Warmer aus EINEM
+# Image (build: .), plus Redis als geteilter Cache. Nur das Start-Kommando
+# unterscheidet die App-Services. Secrets (API-Keys) kommen aus der Coolify-UI
+# (NICHT hier committen). REDIS_URL ist kein Secret -> interne Service-Adresse.
 services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    # LRU-Eviction + kleine Persistenz: Cache überlebt Redis-Neustarts.
+    command: redis-server --save 60 1 --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+
   backend:
     build: .
     command: uvicorn scripts.api:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
     # Öffentliche Domain wird in Coolify gesetzt (Feld docker_compose_domains des
     # Service "backend" → https://api.178-104-138-156.sslip.io). Coolify erzeugt daraus
     # die Traefik-Labels (Routing auf Port 8000) + Let's-Encrypt-HTTPS automatisch.
@@ -17,4 +29,22 @@ services:
     build: .
     command: python -m scripts.telegram_bot
     restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
     # Kein Port: Polling-Bot, braucht keinen eingehenden Verkehr.
+
+  cache-warmer:
+    build: .
+    # Entkoppelt vom Web-Prozess: füllt Redis alle 5 Min im Hintergrund vor,
+    # damit Analyzer/Hot-Stocks sofort aus dem Cache liefern (auch nach Redeploy).
+    command: python -m scripts.warm_cache --loop 300
+    restart: unless-stopped
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - redis
+
+volumes:
+  redis-data:

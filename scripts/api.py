@@ -113,19 +113,82 @@ _PORTFOLIO_GH_PATH  = "20_Career/investments/portfolio-current.json"
 _WATCHLIST_GH_PATH  = "20_Career/investments/stock-watchlist.json"
 
 
+# Two-tier cache: in-memory L1 (fast, per-process) backed by Redis L2 (shared,
+# survives redeploys). If REDIS_URL is unset/unreachable everything degrades
+# gracefully to L1-only — nothing crashes. Same _cache_get/set/del API as before.
+import json as _json
+
+_redis_client = None  # None = not yet tried, False = unavailable, else client
+
+
+def _redis():
+    global _redis_client
+    if _redis_client is not None:
+        return _redis_client or None
+    url = os.getenv("REDIS_URL", "").strip()
+    if not url:
+        _redis_client = False
+        return None
+    try:
+        import redis
+        client = redis.from_url(url, socket_timeout=2, socket_connect_timeout=2,
+                                decode_responses=True)
+        client.ping()
+        _redis_client = client
+        logging.getLogger("cache").info("Redis cache connected")
+        return client
+    except Exception as e:
+        logging.getLogger("cache").warning("Redis unavailable (%s) — L1 cache only", e)
+        _redis_client = False
+        return None
+
+
+_REDIS_GC_EX = 86400  # hard key expiry (24 h); logical freshness enforced via stored ts
+
+
+def _redis_default(o):
+    return o.item() if hasattr(o, "item") else str(o)  # numpy scalars -> python
+
+
 def _cache_get(key: str, ttl: float) -> object | None:
     entry = _cache.get(key)
     if entry and time.monotonic() - entry[0] < ttl:
         return entry[1]
+    r = _redis()
+    if r is not None:
+        try:
+            raw = r.get(f"mc:{key}")
+            if raw:
+                obj = _json.loads(raw)
+                if time.time() - obj["ts"] < ttl:
+                    val = obj["v"]
+                    _cache[key] = (time.monotonic(), val)  # promote to L1
+                    return val
+        except Exception:
+            pass
     return None
 
 
 def _cache_set(key: str, value: object) -> None:
     _cache[key] = (time.monotonic(), value)
+    r = _redis()
+    if r is not None:
+        try:
+            r.set(f"mc:{key}",
+                  _json.dumps({"ts": time.time(), "v": value}, default=_redis_default),
+                  ex=_REDIS_GC_EX)
+        except Exception:
+            pass
 
 
 def _cache_del(key: str) -> None:
     _cache.pop(key, None)
+    r = _redis()
+    if r is not None:
+        try:
+            r.delete(f"mc:{key}")
+        except Exception:
+            pass
 
 
 def _eur_rate(currency: str | None) -> tuple[float, bool]:
