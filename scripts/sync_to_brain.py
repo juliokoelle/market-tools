@@ -18,6 +18,7 @@ import base64
 import logging
 import os
 import subprocess
+import time
 from collections.abc import Callable
 from pathlib import Path
 
@@ -138,11 +139,17 @@ def github_read_modify_write(
     path: str,
     mutate_fn: Callable[[str], str],
     commit_msg: str,
+    max_attempts: int = 4,
 ) -> None:
     """Read path from GitHub, apply mutate_fn(current_text) → new_text, write back.
 
     Creates the file if it doesn't exist (mutate_fn receives "" in that case).
     Raises RuntimeError on GitHub API failure so callers can report the error.
+
+    Retries on a 409 SHA conflict (HTTP 409/422): two near-simultaneous writes
+    to the same file otherwise lose one and surface a false "save failed". On
+    conflict we re-read the latest content and re-apply mutate_fn, so the other
+    write is preserved. mutate_fn must therefore be safe to call more than once.
     """
     cfg = _gh_config()
     if not cfg:
@@ -155,42 +162,54 @@ def github_read_modify_write(
         "Accept": "application/vnd.github.v3+json",
     }
 
-    sha: str | None = None
-    current_text = ""
-    try:
-        resp = requests.get(api_url, headers=headers, timeout=10)
-        if resp.status_code == 200:
-            data = resp.json()
-            sha = data.get("sha")
-            current_text = base64.b64decode(
-                data["content"].replace("\n", "")
-            ).decode("utf-8")
-        elif resp.status_code != 404:
-            raise RuntimeError(f"GitHub GET failed: HTTP {resp.status_code}")
-    except requests.RequestException as e:
-        raise RuntimeError(f"GitHub GET request failed: {e}") from e
+    for attempt in range(max_attempts):
+        sha: str | None = None
+        current_text = ""
+        try:
+            resp = requests.get(api_url, headers=headers, timeout=10)
+            if resp.status_code == 200:
+                data = resp.json()
+                sha = data.get("sha")
+                current_text = base64.b64decode(
+                    data["content"].replace("\n", "")
+                ).decode("utf-8")
+            elif resp.status_code != 404:
+                raise RuntimeError(f"GitHub GET failed: HTTP {resp.status_code}")
+        except requests.RequestException as e:
+            raise RuntimeError(f"GitHub GET request failed: {e}") from e
 
-    new_text = mutate_fn(current_text)
+        new_text = mutate_fn(current_text)
 
-    body: dict = {
-        "message": commit_msg,
-        "content": base64.b64encode(new_text.encode("utf-8")).decode("ascii"),
-        "branch": "main",
-    }
-    if sha:
-        body["sha"] = sha
+        body: dict = {
+            "message": commit_msg,
+            "content": base64.b64encode(new_text.encode("utf-8")).decode("ascii"),
+            "branch": "main",
+        }
+        if sha:
+            body["sha"] = sha
 
-    try:
-        resp = requests.put(api_url, headers=headers, json=body, timeout=30)
-    except requests.RequestException as e:
-        raise RuntimeError(f"GitHub PUT request failed: {e}") from e
+        try:
+            resp = requests.put(api_url, headers=headers, json=body, timeout=30)
+        except requests.RequestException as e:
+            raise RuntimeError(f"GitHub PUT request failed: {e}") from e
 
-    if resp.status_code not in (200, 201):
+        if resp.status_code in (200, 201):
+            action = "updated" if sha else "created"
+            log.info("[brain] github_read_modify_write OK — %s %s", action, path)
+            return
+
+        # 409 Conflict (or 422) = the SHA we sent is stale; re-read and retry.
+        if resp.status_code in (409, 422) and attempt < max_attempts - 1:
+            log.warning(
+                "[brain] SHA conflict on %s (HTTP %s) — retry %d/%d",
+                path, resp.status_code, attempt + 1, max_attempts - 1,
+            )
+            time.sleep(0.5 * (attempt + 1))
+            continue
+
         raise RuntimeError(
             f"GitHub PUT failed: HTTP {resp.status_code} — {resp.text[:200]}"
         )
-    action = "updated" if sha else "created"
-    log.info("[brain] github_read_modify_write OK — %s %s", action, path)
 
 
 def sync(run_date: str, content: str, path: str | None = None) -> None:
