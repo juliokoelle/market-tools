@@ -7,7 +7,10 @@ services:
     build: .
     command: uvicorn scripts.api:app --host 0.0.0.0 --port 8000
     restart: unless-stopped
-    # Coolify mappt die öffentliche Domain auf diesen Port.
+    # Coolify "Magic FQDN": setzt öffentliche Domain + Traefik-Routing auf Port 8000,
+    # HTTPS-Zertifikat (Let's Encrypt) wird automatisch geholt. sslip.io zeigt auf die VPS-IP.
+    environment:
+      - SERVICE_FQDN_BACKEND_8000=https://api.178-104-138-156.sslip.io
     expose:
       - "8000"
 
