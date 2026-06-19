@@ -65,7 +65,7 @@ def classify_text(text: str) -> list[CapturedItem]:
         log.warning("ANTHROPIC_API_KEY not set — falling back to note")
         return [CapturedItem(type="note", text=text)]
     try:
-        client = anthropic.Anthropic(api_key=api_key)
+        client = anthropic.Anthropic(api_key=api_key, timeout=20.0)
         response = client.messages.create(
             model="claude-haiku-4-5-20251001",
             max_tokens=600,

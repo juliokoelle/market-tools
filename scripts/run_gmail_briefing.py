@@ -28,6 +28,7 @@ Required environment variables:
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import sys
 import time
@@ -41,11 +42,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from scripts.fetch_gmail_briefing import fetch_today_briefing  # noqa: E402
+from scripts.redis_state import heartbeat, install_redis_log_handler  # noqa: E402
 from scripts.sync_to_brain import sync as brain_sync           # noqa: E402
 from scripts.utils import today                                 # noqa: E402
 
 OUTPUTS_DIR = Path("outputs")
 LATEST_FILE = OUTPUTS_DIR / "latest-briefing.md"
+
+_SERVICE = "gmail-briefing"
+log = logging.getLogger(_SERVICE)
 
 _GH_TOKEN  = os.getenv("GITHUB_TOKEN", "")
 _GH_OWNER  = os.getenv("JULIO_BRAIN_OWNER", "juliokoelle")
@@ -77,6 +82,7 @@ def _check_env() -> None:
     missing = [v for v in ("GMAIL_USERNAME", "GMAIL_APP_PASSWORD") if not os.getenv(v)]
     if missing:
         _log(f"ERROR — missing env vars: {', '.join(missing)}")
+        log.error("missing env vars: %s", ", ".join(missing))
         sys.exit(1)
 
 
@@ -100,6 +106,8 @@ def _wait_for_network(max_attempts: int = 6, delay: int = 30) -> bool:
 
 
 def run(run_date_str: str | None = None) -> None:
+    install_redis_log_handler(_SERVICE)  # errors below show up in the bot's /health
+    heartbeat(_SERVICE)                  # liveness signal for /health
     _check_env()
 
     run_date = run_date_str or today()
@@ -146,6 +154,7 @@ def run(run_date_str: str | None = None) -> None:
         sync_ok = True
     except Exception as e:
         _log(f"Brain sync failed (non-blocking): {e}")
+        log.error("brain sync failed: %s", e)
 
     _log("=== Pipeline complete. ===")
     if sync_ok:
@@ -167,8 +176,10 @@ if __name__ == "__main__":
         run(args.date)
     except SystemExit as e:
         if e.code and int(e.code) != 0:
+            log.error("pipeline exited with code %s", e.code)
             _notify_telegram("❌ Gmail Briefing fehlgeschlagen — Render Logs prüfen")
         raise
     except Exception as e:
+        log.error("pipeline crashed: %s", e)
         _notify_telegram(f"❌ Gmail Briefing crashed: {e}")
         raise

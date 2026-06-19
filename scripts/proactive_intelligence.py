@@ -242,7 +242,7 @@ def _ask_claude(today_str: str, context: str) -> str:
     if not api_key:
         raise RuntimeError("ANTHROPIC_API_KEY not set")
 
-    client = anthropic.Anthropic(api_key=api_key)
+    client = anthropic.Anthropic(api_key=api_key, timeout=30.0)
 
     user_message = f"Today is {today_str}. Here is Julio's context:\n\n{context}"
 

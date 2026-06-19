@@ -62,7 +62,9 @@ log = logging.getLogger(__name__)
 _SERVICE = "telegram-bot"
 
 _TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN", "")
-_OWNER_ID = int(os.getenv("TELEGRAM_CHAT_ID", "0"))
+# Accept either env name — proactive_intelligence/morning_push use TELEGRAM_OWNER_ID,
+# so supporting both here removes a silent auth-misconfig footgun.
+_OWNER_ID = int(os.getenv("TELEGRAM_CHAT_ID") or os.getenv("TELEGRAM_OWNER_ID") or "0")
 
 _VISION_PROMPT = (
     "Analyze this image. Reply ONLY with valid JSON on a single line — no markdown, no extra text.\n"
@@ -296,6 +298,8 @@ async def handle_confirmation(update: Update, ctx: ContextTypes.DEFAULT_TYPE) ->
     """Handle ✅/✏️/❌ and type-picker button taps."""
     query = update.callback_query
     await query.answer()
+    if not _authorized(update):
+        return
     data: str = query.data or ""
     bot_data = ctx.application.bot_data
 
@@ -475,7 +479,8 @@ def _format_summary(tasks: list[str], questions: list[str], run_date: str) -> st
 # ---------------------------------------------------------------------------
 
 def _authorized(update: Update) -> bool:
-    return update.effective_chat.id == _OWNER_ID
+    chat = update.effective_chat
+    return chat is not None and chat.id == _OWNER_ID
 
 
 # ---------------------------------------------------------------------------
@@ -845,6 +850,24 @@ async def _heartbeat_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     heartbeat(_SERVICE)
 
 
+async def _on_error(update: object, ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    """Global handler: log any uncaught error and tell the owner instead of
+    leaving them staring at a half-finished interaction."""
+    log.error("Unhandled handler error: %s", ctx.error, exc_info=ctx.error)
+    try:
+        if (
+            isinstance(update, Update)
+            and update.effective_chat is not None
+            and update.effective_chat.id == _OWNER_ID
+        ):
+            await ctx.bot.send_message(
+                chat_id=_OWNER_ID,
+                text="⚠️ Interner Fehler bei der Verarbeitung. Details via /health.",
+            )
+    except Exception:  # noqa: BLE001 — never raise from the error handler
+        pass
+
+
 def _configure_logging() -> None:
     """Write rotating file logs (so /health's file fallback works) and push
     WARNING+ records to the shared Redis sink (so /health sees other services)."""
@@ -880,6 +903,7 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.PHOTO,                     handle_photo))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,   plain_text))
     app.add_handler(CallbackQueryHandler(handle_confirmation))
+    app.add_error_handler(_on_error)
 
     app.job_queue.run_daily(
         send_evening_summary,
