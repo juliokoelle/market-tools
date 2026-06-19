@@ -17,8 +17,42 @@ Public API:
 from __future__ import annotations
 
 import os
+import json
+import time
 
 import yfinance as yf
+
+# ---------------------------------------------------------------------------
+# Sentiment cache (Redis, shared). The Haiku classification is the only paid
+# LLM call in scoring and changes slowly, so cache it far longer (6 h) than the
+# 5-min price/momentum warming. This decouples LLM cost from cache freshness:
+# the warmer recomputes momentum every 5 min but reuses the cached sentiment,
+# cutting Haiku calls by ~98 %. Degrades silently to live classification when
+# REDIS_URL is unset/unreachable.
+# ---------------------------------------------------------------------------
+_SENT_TTL = 21600  # 6 h
+_sent_redis = None  # None = untried, False = unavailable, else client
+
+
+def _sent_r():
+    global _sent_redis
+    if _sent_redis is not None:
+        return _sent_redis or None
+    url = os.getenv("REDIS_URL", "").strip()
+    if not url:
+        _sent_redis = False
+        return None
+    try:
+        import redis
+        c = redis.from_url(url, socket_timeout=2, socket_connect_timeout=2,
+                           decode_responses=True)
+        c.ping()
+        _sent_redis = c
+        return c
+    except Exception:
+        _sent_redis = False
+        return None
+
 
 _CRYPTO_SUFFIXES = ("-USD",)
 
@@ -188,19 +222,39 @@ def _haiku_classify(ticker: str, headlines: list[str]) -> str:
 
 
 def _sentiment_score(ticker: str) -> tuple[float, dict]:
+    cache_key = f"mc:sentiment:{ticker.upper()}"
+    r = _sent_r()
+    if r is not None:
+        try:
+            raw = r.get(cache_key)
+            if raw:
+                obj = json.loads(raw)
+                if time.time() - obj["ts"] < _SENT_TTL:
+                    return obj["score"], obj["details"]
+        except Exception:
+            pass
+
     headlines = _fetch_headlines(ticker)
     if not headlines:
+        # Don't cache 'no data' for 6 h — headlines may appear shortly.
         return 50.0, {"label": "neutral", "headlines_count": 0, "source": "no data"}
 
-    label = _haiku_classify(ticker, headlines)
-    score = _SENTIMENT_SCORE_MAP[label]
-    source = "haiku" if os.getenv("ANTHROPIC_API_KEY") else "keywords"
-
-    return round(score, 1), {
+    label = _haiku_classify(ticker, headlines)   # the paid Haiku call
+    score = round(_SENTIMENT_SCORE_MAP[label], 1)
+    details = {
         "label":           label,
         "headlines_count": len(headlines),
-        "source":          source,
+        "source":          "haiku" if os.getenv("ANTHROPIC_API_KEY") else "keywords",
     }
+
+    if r is not None:
+        try:
+            r.set(cache_key, json.dumps({"ts": time.time(), "score": score, "details": details}),
+                  ex=_SENT_TTL + 3600)
+        except Exception:
+            pass
+
+    return score, details
 
 
 # ---------------------------------------------------------------------------
