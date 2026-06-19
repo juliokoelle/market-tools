@@ -31,7 +31,7 @@ def test_run_exits_zero_when_no_emails(monkeypatch):
     monkeypatch.setenv("GMAIL_USERNAME",     "test@gmail.com")
     monkeypatch.setenv("GMAIL_APP_PASSWORD", "test-pass-1234")
     import scripts.run_gmail_briefing as runner
-    monkeypatch.setattr(runner, "fetch_today_briefing", lambda: None)
+    monkeypatch.setattr(runner, "fetch_today_briefing", lambda target_date=None: None)
     with pytest.raises(SystemExit) as exc:
         runner.run()
     assert exc.value.code == 0
@@ -44,7 +44,7 @@ def test_run_saves_latest_and_archive(monkeypatch, tmp_path):
     import scripts.run_gmail_briefing as runner
     monkeypatch.setattr(runner, "OUTPUTS_DIR",          tmp_path)
     monkeypatch.setattr(runner, "LATEST_FILE",          tmp_path / "latest-briefing.md")
-    monkeypatch.setattr(runner, "fetch_today_briefing", lambda: "## MarketsXrunch\n\nGold +1%.")
+    monkeypatch.setattr(runner, "fetch_today_briefing", lambda target_date=None: "## MarketsXrunch\n\nGold +1%.")
     monkeypatch.setattr(runner, "brain_sync",           lambda d, c: synced.append((d, c)))
     monkeypatch.setattr(runner, "today",                lambda: "2026-05-08")
     runner.run()
@@ -65,7 +65,7 @@ def test_run_continues_when_brain_sync_fails(monkeypatch, tmp_path):
     import scripts.run_gmail_briefing as runner
     monkeypatch.setattr(runner, "OUTPUTS_DIR",          tmp_path)
     monkeypatch.setattr(runner, "LATEST_FILE",          tmp_path / "latest-briefing.md")
-    monkeypatch.setattr(runner, "fetch_today_briefing", lambda: "## Section\n\nContent.")
+    monkeypatch.setattr(runner, "fetch_today_briefing", lambda target_date=None: "## Section\n\nContent.")
     monkeypatch.setattr(runner, "brain_sync",
                         lambda d, c: (_ for _ in ()).throw(RuntimeError("sync failed")))
     monkeypatch.setattr(runner, "today",                lambda: "2026-05-08")
