@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 import requests
 
 from scripts.sync_to_brain import _gh_config, github_read
+from scripts.task_format import parse_open_tasks, render_groups
 from scripts.telegram_utils import send_message
 from scripts.utils import today
 
@@ -47,50 +48,6 @@ def _extract_open(text: str, section: str) -> list[str]:
             end = i
             break
     return [l.strip()[6:] for l in lines[start:end] if l.strip().startswith("- [ ]")]
-
-
-def _extract_priority_backlog(text: str, limit: int = 8) -> list[str]:
-    """Extract top open items from OPEN_TASKS.md with section context prefix."""
-    lines = text.splitlines()
-
-    PRIORITY = {"🔴": 0, "💼": 1, "🎯": 2, "🟡": 3, "🔵": 4, "🟢": 5}
-
-    buckets: dict[str, list[str]] = {}
-    section_priority: dict[str, int] = {}
-    current_section = ""
-    current_subsection = ""
-    current_priority = 99
-
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("## "):
-            header = stripped[3:].strip()
-            current_priority = next(
-                (v for k, v in PRIORITY.items() if k in header), 99
-            )
-            current_section = header
-            current_subsection = ""
-        elif stripped.startswith("### "):
-            current_subsection = stripped[4:].strip()
-        elif stripped.startswith("- [ ]") and current_section:
-            label = current_subsection or current_section
-            item = stripped[6:].strip()
-            if "←" in item:
-                item = item[:item.index("←")].strip()
-            tagged = f"[{label}] {item}"
-            if label not in buckets:
-                buckets[label] = []
-                section_priority[label] = current_priority
-            buckets[label].append(tagged)
-
-    result: list[str] = []
-    seen_sections = sorted(buckets.keys(), key=lambda s: section_priority.get(s, 99))
-    for section in seen_sections:
-        result.extend(buckets[section][:2])
-        if len(result) >= limit:
-            break
-
-    return result[:limit]
 
 
 def _extract_qa(text: str, limit: int = 3) -> list[tuple[str, str]]:
@@ -237,7 +194,7 @@ def _build_message(
     followups: list[str],
     birthdays: list[str],
     subtitle: str = "",
-    backlog: list[str] | None = None,
+    backlog_block: str = "",
     qa: list[tuple[str, str]] | None = None,
 ) -> str:
     now = datetime.now(tz=_BERLIN)
@@ -260,10 +217,8 @@ def _build_message(
     else:
         lines.append("Nichts offen ✅")
 
-    if backlog:
-        lines += ["", "🎯 *Offene Prioritäten*"]
-        for b in backlog:
-            lines.append(f"• {b}")
+    if backlog_block:
+        lines += ["", "🎯 *Offene Prioritäten*", "", backlog_block]
 
     if followups:
         lines += ["", "⏰ *Follow-ups*"]
@@ -300,7 +255,7 @@ def send_morning_push() -> None:
     backlog_text = github_read("00_Inbox/OPEN_TASKS.md") or ""
     birthdays = _check_birthdays()
 
-    backlog = _extract_priority_backlog(backlog_text, limit=5) if backlog_text else []
+    backlog_block = render_groups(parse_open_tasks(backlog_text), cap_per_bucket=3) if backlog_text else ""
     yesterday_qa = _extract_qa(yesterday_text) if yesterday_text else []
 
     if text is None:
@@ -314,13 +269,13 @@ def send_morning_push() -> None:
                 message = _build_message(
                     run_date, tasks, followups, birthdays,
                     subtitle=f"Noch keine heutige Note — offene Tasks von {yesterday}",
-                    backlog=backlog, qa=yesterday_qa,
+                    backlog_block=backlog_block, qa=yesterday_qa,
                 )
             else:
                 message = _build_message(
                     run_date, [], [], birthdays,
                     subtitle="Keine offenen Tasks — gestern alles erledigt ✅",
-                    backlog=backlog, qa=yesterday_qa,
+                    backlog_block=backlog_block, qa=yesterday_qa,
                 )
         else:
             message = (
@@ -334,7 +289,7 @@ def send_morning_push() -> None:
         followups = _extract_open(text, "Follow-ups")
         message   = _build_message(
             run_date, tasks, followups, birthdays,
-            backlog=backlog, qa=yesterday_qa,
+            backlog_block=backlog_block, qa=yesterday_qa,
         )
 
     send_message(_TOKEN, _OWNER_ID, message)
