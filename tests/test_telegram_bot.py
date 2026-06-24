@@ -171,29 +171,32 @@ def test_extract_open_items_does_not_leak_into_next_section():
 def test_format_summary_with_items():
     from scripts.telegram_bot import _format_summary
 
+    vault = "## 💼 Beruf / HDP\n- [ ] HubSpot Token eintragen\n"
     msg = _format_summary(
         ["- [ ] Call bank", "- [ ] Review notes"],
+        vault,
         ["- [ ] What is a basis swap? (2026-05-09)"],
         "2026-05-09",
     )
     assert "Call bank" in msg
     assert "Review notes" in msg
     assert "basis swap" in msg
-    assert "2 Tasks" in msg
-    assert "1 Fragen" in msg
+    assert "HubSpot Token eintragen" in msg
+    assert "🏢 Arbeit" in msg          # categorized backlog rendered
+    assert "Heute notiert" in msg      # daily tasks under their own header
 
 
 def test_format_summary_empty_lists():
     from scripts.telegram_bot import _format_summary
 
-    msg = _format_summary([], [], "2026-05-09")
+    msg = _format_summary([], "", [], "2026-05-09")
     assert "erledigt" in msg.lower()
 
 
 def test_format_summary_strips_checkbox_prefix():
     from scripts.telegram_bot import _format_summary
 
-    msg = _format_summary(["- [ ] Do something"], [], "2026-05-09")
+    msg = _format_summary(["- [ ] Do something"], "", [], "2026-05-09")
     assert "Do something" in msg
     assert "- [ ]" not in msg
 

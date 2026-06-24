@@ -43,6 +43,7 @@ from telegram.ext import (
 )
 
 from scripts.sync_to_brain import github_read, github_read_modify_write
+from scripts.task_format import clean_task, parse_open_tasks, render_groups
 from scripts.utils import today
 from scripts.vault_utils import insert_into_section, make_daily_note as _make_daily_note, note_entry as _note_entry
 from scripts.classifier import classify_text, CapturedItem, VALID_TYPES
@@ -456,21 +457,34 @@ def _esc(text: str) -> str:
     return text
 
 
-def _format_summary(tasks: list[str], questions: list[str], run_date: str) -> str:
-    safe_date = _esc(run_date)
-    if not tasks and not questions:
-        return f"✅ *Abend\\-Zusammenfassung — {safe_date}*\n\nAlles erledigt\\. Guten Abend\\!"
+def _format_summary(
+    daily_tasks: list[str], vault_md: str, questions: list[str], run_date: str
+) -> str:
+    """Evening recap / on-demand summary — categorized, capped, clean (Markdown v1).
 
-    def bullet(line: str) -> str:
-        content = line[6:] if line.startswith("- [ ] ") else line
-        return "• " + _esc(content)
+    Recap role: today's noted tasks + a capped, bucketed view of the backlog +
+    a few open questions. Never dumps the whole backlog. Shared with /tasks.
+    """
+    dt = [clean_task(t) for t in daily_tasks]
+    dt = [t for t in dt if t]
+    grouped = render_groups(parse_open_tasks(vault_md), cap_per_bucket=4)
+    qs = [clean_task(q) for q in questions]
+    qs = [q for q in qs if q]
 
-    parts = [f"📋 *Abend\\-Zusammenfassung — {safe_date}*"]
-    parts.append("\n*Offene Tasks:*" if tasks else "\n*Offene Tasks:* —")
-    parts.extend(bullet(t) for t in tasks)
-    parts.append("\n*Offene Fragen:*" if questions else "\n*Offene Fragen:* —")
-    parts.extend(bullet(q) for q in questions)
-    parts.append(f"\n_{len(tasks)} Tasks · {len(questions)} Fragen_")
+    if not dt and not grouped and not qs:
+        return f"✅ *Abend-Zusammenfassung — {run_date}*\n\nAlles erledigt. Guten Abend!"
+
+    parts = [f"📋 *Abend-Zusammenfassung — {run_date}*"]
+    if dt:
+        parts += ["", "*Heute notiert*"] + [f"• {t}" for t in dt[:6]]
+        if len(dt) > 6:
+            parts.append(f"_(+{len(dt) - 6} weitere)_")
+    if grouped:
+        parts += ["", grouped]
+    if qs:
+        parts += ["", "*Offene Fragen*"] + [f"• {q}" for q in qs[:5]]
+        if len(qs) > 5:
+            parts.append(f"_(+{len(qs) - 5} weitere)_")
     return "\n".join(parts)
 
 
@@ -527,12 +541,14 @@ async def cmd_tasks(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
     try:
         daily_text  = github_read(f"10_Daily/{run_date}.md") or ""
         daily_tasks = _extract_open_items(daily_text, "Tasks")
-        vault_tasks = _get_vault_tasks()
-        tasks       = daily_tasks + vault_tasks
+        vault_md    = github_read("00_Inbox/OPEN_TASKS.md") or ""
         q_text      = github_read("40_Knowledge/open-questions.md") or ""
         questions   = [l.strip() for l in q_text.splitlines() if l.strip().startswith("- [ ]")]
-        msg = _format_summary(tasks, questions, run_date)
-        await update.message.reply_text(msg, parse_mode="MarkdownV2")
+        msg = _format_summary(daily_tasks, vault_md, questions, run_date)
+        try:
+            await update.message.reply_text(msg, parse_mode="Markdown")
+        except BadRequest:
+            await update.message.reply_text(msg)  # plain fallback if Markdown trips
     except Exception as e:
         log.error("cmd_tasks failed: %s", e)
         await update.message.reply_text(f"Fehler: {e}")
@@ -774,23 +790,19 @@ async def handle_photo(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _get_vault_tasks() -> list[str]:
-    """Read all open tasks from 00_Inbox/OPEN_TASKS.md."""
-    text = github_read("00_Inbox/OPEN_TASKS.md") or ""
-    return [l.strip() for l in text.splitlines() if l.strip().startswith("- [ ]")]
-
-
 async def send_evening_summary(ctx: ContextTypes.DEFAULT_TYPE) -> None:
     run_date = today()
     try:
         daily_text  = github_read(f"10_Daily/{run_date}.md") or ""
         daily_tasks = _extract_open_items(daily_text, "Tasks")
-        vault_tasks = _get_vault_tasks()
-        tasks       = daily_tasks + vault_tasks
+        vault_md    = github_read("00_Inbox/OPEN_TASKS.md") or ""
         q_text      = github_read("40_Knowledge/open-questions.md") or ""
         questions   = [l.strip() for l in q_text.splitlines() if l.strip().startswith("- [ ]")]
-        msg = _format_summary(tasks, questions, run_date)
-        await ctx.bot.send_message(chat_id=_OWNER_ID, text=msg, parse_mode="MarkdownV2")
+        msg = _format_summary(daily_tasks, vault_md, questions, run_date)
+        try:
+            await ctx.bot.send_message(chat_id=_OWNER_ID, text=msg, parse_mode="Markdown")
+        except BadRequest:
+            await ctx.bot.send_message(chat_id=_OWNER_ID, text=msg)  # plain fallback
     except Exception as e:
         log.error("send_evening_summary failed: %s", e)
         try:
