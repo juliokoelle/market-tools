@@ -28,6 +28,7 @@ from __future__ import annotations
 import base64
 import logging
 import os
+import re
 from datetime import date, timedelta
 from zoneinfo import ZoneInfo
 
@@ -44,6 +45,10 @@ logging.basicConfig(
 log = logging.getLogger(__name__)
 
 _BERLIN = ZoneInfo("Europe/Berlin")
+
+# The hint message Julio receives must start with this marker. Anything Claude
+# emits BEFORE it (reasoning / English lead-in) is stripped and never sent.
+_HINT_MARKER = "🧠"
 
 # ---------------------------------------------------------------------------
 # Config helpers
@@ -226,13 +231,16 @@ Focus on:
 
 Rules:
 - Be SPECIFIC. Name exact people, dates, tasks.
-- Only flag things that are actionable in the next 14 days
-- Return null/empty if nothing urgent
-- Maximum 2 items
-- If returning items, format as a clean Telegram message starting with "🧠 *Second Brain Hint:*"
+- Only flag things that are actionable in the next 14 days.
+- Maximum 2 items.
+- Respond ONLY in German — the message Julio receives must be German.
+- Output ONLY the final Telegram message and NOTHING else: no preamble, no \
+reasoning, no English lead-in such as "Looking at Julio's notes" or "I can see". \
+Start your output directly with the exact marker: "🧠 *Second Brain Hint:*"
+- If nothing is urgent or actionable, output exactly: NICHTS
 - Do NOT be generic. "You have open tasks" is bad. \
-"Your question about Bonn expansion site has been open 9 days — \
-you mentioned a meeting with Paul Haltof next week" is good.\
+"Deine Frage zum Expansionsstandort Bonn ist seit 9 Tagen offen — \
+nächste Woche hast du ein Treffen mit Paul Haltof" is good.\
 """
 
 
@@ -283,14 +291,33 @@ def _send_telegram(text: str) -> None:
 # Entrypoint
 # ---------------------------------------------------------------------------
 
+def _extract_hint(text: str) -> str:
+    """Return only the hint from the marker onward; '' if the marker is absent.
+
+    Claude occasionally prepends reasoning or an English lead-in before the
+    "🧠" marker — we only ever send from the marker on, never the preamble.
+    """
+    if not text:
+        return ""
+    idx = text.find(_HINT_MARKER)
+    if idx == -1:
+        return ""
+    return text[idx:].strip()
+
+
 def _is_empty_response(text: str) -> bool:
-    """Return True if Claude signalled there is nothing actionable."""
+    """Return True if there is nothing actionable to send."""
     if not text:
         return True
     lower = text.lower().strip()
-    empty_signals = ("null", "none", "nothing", "no urgent", "no actionable", "keine")
+    empty_signals = ("null", "none", "nothing", "no urgent", "no actionable", "keine", "nichts")
     # Short responses that are just a null signal
     if len(lower) < 60 and any(lower.startswith(s) for s in empty_signals):
+        return True
+    # Marker present but no real body after stripping marker + label → empty
+    body = text.replace(_HINT_MARKER, "")
+    body = re.sub(r"\*?\s*second brain hint:?\s*\*?", "", body, flags=re.I)
+    if len(body.strip(" *\n\t-")) < 5:
         return True
     return False
 
@@ -308,13 +335,15 @@ def run_proactive_intelligence() -> None:
         log.error("[pi] Claude call failed: %s", exc)
         return
 
-    if _is_empty_response(insight):
-        log.info("[pi] No actionable insights today — exiting silently")
+    # Strip any preamble/reasoning: only ever send from the 🧠 marker onward.
+    hint = _extract_hint(insight)
+    if _is_empty_response(hint):
+        log.info("[pi] No actionable hint (no marker or empty) — exiting silently")
         return
 
     log.info("[pi] Actionable insight found — sending Telegram")
     try:
-        _send_telegram(insight)
+        _send_telegram(hint)
     except Exception as exc:
         log.error("[pi] Failed to deliver insight: %s", exc)
 
