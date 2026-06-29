@@ -2,6 +2,7 @@
 from scripts.task_format import (
     ARBEIT, APPS, PERSOENLICH,
     bucket_for, clean_task, parse_open_tasks, render_groups,
+    esc_v2, header_v2, expandable_v2, render_groups_v2,
 )
 
 SAMPLE = """\
@@ -84,3 +85,36 @@ class TestRenderGroups:
         out = render_groups(items, cap_per_bucket=4)
         assert "_(+2 weitere)_" in out
         assert out.count("• Task") == 4
+
+
+class TestMarkdownV2:
+    def test_esc_escapes_specials(self):
+        assert esc_v2("a.b-c!") == "a\\.b\\-c\\!"
+        assert esc_v2("(x)") == "\\(x\\)"
+
+    def test_header_emoji_outside_bold(self):
+        # emoji must NOT sit directly after '*' (breaks Telegram bold)
+        assert header_v2("🏢", "Arbeit") == "🏢 *Arbeit*"
+
+    def test_expandable_blockquote_structure(self):
+        q = expandable_v2("+2 weitere", ["• a", "• b"])
+        lines = q.split("\n")
+        assert lines[0].startswith("**>")   # expandable start
+        assert lines[1].startswith(">")
+        assert lines[-1].endswith("||")     # expandability mark
+
+    def test_render_v2_caps_and_expands(self):
+        items = [(APPS, f"Task {i}") for i in range(5)]
+        out = render_groups_v2(items, cap_per_bucket=3)
+        assert "📱 *Apps*" in out
+        assert "**>" in out and out.rstrip().endswith("||")  # overflow expandable
+
+
+class TestDedup:
+    def test_duplicate_task_across_sections_kept_once(self):
+        md = (
+            "## 🔴 Dringend\n- [ ] nennung-online Anfrage\n"
+            "## 🟡 Projekte\n### HorseFinder\n- [ ] nennung-online Anfrage ← siehe 🔴\n"
+        )
+        texts = [t for _, t in parse_open_tasks(md)]
+        assert texts.count("nennung-online Anfrage") == 1

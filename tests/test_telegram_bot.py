@@ -182,7 +182,7 @@ def test_format_summary_with_items():
     assert "Review notes" in msg
     assert "basis swap" in msg
     assert "HubSpot Token eintragen" in msg
-    assert "🏢 Arbeit" in msg          # categorized backlog rendered
+    assert "Arbeit" in msg             # categorized backlog rendered (MarkdownV2 header)
     assert "Heute notiert" in msg      # daily tasks under their own header
 
 

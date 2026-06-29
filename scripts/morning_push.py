@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 import requests
 
 from scripts.sync_to_brain import _gh_config, github_read
-from scripts.task_format import parse_open_tasks, render_groups
+from scripts.task_format import bold_v2, esc_v2, expandable_v2, parse_open_tasks, render_groups_v2
 from scripts.telegram_utils import send_message
 from scripts.utils import today
 
@@ -176,11 +176,11 @@ def _check_birthdays() -> list[str]:
 
         if 0 <= days_until <= 7:
             if days_until == 0:
-                msg = f"🎂 *{name}* hat heute Geburtstag!"
+                msg = f"🎂 {name} hat heute Geburtstag!"
             elif days_until == 1:
-                msg = f"🎁 *{name}* hat morgen Geburtstag ({bday_this_year.strftime('%-d. %B')})"
+                msg = f"🎁 {name} hat morgen Geburtstag ({bday_this_year.strftime('%-d. %B')})"
             else:
-                msg = f"🎁 *{name}* hat in {days_until} Tagen Geburtstag ({bday_this_year.strftime('%-d. %B')})"
+                msg = f"🎁 {name} hat in {days_until} Tagen Geburtstag ({bday_this_year.strftime('%-d. %B')})"
             upcoming.append((days_until, msg))
             log.info("[birthday] %s", msg)
 
@@ -200,42 +200,44 @@ def _build_message(
     now = datetime.now(tz=_BERLIN)
     day_str = now.strftime("%-d. %B %Y")
 
+    # MarkdownV2 throughout — emoji stays OUTSIDE the bold marker.
     lines: list[str] = [
-        "☀️ *Guten Morgen!*",
-        f"📅 *{day_str}*",
+        f"☀️ {bold_v2('Guten Morgen!')}",
+        f"📅 {bold_v2(day_str)}",
         "",
     ]
     if subtitle:
-        lines += [f"_{subtitle}_", ""]
+        lines += [f"_{esc_v2(subtitle)}_", ""]
 
-    lines.append("📋 *Tasks heute*")
+    lines.append(f"📋 {bold_v2('Tasks heute')}")
     if tasks:
         for t in tasks[:TASK_LIMIT]:
-            lines.append(f"• {t}")
+            lines.append(f"• {esc_v2(t)}")
         if len(tasks) > TASK_LIMIT:
-            lines.append(f"_(+{len(tasks) - TASK_LIMIT} weitere)_")
+            lines.append(expandable_v2(
+                f"+{len(tasks) - TASK_LIMIT} weitere",
+                [f"• {t}" for t in tasks[TASK_LIMIT:]],
+            ))
     else:
         lines.append("Nichts offen ✅")
 
     if backlog_block:
-        lines += ["", "🎯 *Offene Prioritäten*", "", backlog_block]
+        lines += ["", f"🎯 {bold_v2('Offene Prioritäten')}", "", backlog_block]
 
     if followups:
-        lines += ["", "⏰ *Follow-ups*"]
-        for f in followups:
-            lines.append(f"• {f}")
+        lines += ["", f"⏰ {bold_v2('Follow-ups')}"]
+        lines += [f"• {esc_v2(f)}" for f in followups]
 
     if qa:
-        lines += ["", "💡 *Gestrige Fragen & Antworten*"]
+        lines += ["", f"💡 {bold_v2('Gestrige Fragen & Antworten')}"]
         for question, answer in qa:
-            lines.append(f"❓ _{question}_")
+            lines.append(f"❓ _{esc_v2(question)}_")
             if answer:
-                lines.append(f"→ {answer}")
+                lines.append(f"→ {esc_v2(answer)}")
 
     if birthdays:
-        lines += ["", "🎂 *Geburtstage*"]
-        for b in birthdays:
-            lines.append(b)
+        lines += ["", f"🎂 {bold_v2('Geburtstage')}"]
+        lines += [esc_v2(b) for b in birthdays]
 
     return "\n".join(lines)
 
@@ -255,7 +257,7 @@ def send_morning_push() -> None:
     backlog_text = github_read("00_Inbox/OPEN_TASKS.md") or ""
     birthdays = _check_birthdays()
 
-    backlog_block = render_groups(parse_open_tasks(backlog_text), cap_per_bucket=3) if backlog_text else ""
+    backlog_block = render_groups_v2(parse_open_tasks(backlog_text), cap_per_bucket=3) if backlog_text else ""
     yesterday_qa = _extract_qa(yesterday_text) if yesterday_text else []
 
     if text is None:
@@ -279,11 +281,11 @@ def send_morning_push() -> None:
                 )
         else:
             message = (
-                f"☀️ *Guten Morgen!*\n📅 *{day_str}*\n\n"
-                "Noch keine Daily Note für heute — sie wird in Kürze erstellt."
+                f"☀️ {bold_v2('Guten Morgen!')}\n📅 {bold_v2(day_str)}\n\n"
+                + esc_v2("Noch keine Daily Note für heute — sie wird in Kürze erstellt.")
             )
             if birthdays:
-                message += "\n\n🎂 *Geburtstage*\n" + "\n".join(birthdays)
+                message += f"\n\n🎂 {bold_v2('Geburtstage')}\n" + "\n".join(esc_v2(b) for b in birthdays)
     else:
         tasks     = _extract_open(text, "Tasks")
         followups = _extract_open(text, "Follow-ups")
@@ -292,7 +294,7 @@ def send_morning_push() -> None:
             backlog_block=backlog_block, qa=yesterday_qa,
         )
 
-    send_message(_TOKEN, _OWNER_ID, message)
+    send_message(_TOKEN, _OWNER_ID, message, parse_mode="MarkdownV2")
     log.info("Morning push sent OK")
 
 
