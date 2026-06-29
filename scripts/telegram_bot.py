@@ -43,7 +43,7 @@ from telegram.ext import (
 )
 
 from scripts.sync_to_brain import github_read, github_read_modify_write
-from scripts.task_format import clean_task, parse_open_tasks, render_groups
+from scripts.task_format import bold_v2, clean_task, esc_v2, expandable_v2, parse_open_tasks, render_groups_v2
 from scripts.utils import today
 from scripts.vault_utils import insert_into_section, make_daily_note as _make_daily_note, note_entry as _note_entry
 from scripts.classifier import classify_text, CapturedItem, VALID_TYPES
@@ -465,26 +465,26 @@ def _format_summary(
     Recap role: today's noted tasks + a capped, bucketed view of the backlog +
     a few open questions. Never dumps the whole backlog. Shared with /tasks.
     """
-    dt = [clean_task(t) for t in daily_tasks]
-    dt = [t for t in dt if t]
-    grouped = render_groups(parse_open_tasks(vault_md), cap_per_bucket=4)
-    qs = [clean_task(q) for q in questions]
-    qs = [q for q in qs if q]
+    dt = [t for t in (clean_task(t) for t in daily_tasks) if t]
+    grouped = render_groups_v2(parse_open_tasks(vault_md), cap_per_bucket=4)
+    qs = [q for q in (clean_task(q) for q in questions) if q]
 
+    title = f"📋 {bold_v2('Abend-Zusammenfassung — ' + run_date)}"
     if not dt and not grouped and not qs:
-        return f"✅ *Abend-Zusammenfassung — {run_date}*\n\nAlles erledigt. Guten Abend!"
+        ok = f"✅ {bold_v2('Abend-Zusammenfassung — ' + run_date)}"
+        return f"{ok}\n\n{esc_v2('Alles erledigt. Guten Abend!')}"
 
-    parts = [f"📋 *Abend-Zusammenfassung — {run_date}*"]
+    parts = [title]
     if dt:
-        parts += ["", "*Heute notiert*"] + [f"• {t}" for t in dt[:6]]
+        parts += ["", bold_v2("Heute notiert")] + [f"• {esc_v2(t)}" for t in dt[:6]]
         if len(dt) > 6:
-            parts.append(f"_(+{len(dt) - 6} weitere)_")
+            parts.append(expandable_v2(f"+{len(dt) - 6} weitere", [f"• {t}" for t in dt[6:]]))
     if grouped:
         parts += ["", grouped]
     if qs:
-        parts += ["", "*Offene Fragen*"] + [f"• {q}" for q in qs[:5]]
+        parts += ["", bold_v2("Offene Fragen")] + [f"• {esc_v2(q)}" for q in qs[:5]]
         if len(qs) > 5:
-            parts.append(f"_(+{len(qs) - 5} weitere)_")
+            parts.append(expandable_v2(f"+{len(qs) - 5} weitere", [f"• {q}" for q in qs[5:]]))
     return "\n".join(parts)
 
 
@@ -546,7 +546,7 @@ async def cmd_tasks(update: Update, ctx: ContextTypes.DEFAULT_TYPE) -> None:
         questions   = [l.strip() for l in q_text.splitlines() if l.strip().startswith("- [ ]")]
         msg = _format_summary(daily_tasks, vault_md, questions, run_date)
         try:
-            await update.message.reply_text(msg, parse_mode="Markdown")
+            await update.message.reply_text(msg, parse_mode="MarkdownV2")
         except BadRequest:
             await update.message.reply_text(msg)  # plain fallback if Markdown trips
     except Exception as e:
@@ -800,7 +800,7 @@ async def send_evening_summary(ctx: ContextTypes.DEFAULT_TYPE) -> None:
         questions   = [l.strip() for l in q_text.splitlines() if l.strip().startswith("- [ ]")]
         msg = _format_summary(daily_tasks, vault_md, questions, run_date)
         try:
-            await ctx.bot.send_message(chat_id=_OWNER_ID, text=msg, parse_mode="Markdown")
+            await ctx.bot.send_message(chat_id=_OWNER_ID, text=msg, parse_mode="MarkdownV2")
         except BadRequest:
             await ctx.bot.send_message(chat_id=_OWNER_ID, text=msg)  # plain fallback
     except Exception as e:

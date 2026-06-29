@@ -81,6 +81,7 @@ def parse_open_tasks(md: str) -> list[tuple[str, str]]:
     Tracks ## section and ### subsection so each task is bucketed by its context.
     """
     items: list[tuple[str, str]] = []
+    seen: set[str] = set()
     section = ""
     subsection = ""
     for line in md.splitlines():
@@ -94,6 +95,10 @@ def parse_open_tasks(md: str) -> list[tuple[str, str]]:
             text = clean_task(stripped)
             if not text:
                 continue
+            key = text.lower()
+            if key in seen:          # same task listed under two sections (e.g. 🔴 + project)
+                continue
+            seen.add(key)
             label = subsection or section
             items.append((bucket_for(label, text), text))
     return items
@@ -126,3 +131,63 @@ def render_groups(
             out.append(f"_(+{len(tasks) - cap_per_bucket} weitere)_")
         out.append("")
     return "\n".join(out).strip()
+
+
+# ---------------------------------------------------------------------------
+# MarkdownV2 rendering (Telegram) — expandable blockquote for overflow
+# ---------------------------------------------------------------------------
+
+# Emoji + label split so the emoji sits OUTSIDE the bold marker (Telegram breaks
+# bold when an emoji immediately follows the '*').
+BUCKET_META: dict[str, tuple[str, str]] = {
+    ARBEIT: ("🏢", "Arbeit"),
+    APPS: ("📱", "Apps"),
+    PERSOENLICH: ("🏠", "Persönlich"),
+}
+
+_MD2_SPECIAL = set("_*[]()~`>#+-=|{}.!\\")
+
+
+def esc_v2(text: str) -> str:
+    """Escape arbitrary text for Telegram MarkdownV2."""
+    return "".join("\\" + c if c in _MD2_SPECIAL else c for c in text)
+
+
+def bold_v2(text: str) -> str:
+    """Bold an escaped plain string (Markdown V2)."""
+    return f"*{esc_v2(text)}*"
+
+
+def header_v2(emoji: str, label: str) -> str:
+    """Section header: emoji outside the bold so Telegram renders it cleanly."""
+    return f"{emoji} *{esc_v2(label)}*"
+
+
+def expandable_v2(lead: str, lines: list[str]) -> str:
+    """Telegram MarkdownV2 expandable blockquote.
+
+    `lead` is the visible peek line; `lines` are collapsed until tapped.
+    First line prefixed '**>', the rest '>', last line ends with '||'.
+    """
+    body = [lead, *lines]
+    quoted = [("**>" if i == 0 else ">") + esc_v2(line) for i, line in enumerate(body)]
+    quoted[-1] += "||"
+    return "\n".join(quoted)
+
+
+def render_groups_v2(items: list[tuple[str, str]], cap_per_bucket: int = 3) -> str:
+    """Categorized tasks as MarkdownV2: capped bullets + expandable overflow."""
+    groups = group_and_cap(items)
+    blocks: list[str] = []
+    for bucket in BUCKETS:
+        tasks = groups.get(bucket, [])
+        if not tasks:
+            continue
+        emoji, label = BUCKET_META[bucket]
+        lines = [header_v2(emoji, label)]
+        lines += [f"• {esc_v2(t)}" for t in tasks[:cap_per_bucket]]
+        overflow = tasks[cap_per_bucket:]
+        if overflow:
+            lines.append(expandable_v2(f"+{len(overflow)} weitere", [f"• {t}" for t in overflow]))
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)
