@@ -17,12 +17,15 @@ Only accepts messages from TELEGRAM_CHAT_ID.
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import io
 import json
 import logging
 import os
 import re
+import subprocess
+import sys
 import time as _time_mod
 from datetime import datetime, time, timedelta
 from logging.handlers import RotatingFileHandler
@@ -899,6 +902,37 @@ def _configure_logging() -> None:
     install_redis_log_handler(_SERVICE)
 
 
+# ---------------------------------------------------------------------------
+# Morning jobs — moved off unreliable GitHub-Actions cron (fired 4–5h late or
+# skipped) onto this always-on bot's reliable JobQueue. Each runs the same
+# module the CI step used, as a subprocess inheriting the bot's env.
+# ---------------------------------------------------------------------------
+
+def _run_module(args: list[str]) -> None:
+    subprocess.run([sys.executable, "-m", *args], check=True, timeout=180)
+
+
+async def _daily_note_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    try:
+        await asyncio.to_thread(_run_module, ["scripts.create_daily_note", "--mode", "create", "--cloud"])
+    except Exception as e:
+        log.error("daily_note job failed: %s", e)
+
+
+async def _proactive_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    try:
+        await asyncio.to_thread(_run_module, ["scripts.proactive_intelligence"])
+    except Exception as e:
+        log.error("proactive job failed: %s", e)
+
+
+async def _morning_push_job(ctx: ContextTypes.DEFAULT_TYPE) -> None:
+    try:
+        await asyncio.to_thread(_run_module, ["scripts.morning_push"])
+    except Exception as e:
+        log.error("morning_push job failed: %s", e)
+
+
 def main() -> None:
     if not _TOKEN or not _OWNER_ID:
         raise RuntimeError("TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID must be set.")
@@ -916,6 +950,11 @@ def main() -> None:
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND,   plain_text))
     app.add_handler(CallbackQueryHandler(handle_confirmation))
     app.add_error_handler(_on_error)
+
+    # Morning jobs (reliable bot scheduler, replaces GitHub-Actions cron)
+    app.job_queue.run_daily(_daily_note_job,   time=time(7, 45, tzinfo=_BERLIN))
+    app.job_queue.run_daily(_proactive_job,    time=time(8, 0,  tzinfo=_BERLIN))
+    app.job_queue.run_daily(_morning_push_job, time=time(8, 30, tzinfo=_BERLIN))
 
     app.job_queue.run_daily(
         send_evening_summary,
