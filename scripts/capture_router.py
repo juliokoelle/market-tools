@@ -11,6 +11,7 @@ import anthropic
 import httpx
 
 from scripts.classifier import CapturedItem
+from scripts.proactive_intelligence import build_context
 from scripts.sync_to_brain import github_read_modify_write
 from scripts.vault_utils import insert_into_section, make_daily_note, mark_tasks_done, note_entry
 from scripts.utils import today
@@ -77,21 +78,41 @@ async def route_item(item: CapturedItem) -> str | None:
 
 
 def _answer_question(question: str) -> str:
-    """Answer a question via Claude Haiku. Returns empty string on failure."""
+    """Answer a question grounded in Julio's own vault (recall).
+
+    Pulls recent daily notes, people, open questions and tasks as context so the
+    answer uses his real data (names, dates, decisions) instead of a generic
+    guess. Falls back to a plain answer if the vault context can't be built.
+    Returns empty string on failure.
+    """
     api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
     if not api_key:
         return ""
     try:
-        client = anthropic.Anthropic(api_key=api_key, timeout=20.0)
+        context = build_context(today())
+    except Exception as e:
+        log.warning("_answer_question: vault context failed (%s) — answering without", e)
+        context = ""
+    system = (
+        "Du bist Julios persönliches Second Brain mit Zugriff auf seine Notizen "
+        "(Kontext unten). Beantworte die Frage knapp und klar auf Deutsch, PRIMÄR "
+        "aus dem Kontext — nutze konkrete Namen, Daten und Fakten daraus. Steht die "
+        "Antwort NICHT in den Notizen, sag das offen und gib höchstens eine kurze "
+        "allgemeine Einschätzung. Maximal 4 Sätze oder eine kurze Liste. "
+        "Direkt zur Antwort, kein Intro."
+    )
+    user = (
+        f"Kontext aus meinen Notizen:\n\n{context}\n\n---\n\nFrage: {question}"
+        if context
+        else question
+    )
+    try:
+        client = anthropic.Anthropic(api_key=api_key, timeout=30.0)
         resp = client.messages.create(
             model="claude-haiku-4-5-20251001",
-            max_tokens=400,
-            system=(
-                "Du bist ein präziser persönlicher Assistent. "
-                "Beantworte die Frage knapp und klar auf Deutsch. "
-                "Maximal 4 Sätze oder eine kurze Liste. Direkt zur Antwort, kein Intro."
-            ),
-            messages=[{"role": "user", "content": question}],
+            max_tokens=500,
+            system=system,
+            messages=[{"role": "user", "content": user}],
         )
         return resp.content[0].text.strip()
     except Exception as e:

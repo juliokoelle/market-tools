@@ -184,7 +184,7 @@ def _collect_open_tasks() -> str:
     return ""
 
 
-def _build_context(today_str: str) -> str:
+def build_context(today_str: str) -> str:
     """Gather all context and assemble into a structured summary string."""
     sections: list[str] = []
 
@@ -326,7 +326,7 @@ def run_proactive_intelligence() -> None:
     today_str = today()
     log.info("[pi] Starting proactive intelligence for %s", today_str)
 
-    context = _build_context(today_str)
+    context = build_context(today_str)
     log.info("[pi] Context assembled (%d chars)", len(context))
 
     try:
