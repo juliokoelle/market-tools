@@ -3,7 +3,7 @@ import { mapHotStock, rankTabs, type RawHotStock } from '../components/market/ho
 const BASE = import.meta.env.VITE_API_URL
   ?? (window.location.hostname === 'localhost'
     ? '/api'
-    : 'https://api.178-104-138-156.sslip.io')
+    : 'https://api.juliokoelle.com')
 
 async function get<T>(path: string): Promise<T> {
   const r = await fetch(`${BASE}${path}`)
