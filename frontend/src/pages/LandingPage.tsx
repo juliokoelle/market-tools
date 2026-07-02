@@ -49,6 +49,14 @@ const projects = [
     tags: ['B2B', 'Finance', 'Automation'],
     status: 'Live',
   },
+  {
+    title: 'Gurke',
+    description: 'Digital card game — play the classic trick-taking game Gurke online, including the Wisters game mode with a redesigned card UI.',
+    link: 'https://gurke.vercel.app',
+    external: true,
+    tags: ['React', 'Game', 'Multiplayer'],
+    status: 'Live',
+  },
 ]
 
 export default function LandingPage() {

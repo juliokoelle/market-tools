@@ -39,6 +39,14 @@ const apps = [
     status: 'Live' as const,
     emoji: '📊',
   },
+  {
+    title: 'Gurke',
+    description: 'Digital card game — play the classic trick-taking game Gurke online, including the Wisters game mode with a redesigned card UI.',
+    url: 'https://gurke.vercel.app',
+    tags: ['React', 'Game', 'Multiplayer'],
+    status: 'Live' as const,
+    emoji: '🥒',
+  },
 ]
 
 export default function Ideas() {
